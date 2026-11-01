@@ -1,5 +1,6 @@
-# Demo policy for the acceptance run (A6). The monobank entry proves an allow cannot lift the money rule: the tool
-# is listed as needing approval and a call is refused before it reaches the phone.
+# Demo policy for the acceptance run (A6). Battery state is read-only and runs at once; createAlarm changes state, so
+# it waits for a tap in the approvals app (refused when no [approvals] table is set). The monobank entry proves an allow
+# cannot lift the money rule: the tool is listed as never running and a call is refused before it reaches the phone.
 
 
 [[allow]]
@@ -9,6 +10,7 @@ function = "com.urbandroid.sleep.functions.AppFunctions#createAlarm"
 [[allow]]
 package = "com.android.settings"
 function = "getBatteryDeviceState"
+read_only = true
 
 [[allow]]
 package = "com.ftband.mono"

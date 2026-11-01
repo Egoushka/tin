@@ -1,26 +1,54 @@
 //! The MCP server: JSON-RPC 2.0 messages in, responses out, transport-agnostic.
 
 use crate::backend::Backend;
+use crate::gate::{Gate, Outcome};
 use crate::metadata::{self, Function};
-use crate::policy::{Decision, Policy};
+use crate::policy::{Decision, Policy, SYSTEM, Subject};
+use crate::system::{self, Verb};
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 
-/// A function the policy lets the client see, under its MCP tool name.
+/// The tool a client calls to keep waiting on a held call after its first wait ran out.
+pub const WAIT_TOOL: &str = "approval__wait";
+
+#[derive(Debug, Clone)]
+pub enum Source {
+    App(Function),
+    System(&'static Verb),
+}
+
+/// A tool the policy lets the client see, under its MCP tool name.
 #[derive(Debug, Clone)]
 pub struct Tool {
     pub name: String,
-    pub function: Function,
+    pub source: Source,
     pub decision: Decision,
+}
+
+impl Tool {
+    fn title(&self) -> String {
+        match &self.source {
+            Source::App(f) => format!("{} ({})", f.method(), f.package),
+            Source::System(v) => format!("{} (system)", v.name),
+        }
+    }
+
+    fn id(&self) -> &str {
+        match &self.source {
+            Source::App(f) => &f.id,
+            Source::System(v) => v.name,
+        }
+    }
 }
 
 pub struct Server {
     backend: Box<dyn Backend>,
     policy: Policy,
+    gate: Option<Arc<Gate>>,
     tools: RwLock<HashMap<String, Tool>>,
 }
 
@@ -55,19 +83,46 @@ pub fn name_all(functions: Vec<Function>) -> Vec<(String, Function)> {
 
 impl Server {
     pub fn new(backend: Box<dyn Backend>, policy: Policy) -> Self {
-        Self { backend, policy, tools: RwLock::new(HashMap::new()) }
+        Self { backend, policy, gate: None, tools: RwLock::new(HashMap::new()) }
     }
 
-    /// Re-reads the function list. Apps add and drop functions on update, so `tools/list` always refreshes.
-    pub fn refresh(&self) -> Result<usize, String> {
-        let listing = self.backend.list()?;
-        let tools: HashMap<String, Tool> = name_all(metadata::parse(&listing))
-            .into_iter()
-            .filter_map(|(name, function)| {
-                let decision = self.policy.decide(&function);
-                (decision != Decision::Deny).then(|| (name.clone(), Tool { name, function, decision }))
+    /// Held calls go to `gate`. Without one, a call that needs approval is refused.
+    pub fn with_gate(mut self, gate: Arc<Gate>) -> Self {
+        self.gate = Some(gate);
+        self
+    }
+
+    pub fn gate(&self) -> Option<&Gate> {
+        self.gate.as_deref()
+    }
+
+    /// System verbs the policy names, in table order.
+    pub fn system_tools(&self) -> Vec<Tool> {
+        system::VERBS
+            .iter()
+            .filter_map(|v| {
+                let decision = self.policy.decide_subject(&Subject { package: SYSTEM, id: v.name, read_only: Some(v.read_only) });
+                (decision != Decision::Deny).then(|| Tool { name: v.tool_name(), source: Source::System(v), decision })
             })
-            .collect();
+            .collect()
+    }
+
+    /// Re-reads the function list. Apps add and drop functions on update, so `tools/list` always refreshes. System
+    /// tools are named first; when the AppFunction listing fails they are still served.
+    pub fn refresh(&self) -> Result<usize, String> {
+        let mut tools: HashMap<String, Tool> = self.system_tools().into_iter().map(|t| (t.name.clone(), t)).collect();
+        match self.backend.list() {
+            Ok(listing) => {
+                for (name, function) in name_all(metadata::parse(&listing)) {
+                    let decision = self.policy.decide(&function);
+                    if decision != Decision::Deny && !tools.contains_key(&name) {
+                        tools.insert(name.clone(), Tool { name, source: Source::App(function), decision });
+                    }
+                }
+            }
+            Err(e) if tools.is_empty() => return Err(e),
+            Err(e) => eprintln!("tin: listing AppFunctions failed, serving system tools only: {e}"),
+        }
         let n = tools.len();
         *self.tools.write().unwrap() = tools;
         Ok(n)
@@ -90,7 +145,7 @@ impl Server {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": { "tools": { "listChanged": false } },
                 "serverInfo": { "name": "tin", "version": env!("CARGO_PKG_VERSION") },
-                "instructions": "Android AppFunctions on this phone, as tools. Only functions the phone's policy allows are listed; functions that move money are refused."
+                "instructions": "Android AppFunctions and system tools on this phone. Only what the phone's policy allows is listed. Read-only tools run at once; anything that changes state waits for a tap in the approvals app (call approval__wait with the ticket if the first wait runs out). Functions that move money are refused."
             })),
             "ping" => Ok(json!({})),
             "tools/list" => self.list_tools(),
@@ -105,25 +160,43 @@ impl Server {
 
     fn list_tools(&self) -> Result<Value, (i64, String)> {
         self.refresh().map_err(|e| (-32603, e))?;
-        let tools: Vec<Value> = self
-            .tools()
-            .into_iter()
+        let tools = self.tools();
+        let mut out: Vec<Value> = tools
+            .iter()
             .map(|t| {
-                let note = if t.decision == Decision::Approval { "[needs approval; never run automatically] " } else { "" };
-                json!({
-                    "name": t.name,
-                    "title": format!("{} ({})", t.function.method(), t.function.package),
-                    "description": format!("{note}{} (app: {}, function: {})", t.function.description, t.function.package, t.function.id),
-                    "inputSchema": t.function.input_schema,
-                })
+                let note = match t.decision {
+                    Decision::Approval => "[waits for a tap in the approvals app] ",
+                    Decision::Refuse => "[moves money: never runs, approval or not] ",
+                    _ => "",
+                };
+                let (description, schema) = match &t.source {
+                    Source::App(f) => (format!("{note}{} (app: {}, function: {})", f.description, f.package, f.id), f.input_schema.clone()),
+                    Source::System(v) => (format!("{note}{}", v.description), v.input_schema()),
+                };
+                json!({ "name": t.name, "title": t.title(), "description": description, "inputSchema": schema })
             })
             .collect();
-        Ok(json!({ "tools": tools }))
+        if self.gate.is_some() && tools.iter().any(|t| t.decision == Decision::Approval) {
+            out.push(json!({
+                "name": WAIT_TOOL,
+                "title": "Wait for an approval",
+                "description": "Keeps waiting for the phone owner's decision on a held call, and returns the call's result once it ran.",
+                "inputSchema": { "type": "object", "properties": { "ticket": { "type": "string" } }, "required": ["ticket"] },
+            }));
+        }
+        Ok(json!({ "tools": out }))
     }
 
     fn call_tool(&self, params: &Value) -> Value {
         let name = params.get("name").and_then(Value::as_str).unwrap_or("");
         let args = params.get("arguments").cloned().unwrap_or(json!({}));
+        if name == WAIT_TOOL {
+            return match (&self.gate, args.get("ticket").and_then(Value::as_str)) {
+                (Some(gate), Some(ticket)) => self.settle(gate, ticket),
+                (None, _) => tool_error("no approvals server is configured, so nothing is ever held"),
+                (_, None) => tool_error("ticket: a string is required"),
+            };
+        }
         if self.tools.read().unwrap().is_empty() {
             // A client may call without listing first (after a restart, say).
             if let Err(e) = self.refresh() {
@@ -133,16 +206,70 @@ impl Server {
         let Some(tool) = self.tools.read().unwrap().get(name).cloned() else {
             return tool_error(&format!("unknown or not allowed tool: {name}"));
         };
-        if tool.decision != Decision::Allow {
-            eprintln!("tin: refused {name}: needs approval");
-            return tool_error(&format!(
-                "approval required: {} moves money or is marked for approval, and tin never runs such functions itself. Open it on the phone instead.",
-                tool.function.id
-            ));
+        match tool.decision {
+            Decision::Allow => self.run(&tool, &args),
+            Decision::Refuse => {
+                eprintln!("tin: refused {name}: money");
+                tool_error(&format!(
+                    "refused: {} moves money, and tin never runs such functions, approval or not. Open it on the phone instead.",
+                    tool.id()
+                ))
+            }
+            Decision::Deny => tool_error(&format!("unknown or not allowed tool: {name}")),
+            Decision::Approval => {
+                let Some(gate) = &self.gate else {
+                    eprintln!("tin: refused {name}: needs approval, no approvals server");
+                    return tool_error(&format!(
+                        "approval required: {name} changes state, and no approvals server is configured to ask the phone's owner, so tin does not run it."
+                    ));
+                };
+                // Bad arguments fail here, before anyone is asked to approve a call that cannot run.
+                let (title, summary) = match &tool.source {
+                    Source::System(v) => match v.argv(&args) {
+                        Ok(argv) => (format!("tin: {}", v.describe(&args)), argv.join(" ")),
+                        Err(e) => return tool_error(&e),
+                    },
+                    Source::App(f) => (format!("tin: {} in {}", f.method(), f.package), args.to_string()),
+                };
+                match gate.hold(name, &args, &title, &summary) {
+                    Ok(ticket) => self.settle(gate, &ticket),
+                    Err(e) => tool_error(&format!("could not ask for approval: {e}")),
+                }
+            }
         }
+    }
+
+    /// Waits on a ticket and turns the outcome into a tool result, running the call if it was approved.
+    fn settle(&self, gate: &Gate, ticket: &str) -> Value {
+        match gate.wait(ticket) {
+            Outcome::Run { tool, args } => {
+                let result = match self.tools.read().unwrap().get(&tool).cloned() {
+                    Some(t) if t.decision == Decision::Approval => self.run(&t, &args),
+                    _ => tool_error(&format!("{tool} is no longer allowed by the policy; not run")),
+                };
+                gate.finish(ticket, result.clone());
+                result
+            }
+            Outcome::Done(result) => result,
+            Outcome::Pending => json!({
+                "content": [{ "type": "text", "text": format!("Waiting for a tap in the approvals app. Call {WAIT_TOOL} with ticket {ticket} to keep waiting.") }],
+                "structuredContent": { "status": "pending", "ticket": ticket },
+                "isError": false,
+            }),
+            Outcome::Running => tool_error(&format!("{ticket} was approved and is running for another caller")),
+            Outcome::Denied(action) => tool_error(&format!("denied on the phone ({action}); not run")),
+            Outcome::Expired => tool_error(&format!("{ticket} expired without a decision; not run")),
+            Outcome::Unknown => tool_error(&format!("no such ticket: {ticket}")),
+        }
+    }
+
+    fn run(&self, tool: &Tool, args: &Value) -> Value {
         let start = Instant::now();
-        let outcome = self.backend.execute(&tool.function.package, &tool.function.id, &args.to_string());
-        eprintln!("tin: called {name} ok={} {} ms", outcome.is_ok(), start.elapsed().as_millis());
+        let outcome = match &tool.source {
+            Source::App(f) => self.backend.execute(&f.package, &f.id, &args.to_string()),
+            Source::System(v) => v.run(args, &|p, a| self.backend.shell(p, a)).map(|v| v.to_string()),
+        };
+        eprintln!("tin: called {} ok={} {} ms", tool.name, outcome.is_ok(), start.elapsed().as_millis());
         match outcome {
             Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
             Err(e) => tool_error(&e),

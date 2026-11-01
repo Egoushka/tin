@@ -1,0 +1,37 @@
+[
+  {
+    "decision": "01JB0000000000000000000000",
+    "id": "outreach:beanpress.co.uk:1",
+    "action": "send",
+    "at": "2026-10-19T08:12:03Z",
+    "edited": {
+      "body.text": "Hi there",
+      "body.subject": "Shorts for Beanpress"
+    },
+    "canonical": "{\"body.subject\":\"Shorts for Beanpress\",\"body.text\":\"Hi there\"}",
+    "h": "54c18b0ee6a3a527cce056049177dd25a9cf81d8d52f846d072a5d572a2b8850",
+    "sig": "5043d9db420c1a584c49e98ec023004f74d901b015be1a3e65cc316b139d7cd3"
+  },
+  {
+    "decision": "01JB0000000000000000000001",
+    "id": "bifrost:vk-x:2026-10-19",
+    "action": "leave",
+    "at": "2026-10-19T08:12:03Z",
+    "edited": {},
+    "canonical": "",
+    "h": "",
+    "sig": "96fc600865a264e8ab2725c424525344a56bf3a5d594975e0fc79037e576916e"
+  },
+  {
+    "decision": "01JB0000000000000000000002",
+    "id": "outreach:kavarnya.ua:1",
+    "action": "send",
+    "at": "2026-10-19T08:12:03Z",
+    "edited": {
+      "body.text": "Привіт, Олено — дякую!"
+    },
+    "canonical": "{\"body.text\":\"Привіт, Олено — дякую!\"}",
+    "h": "10b2f78db1c1f9409ee79822abffb6155c7278af6ee040fd38c0c0e13e709579",
+    "sig": "c26bdc5cfc1b90ee0ce3d095b3bb0222b725b994e5d520dc7c8723c8dab960fc"
+  }
+]

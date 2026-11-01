@@ -7,7 +7,7 @@
 
 # tin
 
-> Lets AI agents use an Android phone's apps through MCP: every app's AppFunctions become typed tools, nothing runs unless you allow it, and payments never do.
+> Lets AI agents use an Android phone through MCP: every app's AppFunctions and the phone's own state (notifications, usage, screen text) become typed tools, nothing changes without a tap in the approvals app, and payments never run.
 
 <!-- readme:status:start -->
 **Active**. I work on it this month.
@@ -16,12 +16,15 @@
 ```mermaid
 flowchart LR
     agent["MCP client on the computer"] -- "HTTP over adb forward" --> tin
+    tin -- "held call (PUT item)" --> approvals["approvals server"]
+    approvals -- "signed decision" --> tin
     subgraph phone["Android 16+ phone"]
         shizuku["Shizuku"] -- "starts as shell user" --> host["tin app's service"]
         host -- "runs, restarts" --> tin["tin (Rust)"]
         tin -- "policy.toml" --> policy{"allowed? moves money?"}
         policy -- "yes / no" --> cmd["cmd app_function"]
         cmd --> apps["apps' AppFunctions<br/>(Settings, alarms, …)"]
+        policy -- "yes / no" --> shell["dumpsys, uiautomator, input"]
     end
 ```
 
@@ -42,9 +45,15 @@ computer to call those same typed functions on my own phone, with a hard rule th
 - Runs as the shell user (uid 2000, the user `adb shell` runs as) under [Shizuku](https://github.com/RikkaApps/Shizuku),
   so it keeps serving after the cable is pulled, and restarts itself if it dies.
 - Answers only the shell user and root. Apps on the phone cannot connect, so no app can borrow its access.
+- Serves system tools next to the AppFunctions, run as the shell user: `system__notifications`, `system__usage`,
+  `system__foreground_app`, `system__screen_text` (a `uiautomator` dump, refused while a banking app is on screen),
+  `system__battery`, `system__connectivity`, and the write verbs `system__tap`, `swipe`, `type_text`, `key`, `launch`
+  and `settings_put`. Arguments are checked before anything runs.
+- Holds every call that changes state (any write verb, any AppFunction the policy does not mark `read_only`) until
+  the phone's owner taps Run in the [approvals](https://github.com/Egoushka/approvals) app. The decision comes back
+  signed (HMAC-SHA256) to a listener that serves nothing else. Without an approvals server such calls are refused.
 
-Not here: approving money functions from the phone (part 3 of the plan), the phone dialing out to a server, other
-users or work profiles, iOS.
+Not here: the phone dialing out to a server, other users or work profiles, iOS.
 
 ## Quick start
 
@@ -109,8 +118,12 @@ the 1.4 s is the function itself: an unknown function fails in 89–129 ms, so `
 - [docs/specs/2026-11-01-appfunctions-mcp-bridge.md](docs/specs/2026-11-01-appfunctions-mcp-bridge.md): the design,
   acceptance checks A1–A8 and stop conditions.
 - [docs/results/2026-11-01-pixel-8a.md](docs/results/2026-11-01-pixel-8a.md): the device run, A4–A8 with evidence.
-- [examples/demo-policy.toml](examples/demo-policy.toml): a policy with one allowed alarm, one read-only function and
-  one money function that stays refused.
+- [docs/specs/2026-11-01-phone-mcp-system-tools.md](docs/specs/2026-11-01-phone-mcp-system-tools.md): system tools
+  and approval gating, checks S1–S8 and D1–D6, and what still needs the phone.
+- [examples/demo-policy.toml](examples/demo-policy.toml): a policy with one alarm that needs approval, one read-only
+  function and one money function that stays refused.
+- [examples/system-policy.toml](examples/system-policy.toml): the six read tools, one held write verb and the
+  `[approvals]` table, for `scripts/system-check.py`.
 - [AGENTS.md](AGENTS.md): build and test commands, rules for changing the code.
 
 <!-- readme:footer:start -->

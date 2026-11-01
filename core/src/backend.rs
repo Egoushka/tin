@@ -9,6 +9,11 @@ pub trait Backend: Send + Sync {
     fn list(&self) -> Result<Value, String>;
     /// Runs one function. `Ok` holds the function's output, `Err` the system's error text.
     fn execute(&self, package: &str, function: &str, parameters: &str) -> Result<String, String>;
+    /// Runs one program with argv as the shell user (system tools). `Ok` is stdout.
+    fn shell(&self, program: &str, args: &[String]) -> Result<String, String> {
+        let _ = (program, args);
+        Err("this backend runs no shell programs".into())
+    }
 }
 
 pub struct CmdBackend {
@@ -48,5 +53,16 @@ impl Backend for CmdBackend {
             "--timeout-duration",
             &timeout,
         ])
+    }
+
+    fn shell(&self, program: &str, args: &[String]) -> Result<String, String> {
+        let out = Command::new(program).args(args).output().map_err(|e| format!("{program}: {e}"))?;
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let text = if stderr.trim().is_empty() { stdout.trim() } else { stderr.trim() };
+            return Err(format!("{program} exited {}: {text}", out.status.code().unwrap_or(-1)));
+        }
+        Ok(stdout)
     }
 }

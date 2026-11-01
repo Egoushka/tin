@@ -1,11 +1,13 @@
 //! Transports: newline-delimited JSON-RPC on stdio, and MCP streamable HTTP (JSON responses only, no SSE) on a Unix
 //! socket. On Android the socket is abstract (`@tin`): `adb forward tcp:7381 localabstract:tin` reaches it, and the
-//! peer-uid check keeps every app on the phone out.
+//! peer-uid check keeps every app on the phone out. An optional TCP listener serves only the approvals callback
+//! (`POST /approvals/decision`), whose body is HMAC-signed, so the tailnet can reach nothing else.
 
 use crate::mcp::Server;
 use serde_json::Value;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::AsRawFd;
+use std::net::{TcpListener, TcpStream};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::Arc;
 
@@ -121,7 +123,8 @@ pub fn serve_http(server: Arc<Server>, listener: UnixListener) -> std::io::Resul
         }
         let server = server.clone();
         std::thread::spawn(move || {
-            if let Err(e) = handle_connection(&server, stream) {
+            let result = stream.try_clone().and_then(|r| handle_connection(&server, r, stream, Routes::All));
+            if let Err(e) = result {
                 eprintln!("tin: connection: {e}");
             }
         });
@@ -129,13 +132,41 @@ pub fn serve_http(server: Arc<Server>, listener: UnixListener) -> std::io::Resul
     Ok(())
 }
 
+/// The approvals callback listener: `POST /approvals/decision` and nothing else.
+pub fn serve_decisions(server: Arc<Server>, listener: TcpListener) -> std::io::Result<()> {
+    for stream in listener.incoming() {
+        let stream: TcpStream = match stream {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("tin: accept: {e}");
+                continue;
+            }
+        };
+        // A slow or silent peer must not hold a thread forever.
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(30))).ok();
+        let server = server.clone();
+        std::thread::spawn(move || {
+            let result = stream.try_clone().and_then(|r| handle_connection(&server, r, stream, Routes::DecisionOnly));
+            if let Err(e) = result {
+                eprintln!("tin: decision connection: {e}");
+            }
+        });
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Routes {
+    All,
+    DecisionOnly,
+}
+
 /// Largest request body accepted; a tool call's arguments are a few hundred bytes.
 const MAX_BODY: usize = 1 << 20;
 
 /// HTTP/1.1 with keep-alive: one request after another on the same connection until the client closes.
-fn handle_connection(server: &Server, stream: UnixStream) -> std::io::Result<()> {
-    let mut reader = BufReader::new(stream.try_clone()?);
-    let mut writer = stream;
+fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, routes: Routes) -> std::io::Result<()> {
+    let mut reader = BufReader::new(read);
     loop {
         let mut request_line = String::new();
         if reader.read_line(&mut request_line)? == 0 {
@@ -168,7 +199,19 @@ fn handle_connection(server: &Server, stream: UnixStream) -> std::io::Result<()>
         }
         let mut body = vec![0; content_length];
         reader.read_exact(&mut body)?;
-        match (method.as_str(), path.trim_end_matches('/')) {
+        let path = path.trim_end_matches('/');
+        if routes == Routes::DecisionOnly && path != "/approvals/decision" {
+            respond(&mut writer, 404, "Not Found", None)?;
+            return Ok(());
+        }
+        match (method.as_str(), path) {
+            ("POST", "/approvals/decision") => match server.gate() {
+                Some(gate) => {
+                    let (code, reply) = gate.decide(&body);
+                    respond(&mut writer, code, reason(code), Some(&reply.to_string()))?
+                }
+                None => respond(&mut writer, 404, "Not Found", None)?,
+            },
             ("POST", "/mcp") => match serde_json::from_slice::<Value>(&body) {
                 Ok(msg) => match server.handle(&msg) {
                     Some(reply) => respond(&mut writer, 200, "OK", Some(&reply.to_string()))?,
@@ -187,7 +230,18 @@ fn handle_connection(server: &Server, stream: UnixStream) -> std::io::Result<()>
     }
 }
 
-fn respond(w: &mut UnixStream, code: u16, reason: &str, body: Option<&str>) -> std::io::Result<()> {
+fn reason(code: u16) -> &'static str {
+    match code {
+        200 => "OK",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        404 => "Not Found",
+        409 => "Conflict",
+        _ => "",
+    }
+}
+
+fn respond(w: &mut impl Write, code: u16, reason: &str, body: Option<&str>) -> std::io::Result<()> {
     let body = body.unwrap_or("");
     let ctype = if body.is_empty() { "" } else { "Content-Type: application/json\r\n" };
     write!(w, "HTTP/1.1 {code} {reason}\r\n{ctype}Content-Length: {}\r\n\r\n{body}", body.len())?;

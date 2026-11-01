@@ -1,0 +1,6 @@
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+Display #0 (activities from top to bottom):
+  * Task{a1b2c3 #123 type=standard A=10400:com.ftband.mono}
+    topResumedActivity=ActivityRecord{5e6f7a8 u0 com.ftband.mono/com.ftband.app.MainActivity t123}
+    * Hist  #0: ActivityRecord{5e6f7a8 u0 com.ftband.mono/com.ftband.app.MainActivity t123}
+  ResumedActivity: ActivityRecord{5e6f7a8 u0 com.ftband.mono/com.ftband.app.MainActivity t123}
