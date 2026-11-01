@@ -1,0 +1,38 @@
+# Policy for the device checks D1-D6 (scripts/system-check.py). The six read tools run at once; system__key waits for
+# a tap in the approvals app. Fill in the [approvals] table before D3, D5 and D6; without it system__key is refused.
+
+[[allow]]
+package = "system"
+function = "notifications"
+
+[[allow]]
+package = "system"
+function = "usage"
+
+[[allow]]
+package = "system"
+function = "foreground_app"
+
+[[allow]]
+package = "system"
+function = "screen_text"
+
+[[allow]]
+package = "system"
+function = "battery"
+
+[[allow]]
+package = "system"
+function = "connectivity"
+
+[[allow]]                     # a write verb: always held for approval
+package = "system"
+function = "key"
+
+[approvals]
+url = "http://<approvals server tailnet ip>:<port>"
+source = "tin"
+token_file = "/data/local/tmp/tin/approvals.token"   # the approvals source token for "tin", mode 600
+key_file = "/data/local/tmp/tin/approvals.key"       # APPROVAL_HMAC_KEY, mode 600
+callback = "https://tin.phone.invalid/approvals/"    # must be a prefix in the server's APPROVALS_CALLBACK_ROUTES
+callback_listen = "<phone tailnet ip>:7382"

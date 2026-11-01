@@ -71,8 +71,9 @@ async def demo(alarm: str, c: Checks):
         names = {t.name for t in (await s.list_tools()).tools}
         c.check("A6 tools/list is exactly the demo policy", names == DEMO_TOOLS, ", ".join(sorted(names)))
 
+        # createAlarm changes state: the demo policy sets no approvals server, so it is refused, never run.
         r = await s.call_tool("urbandroid_sleep__createAlarm", {"hour": hour, "minute": minute})
-        c.check(f"A6 createAlarm {alarm}", not r.is_error, text_of(r)[:300])
+        c.check(f"A6 createAlarm {alarm} held without approvals", r.is_error and "approval required" in text_of(r), text_of(r)[:300])
 
         r = await s.call_tool("ftband_mono__topUpPhone", {"phoneNumber": "+380000000000", "amount": 1.0})
         c.check("A6 topUpPhone refused", r.is_error and "approval" in text_of(r), text_of(r)[:200])

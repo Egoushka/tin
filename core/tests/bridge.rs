@@ -105,7 +105,9 @@ fn policy_money_never_reaches_backend() {
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(names, ["android_settings__getBatteryDeviceState", "ftband_mono__topUpPhone", "urbandroid_sleep__createAlarm"]);
     let mono = tools.iter().find(|t| t["name"] == "ftband_mono__topUpPhone").unwrap();
-    assert!(mono["description"].as_str().unwrap().contains("needs approval"));
+    assert!(mono["description"].as_str().unwrap().contains("never runs"));
+    let alarm = tools.iter().find(|t| t["name"] == "urbandroid_sleep__createAlarm").unwrap();
+    assert!(alarm["description"].as_str().unwrap().contains("approvals app"));
 
     let r = rpc(&s, 2, "tools/call", json!({ "name": "ftband_mono__topUpPhone", "arguments": { "phoneNumber": "+380501234567", "amount": 100.0 } }));
     assert_eq!(r["result"]["isError"], true);
@@ -127,13 +129,22 @@ fn mcp_round_trip_over_handle() {
     assert_eq!(init["result"]["protocolVersion"], mcp::PROTOCOL_VERSION);
     assert!(s.handle(&json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })).is_none());
     rpc(&s, 2, "tools/list", json!({}));
-    let r = rpc(&s, 3, "tools/call", json!({ "name": "urbandroid_sleep__createAlarm", "arguments": { "hour": 7, "minute": 30 } }));
+    let r = rpc(&s, 3, "tools/call", json!({ "name": "android_settings__getBatteryDeviceState", "arguments": { "verbose": true } }));
     assert_eq!(r["result"]["isError"], false);
     let calls = backend.calls.lock().unwrap();
     assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].1, "com.urbandroid.sleep.functions.AppFunctions#createAlarm");
+    assert_eq!(calls[0].1, "getBatteryDeviceState");
     let params: Value = serde_json::from_str(&calls[0].2).unwrap();
-    assert_eq!(params, json!({ "hour": 7, "minute": 30 }));
+    assert_eq!(params, json!({ "verbose": true }));
+}
+
+#[test]
+fn policy_state_change_without_approvals_server_is_refused() {
+    let (s, backend) = server(DEMO);
+    let r = rpc(&s, 1, "tools/call", json!({ "name": "urbandroid_sleep__createAlarm", "arguments": { "hour": 7, "minute": 30 } }));
+    assert_eq!(r["result"]["isError"], true);
+    assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("approval required"));
+    assert!(backend.calls.lock().unwrap().is_empty());
 }
 
 #[test]

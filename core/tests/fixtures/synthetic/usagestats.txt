@@ -1,0 +1,12 @@
+user=0
+  In-memory daily stats
+  timeRange="2026-11-01, 00:00:00 - 2026-11-01, 12:34:56"
+  packages
+    package=com.whatsapp totalTimeUsed="01:02:03" lastTimeUsed="2026-11-01 12:30:00" totalTimeVisible="01:05:00" lastTimeVisible="2026-11-01 12:30:01" lastTimeComponentUsed="2026-11-01 12:29:00" totalTimeFS="00:00" lastTimeFS="1970-01-01 03:00:00" appLaunchCount=14
+    package=com.android.chrome totalTimeUsed="12:34" lastTimeUsed="2026-11-01 11:00:00" totalTimeVisible="13:00" lastTimeVisible="2026-11-01 11:00:00" appLaunchCount=3
+    package=com.google.android.apps.nexuslauncher totalTimeUsed="00:42" lastTimeUsed="2026-11-01 12:31:00" appLaunchCount=0
+  ChooserCounts
+  In-memory weekly stats
+  timeRange="2026-10-26, 00:00:00 - 2026-11-01, 12:34:56"
+  packages
+    package=com.whatsapp totalTimeUsed="09:00:00" lastTimeUsed="2026-11-01 12:30:00" appLaunchCount=99

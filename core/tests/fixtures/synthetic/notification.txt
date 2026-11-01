@@ -1,0 +1,31 @@
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x0a1b2c3d: pkg=com.whatsapp user=UserHandle{0} id=1 tag=null importance=4 key=0|com.whatsapp|1|null|10234 appImportanceLocked=false: Notification(channel=individual_chat_defaults_3 shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x10 color=0xff075e54 category=msg groupKey=group_key_messages actions=2 vis=PRIVATE))
+      uid=10234 userId=0
+      opPkg=com.whatsapp
+      icon=Icon(typ=RESOURCE pkg=com.whatsapp id=0x7f080a1c)
+      flags=0x10
+      pri=1
+      key=0|com.whatsapp|1|null|10234
+      mCreationTimeMs=1761988800000
+      extras={
+        android.title=String (Олена)
+        android.text=String (Привіт! Ти вдома?)
+        android.showWhen=Boolean (true)
+      }
+    NotificationRecord(0x0b2c3d4e: pkg=com.spotify.music user=UserHandle{0} id=92 tag=null importance=2 key=0|com.spotify.music|92|null|10301 appImportanceLocked=false: Notification(channel=playback_channel shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x62 color=0x00000000 category=transport vis=PUBLIC))
+      uid=10301 userId=0
+      mCreationTimeMs=1761985200000
+      extras={
+        android.title=String (Shine On You Crazy Diamond)
+        android.text=String (Pink Floyd)
+      }
+    NotificationRecord(0x0c3d4e5f: pkg=android user=UserHandle{-1} id=17040400 tag=null importance=1 key=-1|android|17040400|null|1000 appImportanceLocked=false: Notification(channel=DEVELOPER_IMPORTANT shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x2 color=0xff607d8b category=sys vis=PUBLIC))
+      uid=1000 userId=-1
+      mCreationTimeMs=1761980000000
+      extras={
+        android.title=String (USB debugging connected)
+        android.text=String [length=34]
+      }
+  Snoozed notifications:
+    mSnoozedNotifications: 0
