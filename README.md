@@ -63,6 +63,9 @@ On a Mac the same core serves a second backend:
   `system__stale_processes` (leftover MSBuild nodes, VBCSCompiler, vstest and test hosts; above a swap threshold it
   proposes kills), `system__launch_agents`, and the held write verbs `system__kill` (checks the process start time
   again, so a reused pid is never killed), `system__quit_app` and `system__unload_agent` (never `com.apple.`).
+- Speech to text on the phone (opt-in): `speech__transcribe` records until you stop talking and returns the text,
+  recognised offline by Parakeet-tdt-0.6b-v3 (Ukrainian and English); a push-to-talk notification button and Quick
+  Settings tile keep transcripts for `speech__push_to_talk`. See [Speech](#speech).
 
 Not here: the phone dialing out to a server, other users or work profiles, iOS.
 
@@ -140,6 +143,18 @@ shell per call). What tin plus the USB hop add on top of `cmd` is 69–76 ms at 
 the 1.4 s is the function itself: an unknown function fails in 89–129 ms, so `cmd` and the system service cost about
 0.1 s and Settings spends about 1.3 s building its answer.
 
+## Speech
+
+Add `[speech]` / `enabled = true` to the policy, push the model (`./scripts/speech-push-model.sh`, 670 MB, after
+`bench/run-all.sh` has fetched it), open tin and grant the mic. The shell user cannot hold the mic, so the app's
+foreground `SpeechService` records and decodes; tin reaches it through `@tin-speech`, a socket the Shizuku service
+serves for root and shell only. Parakeet is an offline model, so Silero VAD cuts the mic stream into utterances and
+each one is decoded whole. The Kotlin library in `android/speech` has no tin dependency.
+
+Mac benchmark on FLEURS (`bench/run-all.sh`, table and method in [bench/results.md](bench/results.md)): Parakeet int8
+reaches 9.6% WER on all 750 Ukrainian test clips at 0.11× real time on 4 CPU threads. Phone numbers are pending:
+`uv run scripts/speech-check.py` measures them once the Pixel is set up.
+
 ## Docs
 
 - [docs/specs/2026-11-01-appfunctions-mcp-bridge.md](docs/specs/2026-11-01-appfunctions-mcp-bridge.md): the design,
@@ -155,6 +170,8 @@ the 1.4 s is the function itself: an unknown function fails in 89–129 ms, so `
   and their results.
 - [examples/macos-policy.toml](examples/macos-policy.toml): the Mac read tools, the held write verbs and one intent,
   for `scripts/mac-check.py`.
+- [docs/specs/2026-11-01-speech.md](docs/specs/2026-11-01-speech.md): speech design, checks S1–S8.
+- [bench/results.md](bench/results.md): Parakeet vs Whisper on FLEURS uk/en, with the command that made it.
 - [AGENTS.md](AGENTS.md): build and test commands, rules for changing the code.
 
 <!-- readme:footer:start -->

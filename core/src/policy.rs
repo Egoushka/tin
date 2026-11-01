@@ -25,6 +25,16 @@ pub struct Policy {
     #[serde(default)]
     pub approval: Vec<Rule>,
     pub approvals: Option<Approvals>,
+    #[serde(default)]
+    pub speech: SpeechPolicy,
+}
+
+/// `[speech] enabled = true` lists the speech tools. Off by default: an agent with them can switch on the mic.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpeechPolicy {
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]

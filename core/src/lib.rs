@@ -8,4 +8,5 @@ pub mod mcp;
 pub mod metadata;
 pub mod policy;
 pub mod system;
+pub mod speech;
 pub mod transport;

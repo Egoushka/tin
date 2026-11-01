@@ -5,6 +5,7 @@ use crate::gate::{Gate, Outcome};
 use crate::metadata::Function;
 use crate::policy::{Decision, Policy, SYSTEM, Subject};
 use crate::system::Verb;
+use crate::speech::{self, Speech};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -50,6 +51,7 @@ pub struct Server {
     policy: Policy,
     gate: Option<Arc<Gate>>,
     tools: RwLock<HashMap<String, Tool>>,
+    speech: Option<Speech>,
 }
 
 /// `<last two package segments>__<method>`, limited to `[A-Za-z0-9_-]` and 64 characters (what MCP clients accept).
@@ -83,7 +85,16 @@ pub fn name_all(functions: Vec<Function>) -> Vec<(String, Function)> {
 
 impl Server {
     pub fn new(backend: Box<dyn Backend>, policy: Policy) -> Self {
-        Self { backend, policy, gate: None, tools: RwLock::new(HashMap::new()) }
+        let speech = policy.speech.enabled.then(|| Speech::new(speech::SOCKET));
+        Self { backend, policy, gate: None, tools: RwLock::new(HashMap::new()), speech }
+    }
+
+    /// Points the speech tools at another socket (tests); does not enable them.
+    pub fn with_speech_socket(mut self, socket: &str) -> Self {
+        if self.speech.is_some() {
+            self.speech = Some(Speech::new(socket));
+        }
+        self
     }
 
     /// Held calls go to `gate`. Without one, a call that needs approval is refused.
@@ -185,12 +196,26 @@ impl Server {
                 "inputSchema": { "type": "object", "properties": { "ticket": { "type": "string" } }, "required": ["ticket"] },
             }));
         }
+        if self.speech.is_some() {
+            out.extend(Speech::tools());
+        }
         Ok(json!({ "tools": out }))
     }
 
     fn call_tool(&self, params: &Value) -> Value {
         let name = params.get("name").and_then(Value::as_str).unwrap_or("");
         let args = params.get("arguments").cloned().unwrap_or(json!({}));
+        if let Some(speech) = &self.speech
+            && Speech::handles(name)
+        {
+            let start = Instant::now();
+            let outcome = speech.call(name, &args);
+            eprintln!("tin: called {name} ok={} {} ms", outcome.is_ok(), start.elapsed().as_millis());
+            return match outcome {
+                Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
+                Err(e) => tool_error(&e),
+            };
+        }
         if name == WAIT_TOOL {
             return match (&self.gate, args.get("ticket").and_then(Value::as_str)) {
                 (Some(gate), Some(ticket)) => self.settle(gate, ticket, false),

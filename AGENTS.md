@@ -6,9 +6,14 @@
   `mcp.rs` (protocol 2025-06-18), `backend.rs` (`cmd app_function`, shell argv), `transport.rs` (stdio, HTTP on
   `@tin`, the decision-only TCP listener), `system.rs` (the verb table, Android verbs, their argv and dump parsers),
   `gate.rs` (held calls, the approvals client, decision signatures), `macos.rs` (the macOS backend: actionsdata →
-  tools, the shortcut writer, Mac verbs and their parsers).
-- `android/`: Kotlin host app `io.github.egoushka.tin`; `TinService` is the Shizuku user service.
-- `scripts/`: `build.sh`, `accept.py` (A6–A8), `peer-check.sh` (A5), `system-check.py` (D1–D6), `mac-check.py` (M1–M3).
+  tools, the shortcut writer, Mac verbs and their parsers), `speech.rs` (speech tools, a client of `@tin-speech`).
+- `android/app`: Kotlin host app `io.github.egoushka.tin`; `TinService` is the Shizuku user service, `SpeechBridge`
+  serves `@tin-speech` inside it, `SpeechService` owns the mic and the model in the app process.
+- `android/speech`: speech library (no tin dependency): VAD + Parakeet through sherpa-onnx, push-to-talk, protocol.
+  Its build downloads the sherpa-onnx AAR (pinned by SHA-256) into `android/speech/libs/`.
+- `bench/`: speech benchmark on the Mac (`run-all.sh`, results in `bench/results.md`).
+- `scripts/`: `build.sh`, `accept.py` (A6–A8), `peer-check.sh` (A5), `system-check.py` (D1–D6), `mac-check.py` (M1–M3),
+  `speech-check.py` (S7–S8), `speech-push-model.sh`.
 
 ## Commands
 
@@ -22,6 +27,10 @@
   --read`, `--bench 20`, `--write` (needs taps), `--bank` (a banking app open), `--listen`; `--callback URL` from the box.
 - Mac checks: `cargo build`, then `uv run scripts/mac-check.py --count --read`; `--bench 20` after the Week Number
   shortcut is added. `ps` and `shortcuts` need to run outside a sandbox.
+- Speech: `cd android && ./gradlew :speech:testDebugUnitTest` (no phone). On the phone: `[speech] enabled = true` in
+  the policy, `./scripts/speech-push-model.sh`, open tin, then `uv run scripts/speech-check.py` (S7) and
+  `--mic 5` (S8). Both scripts exit 2 with "no device" when no phone is attached.
+- CI (`.github/workflows/ci.yml`): `cargo test`, `scripts/build.sh` (APK), `:speech:testDebugUnitTest`.
 
 ## Rules
 
@@ -40,3 +49,7 @@
 - Mac write verbs validate their arguments in `argv` so a bad call fails before an approvals item exists; never
   unload a `com.apple.` agent, and `kill` re-reads the start time before signalling.
 - Never commit raw `ps`, `launchctl` or `vm_stat` output from a real Mac: the Mac fixtures are synthetic.
+- Speech is off unless the policy enables it, and both ends (Rust `speech.rs`, Kotlin `SpeechServer`) check that a
+  `file` is a bare `.wav` name; keep the two rules the same.
+- The app must declare `implementation(files("../speech/libs/sherpa-onnx-<v>.aar"))`: a library module cannot carry a
+  local AAR, so `:speech` only compiles against its classes.

@@ -23,3 +23,27 @@ jobs:
       - run: rustup toolchain install stable --profile minimal --component clippy && rustup default stable
       - run: cargo test --locked
       - run: cargo clippy --all-targets --locked -- -D warnings
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: zulu
+          java-version: "21"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/speech/libs
+          key: gradle-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Rust target for the phone
+        run: rustup target add aarch64-linux-android
+      # build.sh cross-compiles tin into libtin.so and runs :app:assembleDebug.
+      - name: Build the APK
+        run: ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}" scripts/build.sh
+      - name: Speech module tests
+        working-directory: android
+        run: ./gradlew --no-daemon :speech:testDebugUnitTest
