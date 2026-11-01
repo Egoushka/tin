@@ -1,0 +1,6 @@
+/target
+**/build/
+.gradle/
+local.properties
+*.apk
+.idea/
