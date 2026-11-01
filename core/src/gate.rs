@@ -102,8 +102,17 @@ enum State {
 struct Ticket {
     tool: String,
     args: Value,
+    /// `call_hash` of tool and args, so a repeat of a pending call finds its ticket.
+    call: String,
     state: State,
     expires: Instant,
+}
+
+/// What `hold` returns: the ticket, and whether it was already pending for the same call.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Held {
+    pub ticket: String,
+    pub existing: bool,
 }
 
 /// What a wait ends with.
@@ -135,14 +144,28 @@ impl Gate {
         Self { approver, key: key.to_vec(), cfg, tickets: Mutex::new(HashMap::new()), changed: Condvar::new() }
     }
 
-    /// Opens a ticket and its approvals item. Nothing runs until a signed `run` arrives.
-    pub fn hold(&self, tool: &str, args: &Value, title: &str, summary: &str) -> Result<String, String> {
+    /// Opens a ticket and its approvals item, or returns the pending ticket for the same call (same tool and arguments)
+    /// with no new item. Nothing runs until a signed `run` arrives.
+    pub fn hold(&self, tool: &str, args: &Value, title: &str, summary: &str) -> Result<Held, String> {
         self.sweep();
-        let pending = self.tickets.lock().unwrap().values().filter(|t| matches!(t.state, State::Pending)).count();
-        if pending >= MAX_PENDING {
-            return Err(format!("{pending} approvals are already waiting on the phone; decide those first"));
-        }
+        let call = call_hash(tool, args);
         let id = format!("{}:{}-{}", self.cfg.source, unix_ms(), random_hex());
+        {
+            // One lock for the lookup and the insert, so two identical calls cannot both open a ticket. The ticket
+            // exists before the item does, so a decision that comes back fast finds it.
+            let mut tickets = self.tickets.lock().unwrap();
+            if let Some((found, _)) = tickets.iter().find(|(_, t)| t.call == call && matches!(t.state, State::Pending)) {
+                return Ok(Held { ticket: found.clone(), existing: true });
+            }
+            let pending = tickets.values().filter(|t| matches!(t.state, State::Pending)).count();
+            if pending >= MAX_PENDING {
+                return Err(format!("{pending} approvals are already waiting on the phone; decide those first"));
+            }
+            tickets.insert(
+                id.clone(),
+                Ticket { tool: tool.to_string(), args: args.clone(), call, state: State::Pending, expires: Instant::now() + self.cfg.ttl },
+            );
+        }
         let expires_at = rfc3339(SystemTime::now() + self.cfg.ttl);
         let item = json!({
             "source": self.cfg.source,
@@ -160,17 +183,12 @@ impl Gate {
             "expires_at": expires_at,
             "callback": self.cfg.callback,
         });
-        // The ticket exists before the item does, so a decision that comes back fast finds it.
-        self.tickets.lock().unwrap().insert(
-            id.clone(),
-            Ticket { tool: tool.to_string(), args: args.clone(), state: State::Pending, expires: Instant::now() + self.cfg.ttl },
-        );
         if let Err(e) = self.approver.put(&id, &item) {
             self.tickets.lock().unwrap().remove(&id);
             return Err(e);
         }
         eprintln!("tin: held {tool} as {id}");
-        Ok(id)
+        Ok(Held { ticket: id, existing: false })
     }
 
     /// Blocks up to the configured wait for a decision on `ticket`.
@@ -265,6 +283,11 @@ impl Gate {
             }
         }
     }
+}
+
+/// SHA-256 hex of the tool name and its arguments as JSON (object keys sorted), so the same call has one hash.
+fn call_hash(tool: &str, args: &Value) -> String {
+    hex(&Sha256::digest(format!("{tool}\0{args}").as_bytes()))
 }
 
 /// `h` in the signature: SHA-256 hex of the edited fields as JSON with sorted keys, `""` when nothing was edited.

@@ -192,7 +192,7 @@ impl Server {
         let args = params.get("arguments").cloned().unwrap_or(json!({}));
         if name == WAIT_TOOL {
             return match (&self.gate, args.get("ticket").and_then(Value::as_str)) {
-                (Some(gate), Some(ticket)) => self.settle(gate, ticket),
+                (Some(gate), Some(ticket)) => self.settle(gate, ticket, false),
                 (None, _) => tool_error("no approvals server is configured, so nothing is ever held"),
                 (_, None) => tool_error("ticket: a string is required"),
             };
@@ -232,15 +232,16 @@ impl Server {
                     Source::App(f) => (format!("tin: {} in {}", f.method(), f.package), args.to_string()),
                 };
                 match gate.hold(name, &args, &title, &summary) {
-                    Ok(ticket) => self.settle(gate, &ticket),
+                    Ok(held) => self.settle(gate, &held.ticket, held.existing),
                     Err(e) => tool_error(&format!("could not ask for approval: {e}")),
                 }
             }
         }
     }
 
-    /// Waits on a ticket and turns the outcome into a tool result, running the call if it was approved.
-    fn settle(&self, gate: &Gate, ticket: &str) -> Value {
+    /// Waits on a ticket and turns the outcome into a tool result, running the call if it was approved. `repeat` marks
+    /// a call that found its ticket already pending.
+    fn settle(&self, gate: &Gate, ticket: &str, repeat: bool) -> Value {
         match gate.wait(ticket) {
             Outcome::Run { tool, args } => {
                 let result = match self.tools.read().unwrap().get(&tool).cloned() {
@@ -251,6 +252,11 @@ impl Server {
                 result
             }
             Outcome::Done(result) => result,
+            Outcome::Pending if repeat => json!({
+                "content": [{ "type": "text", "text": format!("Already pending: this call is waiting for a tap in the approvals app as {ticket}, and no second request was opened. Call {WAIT_TOOL} with ticket {ticket} to keep waiting.") }],
+                "structuredContent": { "status": "pending", "ticket": ticket, "note": "already pending" },
+                "isError": false,
+            }),
             Outcome::Pending => json!({
                 "content": [{ "type": "text", "text": format!("Waiting for a tap in the approvals app. Call {WAIT_TOOL} with ticket {ticket} to keep waiting.") }],
                 "structuredContent": { "status": "pending", "ticket": ticket },
