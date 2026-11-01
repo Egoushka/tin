@@ -27,7 +27,9 @@ with Shizuku. Cheapest test: the public repo plus a demo of an agent setting an 
   the metadata's `functionId` verbatim (Settings uses bare `getBatteryDeviceState`, Sleep as Android
   `com.urbandroid.sleep.functions.AppFunctions#createAlarm`). Device-state functions fail with code 1000 while the
   phone is locked.
-- One raw call from `adb shell` took 0.29–0.54 s end to end.
+- One raw call from `adb shell` took 0.29–0.54 s end to end. Corrected by the device run
+  (`docs/results/2026-11-01-pixel-8a.md`): that was most likely the locked failure path; a successful
+  `getBatteryDeviceState` takes 1.3–2.2 s, of which `cmd` and the system service are about 0.1 s.
 
 ## Design
 
@@ -66,9 +68,9 @@ unlocked, with Shizuku running.
 | A3 | MCP conformance | `cargo test -p tin-core mcp_` | `initialize` → `tools/list` → `tools/call` round-trip over the stdio transport with the fake backend; unknown tool → JSON-RPC result with `isError: true` |
 | A4 | Runs as shell under Shizuku | `adb shell ps -A -o USER,NAME` | a `tin` process owned by `shell` whose parent is the Shizuku user service, with no `adb shell` session holding it |
 | A5 | Only adb can connect | `scripts/peer-check.sh` (runs `tin probe` as shell, then as the debuggable tin app's uid through `run-as`) | as shell: `200`; as the app uid: connection closed, no response |
-| A6 | End to end | `uv run scripts/accept.py --policy demo` | the MCP Python SDK client lists exactly the demo policy's tools, `urbandroid_sleep__createAlarm` returns success once, `mono__topUpPhone` returns `isError` with `approval` |
-| A7 | Latency | `uv run scripts/accept.py --bench 20` | 20 of 20 calls to `settings__getBatteryDeviceState` succeed; prints p50 and p95 |
-| A8 | Overhead | same run | bridge p95 minus raw `adb shell cmd app_function execute-app-function` p95 (20 runs each, same function) ≤ 100 ms (starting value: the function itself takes 300–500 ms, so 100 ms of bridge cost would still be a minority) |
+| A6 | End to end | `uv run scripts/accept.py --policy demo` | the MCP Python SDK client lists exactly the demo policy's tools, `urbandroid_sleep__createAlarm` returns success once, `ftband_mono__topUpPhone` returns `isError` with `approval` |
+| A7 | Latency | `uv run scripts/accept.py --bench 20` | 20 of 20 calls to `android_settings__getBatteryDeviceState` succeed; prints p50 and p95 |
+| A8 | Overhead | same run | bridge p95 minus raw `adb shell cmd app_function execute-app-function` p95 (20 runs each, same function) ≤ 100 ms (starting value: the function itself takes 300–500 ms, so 100 ms of bridge cost would still be a minority; the device run measured 1.3–1.6 s, and also reports bridge minus `cmd` timed inside tin, since raw `adb shell` pays for a new session per call) |
 
 A5 is the weakest check: if SELinux stops the app uid from running the probe at all, A5 is recorded UNKNOWN in the
 README rather than passed.

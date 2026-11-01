@@ -1,6 +1,7 @@
 package io.github.egoushka.tin
 
 import android.content.Context
+import android.system.Os
 import android.util.Log
 import java.io.File
 import kotlin.concurrent.thread
@@ -47,18 +48,27 @@ class TinService(private val context: Context) : ITinService.Stub() {
         }
     }
 
-    /** Writes the binary next to its final path and renames it over, so a running copy is never written to. */
+    /**
+     * Writes the binary next to its final path and renames it over, so a running copy is never written to. Shizuku
+     * starts this process with umask 0, so every mode is set explicitly: only shell may read the policy or swap the
+     * binary.
+     */
     private fun install() {
         val src = File(context.applicationInfo.nativeLibraryDir, "libtin.so")
-        BIN.parentFile!!.mkdirs()
-        val tmp = File(BIN.parentFile, "tin.new")
+        val bin = BIN.parentFile!!
+        bin.mkdirs()
+        Os.chmod(bin.parent!!, 0b111_000_000)
+        Os.chmod(bin.path, 0b111_000_000)
+        val tmp = File(bin, "tin.new")
         src.copyTo(tmp, overwrite = true)
-        check(tmp.setExecutable(true, false)) { "chmod $tmp" }
+        Os.chmod(tmp.path, 0b111_000_000)
         check(tmp.renameTo(BIN)) { "rename $tmp to $BIN" }
     }
 
     private fun rotateLog() {
         if (LOG.length() > 1 shl 20) LOG.renameTo(File(LOG.parentFile, "tin.log.1"))
+        LOG.createNewFile()
+        Os.chmod(LOG.path, 0b110_000_000)
     }
 
     override fun status(): String = "alive=${child?.isAlive ?: false} starts=$starts"
