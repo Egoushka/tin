@@ -1,0 +1,15 @@
+# Demo policy for the acceptance run (A6). The monobank entry proves an allow cannot lift the money rule: the tool
+# is listed as needing approval and a call is refused before it reaches the phone.
+
+
+[[allow]]
+package = "com.urbandroid.sleep"
+function = "com.urbandroid.sleep.functions.AppFunctions#createAlarm"
+
+[[allow]]
+package = "com.android.settings"
+function = "getBatteryDeviceState"
+
+[[allow]]
+package = "com.ftband.mono"
+function = "com.ftband.app.appfunctions.MobileTopUpFunctions#topUpPhone"

@@ -28,19 +28,8 @@ impl Backend for Recording {
     }
 }
 
-const DEMO: &str = r#"
-[[allow]]
-package = "com.urbandroid.sleep"
-function = "com.urbandroid.sleep.functions.AppFunctions#createAlarm"
-
-[[allow]]
-package = "com.android.settings"
-function = "getBatteryDeviceState"
-
-[[allow]]
-package = "com.ftband.mono"
-function = "com.ftband.app.appfunctions.MobileTopUpFunctions#topUpPhone"
-"#;
+/// The policy the device acceptance run (A6) uses too; the monobank entry is there to prove an allow cannot lift the money rule.
+const DEMO: &str = include_str!("../../examples/demo-policy.toml");
 
 fn server(policy: &str) -> (Server, Recording) {
     let backend = Recording::default();
