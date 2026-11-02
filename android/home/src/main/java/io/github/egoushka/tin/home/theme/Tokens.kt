@@ -1,12 +1,16 @@
 package io.github.egoushka.tin.home.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import io.github.egoushka.tin.home.R
 
 /** The `nightglass` column of docs/design/night-glass/tokens.json, one to one. TokensTest guards the mapping. */
 object Ng {
@@ -68,9 +72,15 @@ object Dimen {
     val backEdge = 24.dp                // Android's back gesture owns the side edges
 }
 
-/** The five type sizes; nothing else is allowed. Roboto until Yehor decides on Inter (spec, H10). */
+/** The five type sizes; nothing else is allowed. Inter variable (OFL, assets/licenses), bundled whole: Yehor, 2026-11-02 (spec, H10). */
+@OptIn(ExperimentalTextApi::class)
 object NgType {
-    private val family = FontFamily.Default
+    // 450 and 550 exist only on the variable axis, so each weight pins `wght` explicitly.
+    private val family = FontFamily(
+        listOf(200, 450, 550, 600).map {
+            Font(R.font.inter, FontWeight(it), variationSettings = FontVariation.Settings(FontVariation.weight(it)))
+        },
+    )
     private const val TNUM = "tnum"
 
     val clock = TextStyle(fontFamily = family, fontSize = 76.sp, lineHeight = 72.sp, fontWeight = FontWeight(200),
