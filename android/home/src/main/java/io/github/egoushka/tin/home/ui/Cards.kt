@@ -28,8 +28,11 @@ import android.text.format.DateFormat
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.egoushka.tin.home.Actions
@@ -39,6 +42,7 @@ import io.github.egoushka.tin.home.layer.Freshness
 import io.github.egoushka.tin.home.layer.LayerCard
 import io.github.egoushka.tin.home.layer.ageText
 import io.github.egoushka.tin.home.layer.rememberNow
+import io.github.egoushka.tin.home.layer.spokenAge
 import io.github.egoushka.tin.home.signals.AlarmSource
 import io.github.egoushka.tin.home.signals.Homelab
 import io.github.egoushka.tin.home.signals.HomelabSource
@@ -107,7 +111,9 @@ fun GlanceCard(signals: Signals, actions: Actions) {
             Spacer(Modifier.width(Dimen.space2))
             Text(latest.text, style = NgType.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(Dimen.space2))
-            Text(ageText(Freshness.age(now, latest.whenMs)), style = NgType.body)
+            val age = Freshness.age(now, latest.whenMs)
+            val spoken = spokenAge(age)
+            Text(ageText(age), style = NgType.body, modifier = Modifier.clearAndSetSemantics { text = AnnotatedString(spoken) })
         }
     }
 }

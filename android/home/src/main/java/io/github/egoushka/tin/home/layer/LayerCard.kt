@@ -14,7 +14,12 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.theme.Dimen
@@ -54,6 +59,15 @@ fun ageText(age: Age): String = when (age.unit) {
     AgeUnit.Day -> stringResource(R.string.age_day, age.n)
 }
 
+/** What a screen reader says for [ageText]: "1 d" is read "1 D", and the unit needs its plural forms. */
+@Composable
+fun spokenAge(age: Age): String = when (age.unit) {
+    AgeUnit.Now -> stringResource(R.string.age_now_spoken)
+    AgeUnit.Min -> pluralStringResource(R.plurals.age_min_spoken, age.n, age.n)
+    AgeUnit.Hour -> pluralStringResource(R.plurals.age_hour_spoken, age.n, age.n)
+    AgeUnit.Day -> pluralStringResource(R.plurals.age_day_spoken, age.n, age.n)
+}
+
 /**
  * The shared glass card: label and source age on the first line, then [content]. Light moves with the table of
  * cards/Light.md (theme/Motion.kt); stale fades to 55%; focus dims calm cards to 40% unless [keepBright] (Today).
@@ -90,6 +104,7 @@ fun LayerCard(
     Column(
         modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) {}
             .softShadow(CardShape, Color.Black.copy(alpha = GlassPaint.DROP_ALPHA), GlassPaint.DROP_DY, GlassPaint.DROP_BLUR,
                 GlassPaint.DROP_SPREAD, opacity)
             .softShadow(CardShape, attention, 0f, GlassPaint.HALO_BLUR, GlassPaint.HALO_SPREAD) { needsYou.value * opacity() }
@@ -106,7 +121,9 @@ fun LayerCard(
 /** A lit card's label turns from ink-2 to ink; reading [lit] here keeps that recomposition off the card body. */
 @Composable
 private fun CardHeader(label: String, age: Age?, lit: State<Float>) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    val spoken = if (age == null) label else "$label, ${spokenAge(age)}"
+    // `text`, not `contentDescription`: on a merged card a description would hide the rows' text from TalkBack.
+    Row(Modifier.fillMaxWidth().clearAndSetSemantics { text = AnnotatedString(spoken) }, horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label.uppercase(), style = NgType.label, color = lerpColor(Ng.ink2, Ng.ink, lit.value))
         if (age != null) Text(ageText(age), style = NgType.meta)
     }

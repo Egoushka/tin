@@ -33,7 +33,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import io.github.egoushka.tin.home.voice.Voice
 import io.github.egoushka.tin.home.voice.VoiceIntent
@@ -213,7 +215,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
             .navigationBarsPadding()
             .padding(horizontal = Dimen.gutter),
     ) {
-        Glance(Modifier.padding(top = Dimen.space6))
+        Glance(Modifier.padding(top = Dimen.space6), actions, onLayer)
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
         Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
             NeedsYouCard(signals.needsYou, actions)
@@ -232,7 +234,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
 }
 
 @Composable
-private fun Glance(modifier: Modifier = Modifier) {
+private fun Glance(modifier: Modifier = Modifier, actions: Actions, onLayer: (Layer) -> Unit) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -244,7 +246,22 @@ private fun Glance(modifier: Modifier = Modifier) {
     val timePattern = if (DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm"
     val datePattern = DateFormat.getBestDateTimePattern(locale, stringResource(R.string.date_skeleton))
     val date = Date(now)
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // The drags, the double tap and the long press have no screen-reader equivalent; the clock is the first stop.
+    val apps = stringResource(R.string.action_apps)
+    val notifications = stringResource(R.string.action_notifications)
+    val torch = stringResource(R.string.action_torch)
+    val tune = stringResource(R.string.tune)
+    Row(
+        modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            customActions = listOf(
+                CustomAccessibilityAction(apps) { onLayer(Layer.Apps); true },
+                CustomAccessibilityAction(notifications) { actions.openNotifications(); true },
+                CustomAccessibilityAction(torch) { actions.toggleTorch(); true },
+                CustomAccessibilityAction(tune) { onLayer(Layer.Tune); true },
+            )
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock, modifier = Modifier.weight(1f))
         Text(
             android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
@@ -288,7 +305,7 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
             .fillMaxWidth()
             .height(Dimen.tile)
             .glass(RoundedCornerShape(Dimen.radiusCard))
-            .plainClickable(onLongClick = onMic, onClick = onOpen)
+            .plainClickable(onLongClick = onMic, onLongClickLabel = stringResource(R.string.mic), onClick = onOpen)
             .padding(start = Dimen.space4, end = Dimen.space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
