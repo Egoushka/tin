@@ -74,7 +74,8 @@ class StringsTest {
     fun ukrainianIsNotLeftInEnglish() {
         // Product names stay as they are.
         val kept = setOf("Approvals", "Tin", "Home")
-        for ((k, v) in uk.strings) {
+        // The date skeleton is an ICU pattern, not text.
+        for ((k, v) in uk.strings - "date_skeleton") {
             val words = Regex("""[A-Za-z]{2,}""").findAll(v.replace(Regex("""%(\d+\$)?[sd]"""), "")).map { it.value }.filterNot { it in kept }.toList()
             assertTrue("uk $k has English words $words", words.isEmpty())
         }

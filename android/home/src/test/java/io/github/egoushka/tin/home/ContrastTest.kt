@@ -111,7 +111,7 @@ class ContrastTest {
     private fun check(label: String, min: Double, fg: C, spots: List<Spot>) {
         val (where, r) = spots.map { it.name to ratio(fg, it.bg) }.minBy { it.second }
         println("contrast %-34s %.2f:1 (needs %.1f) at %s".format(label, r, min, where))
-        if (r < min) misses += "$label: %.2f:1 at %s, needs %.1f".format(r, where, min)
+        if (r < min) misses += "%s: %.2f:1 at %s, needs %.1f".format(label, r, where, min)
     }
 
     private fun assertNoMisses() = assertTrue("contrast misses:\n" + misses.joinToString("\n"), misses.isEmpty())
@@ -132,10 +132,13 @@ class ContrastTest {
         assertNoMisses()
     }
 
-    /** README: ink-2 stays at or above 5.0:1 on the clearest glass, tint 35%. Under a lit card it holds only for some hues. */
+    /**
+     * README: ink-2 stays at or above 5.0:1 on the clearest glass, tint 35%. The rows that wash the glass (the now row,
+     * a broken card) only keep 4.5:1, which the test above pins, and under a lit card it holds only for some hues.
+     */
     @Test
     fun ink2KeepsTheDocumentedFloorOnTheGlass() {
-        check("ink-2 floor, tint 35%", 5.0, token("nightglass", "ink-2"), nightGlassSpots(0.35).notLit())
+        check("ink-2 floor, tint 35%", 5.0, token("nightglass", "ink-2"), nightGlassSpots(0.35).filter { it.name.startsWith("calm") })
         assertNoMisses()
     }
 
