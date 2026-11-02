@@ -20,7 +20,7 @@ subprojects {
                 keyAlias = providers.gradleProperty("tin.signing.keyAlias").get()
                 keyPassword = providers.gradleProperty("tin.signing.keyPassword").get()
             }
-            buildTypes.getByName("release").signingConfig = release
+            buildTypes.matching { it.name == "release" }.configureEach { signingConfig = release }
         }
     }
 }
