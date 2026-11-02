@@ -26,6 +26,25 @@ object Lucide {
         "x" to """<path d="M18 6 6 18"/><path d="m6 6 12 12"/>""",
         "grid" to """<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>""",
         "check" to """<path d="M20 6 9 17l-5-5"/>""",
+        "play" to """<polygon points="6 3 20 12 6 21 6 3"/>""",
+        "pause" to """<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>""",
+        "next" to """<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/>""",
+        "prev" to """<polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/>""",
+        "alarm" to """<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/>""",
+        "buds" to """<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>""",
+        "bell" to """<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>""",
+        "mail" to """<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>""",
+        "hash" to """<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>""",
+        "pr" to """<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/>""",
+        "reply" to """<polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>""",
+        "car" to """<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>""",
+        "warn" to """<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>""",
+        "cal" to """<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>""",
+        "server" to """<rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>""",
+        "pulse" to """<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>""",
+        "merge" to """<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>""",
+        "lock" to """<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>""",
+        "inbox" to """<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>""",
     )
 
     private data class Key(val name: String, val sizeDp: Float, val strokeDp: Float, val color: Color)
@@ -45,6 +64,10 @@ object Lucide {
     private val element = Regex("""<(\w+)([^>]*)/>""")
     private val attr = Regex("""([\w-]+)="([^"]*)"""")
 
+    /** "5 4 15 12" or "5,4 15,12" as a polyline path: numbers are x y pairs, not tokens. */
+    private fun points(raw: String): String =
+        raw.trim().split(Regex("[\\s,]+")).chunked(2).joinToString("L", prefix = "M") { "${it[0]} ${it[1]}" }
+
     /** SVG elements (path, circle, line, rect, polyline) as path data strings. */
     fun toPathData(body: String): List<String> = element.findAll(body).map { m ->
         val a = attr.findAll(m.groupValues[2]).associate { it.groupValues[1] to it.groupValues[2] }
@@ -56,7 +79,8 @@ object Lucide {
                 "M${cx - r},${cy}a$r,$r 0 1,0 ${2 * r},0a$r,$r 0 1,0 ${-2 * r},0Z"
             }
             "line" -> "M${f("x1")},${f("y1")}L${f("x2")},${f("y2")}"
-            "polyline" -> "M" + a.getValue("points").trim().split(Regex("\\s+")).joinToString("L")
+            "polyline" -> points(a.getValue("points"))
+            "polygon" -> points(a.getValue("points")) + "Z"
             "rect" -> {
                 val (x, y, w, h) = listOf(f("x"), f("y"), f("width"), f("height"))
                 val r = f("rx")

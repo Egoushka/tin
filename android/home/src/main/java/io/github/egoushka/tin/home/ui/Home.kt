@@ -55,6 +55,7 @@ import io.github.egoushka.tin.home.Actions
 import io.github.egoushka.tin.home.Dock
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppRepository
+import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Frost
 import io.github.egoushka.tin.home.theme.FrostRenderer
@@ -80,6 +81,7 @@ fun HomeScreen(
     onTune: (Tune) -> Unit,
     apps: AppRepository,
     actions: Actions,
+    signals: Signals,
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val scale = animatorScale()
@@ -90,7 +92,7 @@ fun HomeScreen(
             .drawBehind { drawRoom(tune.roomLight, this.size) },
     ) {
         FrostRenderer(tune, size, frost)
-        Home(tune, onLayer, actions)
+        Home(tune, onLayer, actions, signals)
 
         AnimatedVisibility(
             visible = layer == Layer.Apps || layer == Layer.Search,
@@ -120,7 +122,7 @@ fun HomeScreen(
 
 /** The stock launcher's job: glance, dock, search bar; gestures on empty space only. */
 @Composable
-private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions) {
+private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals: Signals) {
     val density = LocalDensity.current
     val edge = with(density) { Dimen.backEdge.toPx() }
     val travel = with(density) { Dimen.target.toPx() } // one target's travel opens a layer
@@ -151,6 +153,11 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions) {
             .padding(horizontal = Dimen.gutter),
     ) {
         Glance(Modifier.padding(top = Dimen.space6))
+        Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
+        Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
+            GlanceCard(signals, actions)
+            MusicCard(signals.music)
+        }
         Spacer(Modifier.weight(1f))
         DockRow(tune, actions)
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))

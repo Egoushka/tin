@@ -37,4 +37,15 @@
         <item quantity="one">%d change from Default</item>
         <item quantity="other">%d changes from Default</item>
     </plurals>
+    <string name="age_now">now</string>
+    <string name="age_min">%d min</string>
+    <string name="age_hour">%d h</string>
+    <string name="age_day">%d d</string>
+    <string name="notif_access">Allow notification access</string>
+    <string name="notif_access_hint">Shows unread counts and music here</string>
+    <string name="music_play">Play</string>
+    <string name="music_pause">Pause</string>
+    <string name="music_next">Next track</string>
+    <string name="music_prev">Previous track</string>
+    <string name="buds_battery">Earbuds battery %1$s</string>
 </resources>

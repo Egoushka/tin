@@ -4,6 +4,9 @@
     <!-- Swipe down opens the notification shade (StatusBarManager). -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
+    <!-- Earbud battery of the current audio output; asked once, the card works without it. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <!-- LauncherApps only returns activities this package can see. -->
     <queries>
         <intent>
@@ -44,5 +47,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Notification glance; the grant also lets Home read active media sessions. -->
+        <service
+            android:name=".signals.TinListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
