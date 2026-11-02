@@ -16,15 +16,18 @@ Phone: Pixel 8a (`akita`), stock Android 17 (build `CP3A.261005.005`), over USB.
 | V7 | needs a voice and the tile | script line 4 |
 | V8 | needs a voice | script line 5 |
 | V9 | not run | the phone was in use by another session's Home check (last touch 37 s before I looked), and installing my build would have replaced its build; nobody has to speak, steps in "V9" below |
-| S7 | blocked | Shizuku is not installed on the phone now (the 2026-11-01 run had it), so nothing serves `@tin`; see "S7" below |
+| S7 | passed | RTF p50 0.059, p95 0.061 (pass is below 0.5), WER 8.8 % on 20 FLEURS uk clips, call minus decode p50 119 ms; see "S7" below |
 
 ## What is on the phone
 
 - Model: `files/models/` in tin holds Parakeet-tdt-0.6b-v3 int8 (encoder 652 184 281 B, decoder 11 845 275 B, joiner
   6 355 277 B, tokens 93 939 B) and Silero VAD (643 854 B), pushed by `./scripts/speech-push-model.sh` from files whose
   SHA-256 match the pins in `ModelStore.kt`.
-- Policy: `/data/local/tmp/tin/policy.toml` is only `[speech]` / `enabled = true` (mode 600, folder 700). It did not
-  exist; it holds no AppFunction rules, so merge it with `examples/demo-policy.toml` before the A and D checks.
+- Policy: `/data/local/tmp/tin/policy.toml` is `examples/demo-policy.toml` plus `[speech]` / `enabled = true` (mode 600,
+  folder 700). It did not exist before this run. It has no `[approvals]` table, so state-changing calls are refused.
+- Shizuku: v13.6.0 (r1086) was not installed; I installed the release APK (SHA-256 `6e273ab0…790f`), started the server
+  with its `libshizuku.so` starter over adb, and tapped "Allow all the time" for tin. The server runs until the phone
+  restarts.
 - Permissions: `RECORD_AUDIO` and `POST_NOTIFICATIONS` granted to tin with `adb shell pm grant`; tin's start code
   (`MainActivity.startSpeech`) does not start `SpeechService` until both are held.
 
@@ -36,8 +39,9 @@ Setup, once (installs Home with the real engine, opens tin so `SpeechService` lo
 cd android && ./gradlew :home:installDebug -Ptin.voice=real && adb shell am start -n io.github.egoushka.tin/.MainActivity
 ```
 
-1. tin shows "Shizuku is not running" on its own screen; ignore it, Home's mic does not use Shizuku. Wait until tin's
-   notification reads `ready (model loaded in … ms)`, press Home, then run lines 2 to 5 with Home in front.
+1. Wait until the "tin speech" notification reads `ready (model loaded in … ms)` (5.6 s here), press Home, then run lines
+   2 to 5 with Home in front. Home's mic does not need Shizuku; if the phone restarted, tin shows "Shizuku is not
+   running" and only S7 is affected.
 2. V6 English: tap the mic and say "open calendar", ten times. Each time the bar reads "Listening…", then "Thinking…",
    then Home goes back to "Search or ask" and Vanadium opens a search for your words (Home hands them to
    `ACTION_WEB_SEARCH`; the bar itself never shows the text). Pass: 10 of 10 in that order with the words as you said them.
@@ -74,9 +78,13 @@ adb exec-out run-as io.github.egoushka.tin.home cat files/datastore/tin.voice.pr
 
 ## S7
 
-`uv run scripts/speech-check.py` needs tin serving on `@tin`, and `@tin-speech` is served by the Shizuku user service.
-Shizuku is not installed, so S7 did not run and the phone has no speed number yet. To run it: install Shizuku v13.6.0 from
-its releases page, start it with the `libshizuku.so` starter over adb, push `examples/demo-policy.toml` merged with
-`[speech]` to `/data/local/tmp/tin/policy.toml`, open tin and tap "Allow" in Shizuku's dialog (README, "Quick
-start"), then `adb forward tcp:7381 localabstract:tin` and `uv run scripts/speech-check.py`. The 20 clips S7 uses
-are already cached in `bench/.cache/data/` on the Mac. Pass is RTF p95 below 0.5; above 1.0 stops the plan.
+`@tin-speech` is served by the Shizuku user service, so S7 needed Shizuku running and allowed for tin (see "What is on
+the phone"). Then `adb forward tcp:7381 localabstract:tin` and `uv run scripts/speech-check.py`:
+
+| clips | RTF p50 | RTF p95 | WER % | call minus decode p50 ms |
+|---|---|---|---|---|
+| 20 | 0.059 | 0.061 | 8.8 | 119 |
+
+PASS: RTF p95 0.061 against the limit of 0.5 (above 1.0 stops the plan). The clips are FLEURS Ukrainian, cached in
+`bench/.cache/data/` on the Mac. This is the speed of tin's recogniser on the phone; V6's 1.5 s p95 is the whole
+path from the last word to Vanadium opening, which only a spoken run measures.
