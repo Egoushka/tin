@@ -1,6 +1,8 @@
 package io.github.egoushka.tin.home
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -15,7 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
+import androidx.lifecycle.lifecycleScope
 import io.github.egoushka.tin.home.apps.AppRepository
+import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Frost
 import io.github.egoushka.tin.home.theme.LocalFrost
 import io.github.egoushka.tin.home.theme.LocalTune
@@ -38,6 +42,8 @@ class HomeActivity : ComponentActivity() {
         val store = TuneStore(applicationContext)
         val apps = AppRepository(applicationContext)
         val actions = Actions(this)
+        val signals = Signals(applicationContext).also { it.start(lifecycleScope) }
+        askBluetoothOnce()
 
         setContent {
             val tune by store.tune.collectAsState(initial = Tune())
@@ -53,9 +59,19 @@ class HomeActivity : ComponentActivity() {
                     onTune = { t -> scope.launch { store.save(t) } },
                     apps = apps,
                     actions = actions,
+                    signals = signals,
                 )
             }
         }
+    }
+
+    /** Earbud battery needs BLUETOOTH_CONNECT; asked once so a refusal does not nag on every Home press. */
+    private fun askBluetoothOnce() {
+        val prefs = getSharedPreferences("tin.asked", MODE_PRIVATE)
+        if (prefs.getBoolean("bluetooth", false)) return
+        if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) return
+        prefs.edit().putBoolean("bluetooth", true).apply()
+        requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
     }
 
     override fun onNewIntent(intent: Intent) {

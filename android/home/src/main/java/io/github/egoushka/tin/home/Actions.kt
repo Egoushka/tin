@@ -3,14 +3,17 @@ package io.github.egoushka.tin.home
 import android.annotation.SuppressLint
 import android.app.SearchManager
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.provider.MediaStore
+import android.provider.Settings
 import android.widget.Toast
 import androidx.annotation.StringRes
+import io.github.egoushka.tin.home.signals.TinListener
 
 /** A dock slot: a Lucide icon and the default handler for one job, so the dock follows the user's app choices. */
 enum class Dock(val icon: String, @StringRes val label: Int, val intent: () -> Intent, val fallback: (() -> Intent)? = null) {
@@ -38,6 +41,14 @@ class Actions(private val context: Context) {
         val intent = d.intent().takeIf { it.resolveActivity(context.packageManager) != null } ?: d.fallback?.invoke() ?: d.intent()
         start(intent, context.getString(d.label))
     }
+
+    /** The grant that lets the glance and the music card read notifications and media sessions. */
+    fun openListenerSettings() = start(
+        Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
+            Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ComponentName(context, TinListener::class.java).flattenToString(),
+        ),
+        context.getString(R.string.notif_access),
+    )
 
     fun webSearch(query: String) = start(Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, query), query)
 

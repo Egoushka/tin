@@ -38,4 +38,15 @@
         <item quantity="many">%d змін від типових</item>
         <item quantity="other">%d зміни від типових</item>
     </plurals>
+    <string name="age_now">зараз</string>
+    <string name="age_min">%d хв</string>
+    <string name="age_hour">%d год</string>
+    <string name="age_day">%d д</string>
+    <string name="notif_access">Дозволити доступ до сповіщень</string>
+    <string name="notif_access_hint">Покаже лічильники сповіщень і музику тут</string>
+    <string name="music_play">Грати</string>
+    <string name="music_pause">Пауза</string>
+    <string name="music_next">Наступний трек</string>
+    <string name="music_prev">Попередній трек</string>
+    <string name="buds_battery">Заряд навушників %1$s</string>
 </resources>
