@@ -15,3 +15,4 @@ rootProject.name = "tin"
 include(":app")
 include(":home")
 include(":speech")
+include(":voice-ipc")
