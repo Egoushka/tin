@@ -79,7 +79,8 @@ and parsers. `describe` may read state (the approvals title for a kill names the
   number bounds come from `typeSpecificMetadata`.
 - The money rule applies unchanged: `policy::is_money` on bundle id and identifier.
 - Invocation goes through Shortcuts. `tin shortcut <bundle> <identifier>` writes a signed one-action shortcut named
-  `tin: <bundle>.<identifier>`; it is imported once by opening it. `execute` runs it with `shortcuts run`, stdin
+  `tin <bundle>.<identifier>` (no colon: Shortcuts drops it when it names an import after the file); it is imported
+  once by opening it. `execute` runs it with `shortcuts run`, stdin
   closed, output to a temporary file, with a timeout. Parameters are not wired into the shortcut in this slice: a call
   with arguments is refused before anything runs.
 

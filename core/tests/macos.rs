@@ -231,7 +231,7 @@ fn macos_execute_refuses_parameters_before_running() {
     let b = MacBackend { roots: vec![], timeout: Duration::from_secs(1) };
     let e = b.execute(BUNDLE, "GetCountIntent", r#"{"count":3}"#).unwrap_err();
     assert!(e.contains("does not pass parameters"), "{e}");
-    assert_eq!(macos::shortcut_name(BUNDLE, "GetCountIntent"), "tin: com.example.Counter.GetCountIntent");
+    assert_eq!(macos::shortcut_name(BUNDLE, "GetCountIntent"), "tin com.example.Counter.GetCountIntent");
 }
 
 #[test]
@@ -477,4 +477,20 @@ fn macos_bad_arguments_fail_before_anyone_is_asked() {
     }
     assert!(inbox.items.lock().unwrap().is_empty(), "no item for a call that can never run");
     assert!(mac.ran("kill").is_empty() && mac.ran("osascript").is_empty() && mac.ran("launchctl").is_empty());
+}
+
+#[test]
+fn macos_shortcut_name_survives_the_import_file_name() {
+    let name = macos::shortcut_name("com.sindresorhus.Week-Number", "GetWeekNumberIntent");
+    assert_eq!(name, "tin com.sindresorhus.Week-Number.GetWeekNumberIntent");
+    assert!(!name.contains([':', '/']), "Shortcuts drops these from the imported name");
+}
+
+#[test]
+fn macos_shortcuts_run_asks_for_plain_text_output() {
+    let args = macos::shortcuts_run_args("tin a.B", Path::new("/tmp/x.out"));
+    let at = |flag: &str| args.iter().position(|a| a == flag).map(|i| args[i + 1].as_str());
+    assert_eq!(args[..2], ["run", "tin a.B"]);
+    assert_eq!(at("--output-path"), Some("/tmp/x.out"));
+    assert_eq!(at("--output-type"), Some("public.plain-text"), "without a type shortcuts writes no file");
 }

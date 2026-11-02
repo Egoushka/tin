@@ -257,9 +257,10 @@ fn enums(data: &Value) -> Box<dyn Iterator<Item = &Value> + '_> {
     }
 }
 
-/// The library name of the shortcut that runs one intent.
+/// The library name of the shortcut that runs one intent. No colon: Shortcuts names an imported file after its
+/// file name and drops the colon, so the name `shortcuts run` looks up must equal the file stem.
 pub fn shortcut_name(bundle_id: &str, identifier: &str) -> String {
-    format!("tin: {bundle_id}.{identifier}")
+    format!("tin {bundle_id}.{identifier}")
 }
 
 fn xml_escape(s: &str) -> String {
@@ -304,6 +305,11 @@ pub fn shortcut_plist(bundle_id: &str, identifier: &str, app_name: &str, team: O
     )
 }
 
+/// Arguments of `shortcuts run`. `-o` alone writes nothing and prints nothing: the file appears only with an output type.
+pub fn shortcuts_run_args(name: &str, out: &Path) -> Vec<String> {
+    ["run", name, "--output-path", &out.to_string_lossy(), "--output-type", "public.plain-text"].map(String::from).to_vec()
+}
+
 /// App Intents and system tools on this Mac.
 pub struct MacBackend {
     pub roots: Vec<PathBuf>,
@@ -340,7 +346,7 @@ impl MacBackend {
         let uuid = uuid_v4();
         let unsigned = dir.join(format!("{identifier}.unsigned.shortcut"));
         std::fs::write(&unsigned, shortcut_plist(bundle_id, identifier, &name, team.as_deref(), &uuid)).map_err(|e| e.to_string())?;
-        let out = dir.join(format!("{}.shortcut", shortcut_name(bundle_id, identifier).replace([':', '/'], "")));
+        let out = dir.join(format!("{}.shortcut", shortcut_name(bundle_id, identifier)));
         let s = |p: &Path| p.to_string_lossy().into_owned();
         let signed = run_argv("shortcuts", &["sign".into(), "--mode".into(), "people-who-know-me".into(), "-i".into(), s(&unsigned), "-o".into(), s(&out)]);
         let _ = std::fs::remove_file(&unsigned);
@@ -420,7 +426,7 @@ impl Backend for MacBackend {
         let name = shortcut_name(package, function);
         let out = std::env::temp_dir().join(format!("tin-{}-{}.out", std::process::id(), RUNS.fetch_add(1, Ordering::Relaxed)));
         let mut cmd = Command::new("shortcuts");
-        cmd.args(["run", &name, "-o"]).arg(&out);
+        cmd.args(shortcuts_run_args(&name, &out));
         let result = run_with_timeout(cmd, self.timeout);
         let output = std::fs::read_to_string(&out).unwrap_or_default();
         let _ = std::fs::remove_file(&out);
