@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -37,7 +36,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -69,7 +67,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -82,6 +79,7 @@ import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.apps.DockSlots
 import io.github.egoushka.tin.home.signals.Signals
+import io.github.egoushka.tin.home.signals.WeatherSource
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Frost
 import io.github.egoushka.tin.home.theme.FrostRenderer
@@ -91,6 +89,10 @@ import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
 import io.github.egoushka.tin.home.theme.drawRoom
 import io.github.egoushka.tin.home.theme.glass
+import io.github.egoushka.tin.home.theme.plainClickable
+import io.github.egoushka.tin.home.theme.pressGlass
+import io.github.egoushka.tin.home.theme.pressable
+import io.github.egoushka.tin.home.theme.rememberAnimatorScale
 import io.github.egoushka.tin.home.tune.Tune
 import java.util.Date
 import kotlin.math.abs
@@ -296,7 +298,7 @@ private fun Home(
             .navigationBarsPadding()
             .padding(horizontal = Dimen.gutter),
     ) {
-        Glance(Modifier.padding(top = Dimen.space6))
+        Glance(signals.weather, Modifier.padding(top = Dimen.space6))
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
         Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
             NeedsYouCard(signals.needsYou, actions)
@@ -315,7 +317,7 @@ private fun Home(
 }
 
 @Composable
-private fun Glance(modifier: Modifier = Modifier) {
+private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -329,10 +331,13 @@ private fun Glance(modifier: Modifier = Modifier) {
     val date = Date(now)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock, modifier = Modifier.weight(1f))
-        Text(
-            android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
-            style = NgType.title, textAlign = TextAlign.End,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
+                style = NgType.title, textAlign = TextAlign.End,
+            )
+            WeatherLine(weather, now)
+        }
     }
 }
 
@@ -364,12 +369,12 @@ private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, read
     val label = app?.label ?: stringResource(d.label)
     val description = if (unread) stringResource(R.string.app_unread, label) else label
     val longClickLabel = stringResource(R.string.app_options)
-    val shape = Modifier.size(Dimen.tile).glass(CircleShape)
+    val tile = Modifier.size(Dimen.tile)
     Box(
-        if (!ready) shape else shape
+        if (!ready) tile.glass(CircleShape) else tile
             .ownsPress()
-            .combinedClickable(
-                role = Role.Button,
+            .pressGlass(
+                CircleShape,
                 onLongClickLabel = longClickLabel,
                 onLongClick = { if (app != null) menu.open(app, slot) else menu.pick(slot) },
                 onClick = { if (app != null) apps.launch(app) else actions.dock(d) },
@@ -400,7 +405,7 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
             .fillMaxWidth()
             .height(Dimen.tile)
             .glass(RoundedCornerShape(Dimen.radiusCard))
-            .combinedClickable(onClick = onOpen, onLongClick = onMic)
+            .plainClickable(onLongClick = onMic, onClick = onOpen)
             .padding(start = Dimen.space4, end = Dimen.space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -417,9 +422,9 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
         Box(
             Modifier
                 .size(Dimen.target)
+                .pressable(onClick = onMic)
                 .clip(CircleShape)
                 .background(Ng.accent)
-                .clickable(role = Role.Button, onClick = onMic)
                 .semantics { contentDescription = word },
             contentAlignment = Alignment.Center,
         ) {
@@ -457,14 +462,9 @@ private fun Dots(scale: Float) {
     }
 }
 
-/** System animator duration scale; 0 is reduced motion. */
+/** System animator duration scale, live; 0 is reduced motion. */
 @Composable
-fun animatorScale(): Float {
-    val resolver = LocalContext.current.contentResolver
-    return remember {
-        android.provider.Settings.Global.getFloat(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-    }
-}
+fun animatorScale(): Float = rememberAnimatorScale()
 
 /** Keeps [key] steady for a frame so a just-opened layer can request focus after it is attached. */
 @Composable
