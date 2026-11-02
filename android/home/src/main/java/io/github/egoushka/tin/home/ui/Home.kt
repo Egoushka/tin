@@ -1,13 +1,18 @@
 package io.github.egoushka.tin.home.ui
 
 import android.text.format.DateFormat
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +47,7 @@ import io.github.egoushka.tin.home.voice.VoiceState
 import io.github.egoushka.tin.home.voice.ask
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -70,9 +76,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.github.egoushka.tin.home.Actions
-import io.github.egoushka.tin.home.Dock
+import io.github.egoushka.tin.home.DockDefault
 import io.github.egoushka.tin.home.R
+import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
+import io.github.egoushka.tin.home.apps.DockSlots
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Frost
@@ -87,8 +95,14 @@ import io.github.egoushka.tin.home.tune.Tune
 import java.util.Date
 import kotlin.math.abs
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-enum class Layer { Home, Apps, Search, Tune }
+enum class Layer { Home, Apps, Search, Tune, Hidden }
+
+/** The app whose menu is open, and its dock slot when the press was on the dock. */
+private data class SheetFor(val app: AppEntry, val dockSlot: Int?)
 
 @Composable
 fun HomeScreen(
@@ -103,44 +117,112 @@ fun HomeScreen(
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val scale = animatorScale()
-    Box(
-        Modifier
-            .fillMaxSize()
-            .onSizeChanged { size = it }
-            .drawBehind { drawRoom(tune.roomLight, this.size) },
-    ) {
-        FrostRenderer(tune, size, frost)
-        Home(tune, onLayer, actions, signals)
+    val scope = rememberCoroutineScope()
+    val onLayerNow by rememberUpdatedState(onLayer)
+    var sheet by remember { mutableStateOf<SheetFor?>(null) }
+    var pickSlot by remember { mutableStateOf<Int?>(null) }
+    val menu = remember {
+        AppMenu(
+            open = { app, slot -> sheet = SheetFor(app, slot) },
+            pick = { slot -> pickSlot = slot; onLayerNow(Layer.Apps) },
+        )
+    }
+    val dock = remember(apps, actions) {
+        apps.dock { DockDefault.entries.map(actions::handler) }.stateIn(scope, SharingStarted.WhileSubscribed(5_000), null)
+    }
+    fun dockApp(slot: Int, app: AppEntry) {
+        val current = dock.value ?: return
+        scope.launch { apps.saveDock(current.put(slot, app.key)) }
+    }
+    val pick = remember(pickSlot) {
+        pickSlot?.let { slot -> DockPick(slot) { app -> dockApp(slot, app); pickSlot = null; onLayerNow(Layer.Home) } }
+    }
+    // Picking ends with the drawer: Back or Home leaves the dock as it was.
+    LaunchedEffect(layer) { if (layer != Layer.Apps && layer != Layer.Search) pickSlot = null }
+    BackHandler(enabled = layer == Layer.Hidden) { onLayer(Layer.Tune) }
+    BackHandler(enabled = sheet != null) { sheet = null }
+    val glance = signals.glance.collectAsState()
+    val unread = remember(glance) { { pkg: String -> (glance.value.glance.byPackage[pkg] ?: 0) > 0 } }
 
-        // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
-        val open = layer == Layer.Apps || layer == Layer.Search
-        var drawerReady by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            withFrameNanos { }
-            withFrameNanos { }
-            drawerReady = true
-        }
-        LaunchedEffect(apps) { apps.keepLoaded() }
-        if (drawerReady || open) {
-            DrawerHost(open, scale) {
-                Drawer(
-                    apps = apps,
-                    actions = actions,
-                    open = open,
-                    focusSearch = layer == Layer.Search,
+    CompositionLocalProvider(LocalAppMenu provides menu, LocalDockPick provides pick, LocalUnread provides unread) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { size = it }
+                .drawBehind { drawRoom(tune.roomLight, this.size) },
+        ) {
+            FrostRenderer(tune, size, frost)
+            Home(tune, onLayer, dock, apps, actions, signals)
+
+            // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
+            val open = layer == Layer.Apps || layer == Layer.Search
+            var drawerReady by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                withFrameNanos { }
+                withFrameNanos { }
+                drawerReady = true
+            }
+            LaunchedEffect(apps) { apps.keepLoaded() }
+            if (drawerReady || open) {
+                DrawerHost(open, scale) {
+                    Drawer(
+                        apps = apps,
+                        actions = actions,
+                        open = open,
+                        focusSearch = layer == Layer.Search,
+                        onClose = { onLayer(Layer.Home) },
+                        onTune = { onLayer(Layer.Tune) },
+                        onAsk = { said -> actions.ask(said, signals.needsYou.state.value.needs) },
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = layer == Layer.Tune,
+                enter = fadeIn(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))),
+                exit = fadeOut(tween(Motion.duration(Motion.BROKEN_IN, scale))),
+            ) {
+                val state by apps.state.collectAsState()
+                TuneSheet(
+                    tune = tune,
+                    onChange = onTune,
+                    hidden = state.hiddenApps.size,
+                    onHidden = { onLayer(Layer.Hidden) },
                     onClose = { onLayer(Layer.Home) },
-                    onTune = { onLayer(Layer.Tune) },
-                    onAsk = { said -> actions.ask(said, signals.needsYou.state.value.needs) },
                 )
             }
-        }
 
-        AnimatedVisibility(
-            visible = layer == Layer.Tune,
-            enter = fadeIn(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))),
-            exit = fadeOut(tween(Motion.duration(Motion.BROKEN_IN, scale))),
-        ) {
-            TuneSheet(tune = tune, onChange = onTune, onClose = { onLayer(Layer.Home) })
+            AnimatedVisibility(
+                visible = layer == Layer.Hidden,
+                enter = fadeIn(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))),
+                exit = fadeOut(tween(Motion.duration(Motion.BROKEN_IN, scale))),
+            ) {
+                HiddenSheet(apps, onShow = { key -> scope.launch { apps.show(key) } }, onClose = { onLayer(Layer.Tune) })
+            }
+
+            // Last, so the menu opens above the drawer and above Tune.
+            AnimatedContent(
+                targetState = sheet,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    fadeIn(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))) togetherWith
+                        fadeOut(tween(Motion.duration(Motion.BROKEN_IN, scale)))
+                },
+                label = "app-sheet",
+            ) { s ->
+                if (s != null) {
+                    AppSheet(
+                        app = s.app,
+                        apps = apps,
+                        dock = dock,
+                        dockSlot = s.dockSlot,
+                        onPin = { slot -> dockApp(slot, s.app); sheet = null },
+                        onReplace = { sheet = null; s.dockSlot?.let(menu.pick) },
+                        onHide = { scope.launch { apps.hide(s.app) }; sheet = null },
+                        onClose = { sheet = null },
+                    )
+                }
+            }
         }
     }
 }
@@ -171,7 +253,14 @@ private fun DrawerHost(open: Boolean, scale: Float, content: @Composable () -> U
 
 /** The stock launcher's job: glance, dock, search bar; gestures on empty space only. */
 @Composable
-private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals: Signals) {
+private fun Home(
+    tune: Tune,
+    onLayer: (Layer) -> Unit,
+    dock: StateFlow<DockSlots?>,
+    apps: AppRepository,
+    actions: Actions,
+    signals: Signals,
+) {
     val density = LocalDensity.current
     val edge = with(density) { Dimen.backEdge.toPx() }
     val travel = with(density) { Dimen.target.toPx() } // one target's travel opens a layer
@@ -218,7 +307,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
             HomelabCard(signals.homelab)
         }
         Spacer(Modifier.weight(1f))
-        DockRow(tune, actions)
+        DockRow(tune, dock, apps, actions)
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
         SearchBar(tune, voice.state, onOpen = { onLayer(Layer.Search) }, onMic = listen)
         Spacer(Modifier.height(Dimen.space2))
@@ -248,21 +337,49 @@ private fun Glance(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DockRow(tune: Tune, actions: Actions) {
+private fun DockRow(tune: Tune, dock: StateFlow<DockSlots?>, apps: AppRepository, actions: Actions) {
+    val slots by dock.collectAsState()
+    val state by apps.state.collectAsState()
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Dock.entries.forEach { d ->
-            val label = stringResource(d.label)
-            Box(
-                Modifier
-                    .size(Dimen.tile)
-                    .glass(CircleShape)
-                    .clickable(role = Role.Button) { actions.dock(d) }
-                    .semantics { contentDescription = label },
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(Lucide.icon(d.icon, 24f, tune.strokeDp), contentDescription = null, Modifier.size(Dimen.glyphTile))
-            }
+        DockDefault.entries.forEachIndexed { slot, d ->
+            val app = state[slots?.keys?.getOrNull(slot)]
+            DockTile(tune, d, slot, app, ready = slots != null, apps, actions)
         }
+    }
+}
+
+/**
+ * Consumes the touch-down after the child's own handlers saw it, so Home's long-press (Tune) does not fire on top of
+ * this tile's long-press: the parent's detector only skips a gesture whose down is already consumed.
+ */
+private fun Modifier.ownsPress() = pointerInput(Unit) {
+    awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
+}
+
+/** One dock slot: the chosen app, or the default's glyph while the slot is empty or its app is gone. */
+@Composable
+private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, ready: Boolean, apps: AppRepository, actions: Actions) {
+    val menu = LocalAppMenu.current
+    val unread by rememberUnread(app?.pkg)
+    val label = app?.label ?: stringResource(d.label)
+    val description = if (unread) stringResource(R.string.app_unread, label) else label
+    val longClickLabel = stringResource(R.string.app_options)
+    val shape = Modifier.size(Dimen.tile).glass(CircleShape)
+    Box(
+        if (!ready) shape else shape
+            .ownsPress()
+            .combinedClickable(
+                role = Role.Button,
+                onLongClickLabel = longClickLabel,
+                onLongClick = { if (app != null) menu.open(app, slot) else menu.pick(slot) },
+                onClick = { if (app != null) apps.launch(app) else actions.dock(d) },
+            )
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (app != null) AppIcon(app, apps, Modifier.size(Dimen.glyphTile * 1.5f))
+        else if (ready) Image(Lucide.icon(d.icon, 24f, tune.strokeDp), contentDescription = null, Modifier.size(Dimen.glyphTile))
+        UnreadDot(unread)
     }
 }
 

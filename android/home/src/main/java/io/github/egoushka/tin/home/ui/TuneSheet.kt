@@ -52,7 +52,7 @@ import kotlin.math.roundToInt
 /** Tune (long press on Home, or the sliders button in All apps): every knob writes `tin.tune` at once. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onClose: () -> Unit) {
+fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, hidden: Int, onHidden: () -> Unit, onClose: () -> Unit) {
     val res = LocalContext.current.resources
     Box(
         Modifier
@@ -120,6 +120,18 @@ fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onClose: () -> Unit) {
                         uncheckedThumbColor = Ng.ink2, uncheckedTrackColor = Ng.track, uncheckedBorderColor = Ng.edge,
                     ),
                 )
+            }
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Dimen.target)
+                    .clip(RoundedCornerShape(Dimen.radiusRow))
+                    .clickable(role = Role.Button, onClick = onHidden),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.tune_hidden), style = NgType.title, modifier = Modifier.weight(1f))
+                Text(hidden.toString(), style = NgType.label.copy(color = Ng.ink))
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {

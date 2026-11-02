@@ -59,7 +59,7 @@ data class Tune(
     }
 }
 
-private val Context.tuneStore: DataStore<Preferences> by preferencesDataStore(name = "tin.tune")
+internal val Context.tuneStore: DataStore<Preferences> by preferencesDataStore(name = "tin.tune")
 
 class TuneStore(private val context: Context) {
     private object K {

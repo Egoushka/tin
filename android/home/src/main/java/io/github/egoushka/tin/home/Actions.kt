@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
@@ -15,10 +16,10 @@ import android.widget.Toast
 import androidx.annotation.StringRes
 import io.github.egoushka.tin.home.signals.TinListener
 
-/** A dock slot: a Lucide icon and the default handler for one job, so the dock follows the user's app choices. */
 private const val APPROVALS_PACKAGE = "com.yehor.approvals"
 
-enum class Dock(val icon: String, @StringRes val label: Int, val intent: () -> Intent, val fallback: (() -> Intent)? = null) {
+/** One job of the dock and the system's default handler for it: what a slot holds until the user picks an app. */
+enum class DockDefault(val icon: String, @StringRes val label: Int, val intent: () -> Intent, val fallback: (() -> Intent)? = null) {
     Phone("phone", R.string.dock_phone, { Intent(Intent.ACTION_DIAL) }),
     Messages("msg", R.string.dock_messages, { Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MESSAGING) }),
     Camera("camera", R.string.dock_camera, { Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA) }),
@@ -39,9 +40,15 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
         }
     }
 
-    fun dock(d: Dock) {
+    fun dock(d: DockDefault) {
         val intent = d.intent().takeIf { it.resolveActivity(context.packageManager) != null } ?: d.fallback?.invoke() ?: d.intent()
         start(intent, context.getString(d.label))
+    }
+
+    /** The activity [d] opens now; null when nothing handles it or the system would ask which app ("android" is its chooser). */
+    fun handler(d: DockDefault): Pair<String, String>? {
+        val info = context.packageManager.resolveActivity(d.intent(), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo ?: return null
+        return if (info.packageName == "android") null else info.packageName to info.name
     }
 
     /** The grant that lets the glance and the music card read notifications and media sessions. */

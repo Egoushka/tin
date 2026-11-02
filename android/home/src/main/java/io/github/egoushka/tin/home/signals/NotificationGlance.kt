@@ -14,8 +14,8 @@ data class Note(
 
 data class AppCount(val pkg: String, val app: String, val kind: NoteKind, val count: Int)
 
-/** Unread counts per app (most first, [MAX_CHIPS] shown) and the latest message. */
-data class Glance(val apps: List<AppCount>, val latest: Note?, val total: Int) {
+/** Unread counts per app (most first, [MAX_CHIPS] shown), the latest message, and the count of every package for the dots. */
+data class Glance(val apps: List<AppCount>, val latest: Note?, val total: Int, val byPackage: Map<String, Int> = emptyMap()) {
     companion object {
         const val MAX_CHIPS = 3
         val Empty = Glance(emptyList(), null, 0)
@@ -27,7 +27,7 @@ data class Glance(val apps: List<AppCount>, val latest: Note?, val total: Int) {
                 AppCount(pkg, newest.app, newest.kind, list.size) to newest.whenMs
             }.sortedWith(compareByDescending<Pair<AppCount, Long>> { it.first.count }.thenByDescending { it.second })
                 .map { it.first }
-            return Glance(apps.take(MAX_CHIPS), notes.maxBy { it.whenMs }, notes.size)
+            return Glance(apps.take(MAX_CHIPS), notes.maxBy { it.whenMs }, notes.size, notes.groupingBy { it.pkg }.eachCount())
         }
     }
 }

@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
+import io.github.egoushka.tin.home.apps.AppPrefs
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Frost
@@ -47,7 +48,7 @@ class HomeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val store = TuneStore(applicationContext)
-        val apps = AppRepository(applicationContext)
+        val apps = AppRepository(applicationContext, AppPrefs(applicationContext))
         val signals = Signals.of(applicationContext)
         askBluetoothOnce()
 
