@@ -23,6 +23,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import android.text.format.DateFormat
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -36,6 +39,9 @@ import io.github.egoushka.tin.home.layer.Freshness
 import io.github.egoushka.tin.home.layer.LayerCard
 import io.github.egoushka.tin.home.layer.ageText
 import io.github.egoushka.tin.home.layer.rememberNow
+import io.github.egoushka.tin.home.signals.AlarmSource
+import io.github.egoushka.tin.home.signals.Agenda
+import io.github.egoushka.tin.home.signals.CalendarSource
 import io.github.egoushka.tin.home.signals.Glance
 import io.github.egoushka.tin.home.signals.MusicSource
 import io.github.egoushka.tin.home.signals.NoteKind
@@ -154,5 +160,88 @@ private fun Transport(icon: String, label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Image(Lucide.icon(icon, 24f, tune.strokeDp), null, Modifier.size(Dimen.glyphTile))
+    }
+}
+
+private fun clock(context: android.content.Context, ms: Long): String =
+    DateFormat.getTimeFormat(context).format(java.util.Date(ms))
+
+/** The rest of today: current event teal, clashes marked warn; asks for the calendar grant while it is missing. */
+@Composable
+fun TodayCard(calendar: CalendarSource, actions: Actions) {
+    val state by calendar.state.collectAsState()
+    val tune = LocalTune.current
+    val context = LocalContext.current
+    val now = rememberNow()
+    val label = stringResource(R.string.today)
+    if (!state.granted) {
+        if (state.at == 0L) return // first read not back yet; no flash of the prompt
+        LayerCard(label, null, CardLight(null), Modifier.clickable(role = Role.Button) { actions.askCalendar() }) {
+            Text(stringResource(R.string.calendar_access), style = NgType.title)
+            Text(stringResource(R.string.calendar_access_hint), style = NgType.body)
+        }
+        return
+    }
+    val agenda = Agenda.of(state.events, now)
+    val stale = Freshness.isStale(now, state.at, CalendarSource.INTERVAL_MS)
+    LayerCard(
+        label, Freshness.age(now, state.at),
+        CardLight(if (agenda.hasCurrent) Ng.signal else null, stale),
+    ) {
+        if (agenda.items.isEmpty()) {
+            Text(stringResource(R.string.today_empty), style = NgType.body)
+        } else {
+            agenda.items.forEach { row ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.signal else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space2))
+                    Text(
+                        row.event.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (row.clash) {
+                        val clash = stringResource(R.string.clash)
+                        Spacer(Modifier.width(Dimen.space2))
+                        Image(
+                            Lucide.icon("warn", 16f, tune.strokeDp, Ng.warn), null,
+                            Modifier.size(Dimen.glyphSmall).semantics { contentDescription = clash },
+                        )
+                    }
+                }
+            }
+            if (agenda.more > 0) Text(stringResource(R.string.today_more, agenda.more), style = NgType.body)
+        }
+    }
+}
+
+/** The next alarm clock; absent when none is set. */
+@Composable
+fun AlarmCard(alarm: AlarmSource) {
+    val next = alarm.next.collectAsState().value ?: return
+    val tune = LocalTune.current
+    val context = LocalContext.current
+    val locale = LocalConfiguration.current.locales[0]
+    val now = rememberNow()
+    val inMin = ((next - now) / 60_000).toInt().coerceAtLeast(0)
+    val relative = when {
+        inMin >= 24 * 60 -> null
+        inMin >= 60 -> stringResource(R.string.alarm_in_hm, inMin / 60, inMin % 60)
+        else -> stringResource(R.string.alarm_in_min, inMin)
+    }
+    val sameDay = java.time.Instant.ofEpochMilli(next).atZone(java.time.ZoneId.systemDefault()).toLocalDate() == java.time.LocalDate.now()
+    val at = if (sameDay) clock(context, next) else {
+        val pattern = DateFormat.getBestDateTimePattern(locale, if (DateFormat.is24HourFormat(context)) "EEEHm" else "EEEjm")
+        android.icu.text.SimpleDateFormat(pattern, locale).format(java.util.Date(next))
+    }
+    LayerCard("", null, CardLight(null)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(Lucide.icon("alarm", 20f, tune.strokeDp), null, Modifier.size(Dimen.glyph))
+            Spacer(Modifier.width(Dimen.space3))
+            Text(stringResource(R.string.alarm), style = NgType.body, modifier = Modifier.weight(1f))
+            Text(at, style = NgType.title)
+            if (relative != null) {
+                Spacer(Modifier.width(Dimen.space2))
+                Text(relative, style = NgType.body)
+            }
+        }
     }
 }

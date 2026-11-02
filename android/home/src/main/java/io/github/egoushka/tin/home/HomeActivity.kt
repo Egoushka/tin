@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -17,7 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
-import androidx.lifecycle.lifecycleScope
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Frost
@@ -34,6 +34,13 @@ class HomeActivity : ComponentActivity() {
     /** The open layer; HOME pressed while Home is in front closes it (stock launcher behaviour). */
     private var layer by mutableStateOf(Layer.Home)
 
+    private val calendarPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        Signals.of(applicationContext).calendar.refresh()
+        // A second refusal is final on Android; only the app's settings can still grant it.
+        if (!granted && !shouldShowRequestPermissionRationale(Manifest.permission.READ_CALENDAR)) actions.openAppSettings()
+    }
+    private val actions: Actions by lazy { Actions(this) { calendarPermission.launch(Manifest.permission.READ_CALENDAR) } }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val dark = SystemBarStyle.dark(Ng.bg.copy(alpha = 0f).toArgb())
         enableEdgeToEdge(statusBarStyle = dark, navigationBarStyle = dark)
@@ -41,8 +48,7 @@ class HomeActivity : ComponentActivity() {
 
         val store = TuneStore(applicationContext)
         val apps = AppRepository(applicationContext)
-        val actions = Actions(this)
-        val signals = Signals(applicationContext).also { it.start(lifecycleScope) }
+        val signals = Signals.of(applicationContext)
         askBluetoothOnce()
 
         setContent {

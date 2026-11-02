@@ -48,4 +48,13 @@
     <string name="music_next">Next track</string>
     <string name="music_prev">Previous track</string>
     <string name="buds_battery">Earbuds battery %1$s</string>
+    <string name="today">Today</string>
+    <string name="today_empty">Nothing else today</string>
+    <string name="today_more">+%d more</string>
+    <string name="calendar_access">Allow calendar access</string>
+    <string name="calendar_access_hint">Shows what is next today</string>
+    <string name="clash">Overlaps another event</string>
+    <string name="alarm">Alarm</string>
+    <string name="alarm_in_min">in %d min</string>
+    <string name="alarm_in_hm">in %1$d h %2$d min</string>
 </resources>

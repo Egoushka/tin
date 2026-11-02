@@ -49,4 +49,13 @@
     <string name="music_next">Наступний трек</string>
     <string name="music_prev">Попередній трек</string>
     <string name="buds_battery">Заряд навушників %1$s</string>
+    <string name="today">Сьогодні</string>
+    <string name="today_empty">Більше нічого на сьогодні</string>
+    <string name="today_more">ще %d</string>
+    <string name="calendar_access">Дозволити доступ до календаря</string>
+    <string name="calendar_access_hint">Покаже, що далі сьогодні</string>
+    <string name="clash">Перетинається з іншою подією</string>
+    <string name="alarm">Будильник</string>
+    <string name="alarm_in_min">за %d хв</string>
+    <string name="alarm_in_hm">за %1$d год %2$d хв</string>
 </resources>

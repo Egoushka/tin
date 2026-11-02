@@ -4,6 +4,9 @@
     <!-- Swipe down opens the notification shade (StatusBarManager). -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
+    <!-- Today card: remaining events of the day, read-only. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <!-- Earbud battery of the current audio output; asked once, the card works without it. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
