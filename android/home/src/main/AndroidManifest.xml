@@ -7,6 +7,9 @@
     <!-- Today card: remaining events of the day, read-only. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
+    <!-- Search bar: people by name. Asked by a tap on the people row, never by typing; Home works without it. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
     <!-- Needs-you card: the approvals app's read-only provider. The name is the one Home proposes to that app (its N1);
          it is signature-protected there, so it is granted only when both apps share a signer. -->
     <uses-permission android:name="com.yehor.approvals.permission.READ_NEEDS_YOU" />

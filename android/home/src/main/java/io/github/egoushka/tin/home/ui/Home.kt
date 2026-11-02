@@ -5,11 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -31,36 +28,40 @@ import androidx.compose.material3.Text
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import io.github.egoushka.tin.home.voice.Engines
 import io.github.egoushka.tin.home.voice.Voice
-import io.github.egoushka.tin.home.voice.VoiceIntent
 import io.github.egoushka.tin.home.voice.VoiceState
+import io.github.egoushka.tin.home.voice.ask
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -71,6 +72,7 @@ import io.github.egoushka.tin.home.Dock
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.signals.Signals
+import io.github.egoushka.tin.home.signals.WeatherSource
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Frost
 import io.github.egoushka.tin.home.theme.FrostRenderer
@@ -80,6 +82,10 @@ import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
 import io.github.egoushka.tin.home.theme.drawRoom
 import io.github.egoushka.tin.home.theme.glass
+import io.github.egoushka.tin.home.theme.plainClickable
+import io.github.egoushka.tin.home.theme.pressGlass
+import io.github.egoushka.tin.home.theme.pressable
+import io.github.egoushka.tin.home.theme.rememberAnimatorScale
 import io.github.egoushka.tin.home.tune.Tune
 import java.util.Date
 import kotlin.math.abs
@@ -109,20 +115,27 @@ fun HomeScreen(
         FrostRenderer(tune, size, frost)
         Home(tune, onLayer, actions, signals)
 
-        AnimatedVisibility(
-            visible = layer == Layer.Apps || layer == Layer.Search,
-            enter = slideInVertically(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))) { it / 3 } +
-                fadeIn(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))),
-            exit = slideOutVertically(tween(Motion.duration(Motion.BROKEN_IN, scale))) { it / 3 } +
-                fadeOut(tween(Motion.duration(Motion.BROKEN_IN, scale))),
-        ) {
-            Drawer(
-                apps = apps,
-                actions = actions,
-                focusSearch = layer == Layer.Search,
-                onClose = { onLayer(Layer.Home) },
-                onTune = { onLayer(Layer.Tune) },
-            )
+        // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
+        val open = layer == Layer.Apps || layer == Layer.Search
+        var drawerReady by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            withFrameNanos { }
+            drawerReady = true
+        }
+        LaunchedEffect(apps) { apps.keepLoaded() }
+        if (drawerReady || open) {
+            DrawerHost(open, scale) {
+                Drawer(
+                    apps = apps,
+                    actions = actions,
+                    open = open,
+                    focusSearch = layer == Layer.Search,
+                    onClose = { onLayer(Layer.Home) },
+                    onTune = { onLayer(Layer.Tune) },
+                    onAsk = { said -> actions.ask(said, signals.needsYou.state.value.needs) },
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -135,6 +148,30 @@ fun HomeScreen(
     }
 }
 
+/** Slides and fades [content] in and out with the layer motion; closed, it is measured but not placed or hit. */
+@Composable
+private fun DrawerHost(open: Boolean, scale: Float, content: @Composable () -> Unit) {
+    val shown by animateFloatAsState(
+        targetValue = if (open) 1f else 0f,
+        animationSpec = tween(Motion.duration(if (open) Motion.NEEDS_YOU_IN else Motion.BROKEN_IN, scale)),
+        label = "drawer",
+    )
+    val isOpen by rememberUpdatedState(open)
+    val placed by remember { derivedStateOf { isOpen || shown > 0f } }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .layout { measurable, constraints ->
+                val p = measurable.measure(constraints)
+                layout(p.width, p.height) { if (placed) p.place(0, 0) }
+            }
+            .graphicsLayer {
+                alpha = shown
+                translationY = (1f - shown) * size.height / 3f
+            },
+    ) { content() }
+}
+
 /** The stock launcher's job: glance, dock, search bar; gestures on empty space only. */
 @Composable
 private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals: Signals) {
@@ -145,13 +182,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
     val voice = remember { Voice(Engines.default(context)) }
     val scope = rememberCoroutineScope()
     val listen = {
-        val started = voice.start(scope) { said ->
-            when (val intent = VoiceIntent.of(said, signals.needsYou.state.value.needs)) {
-                is VoiceIntent.OpenItem -> actions.openItem(intent.deepLink)
-                VoiceIntent.OpenQueue -> actions.openApprovals()
-                is VoiceIntent.Search -> actions.webSearch(intent.query)
-            }
-        }
+        val started = voice.start(scope) { said -> actions.ask(said, signals.needsYou.state.value.needs) }
         if (!started && !actions.voice()) onLayer(Layer.Search)
     }
     Column(
@@ -180,7 +211,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
             .navigationBarsPadding()
             .padding(horizontal = Dimen.gutter),
     ) {
-        Glance(Modifier.padding(top = Dimen.space6))
+        Glance(signals.weather, Modifier.padding(top = Dimen.space6))
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
         Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
             NeedsYouCard(signals.needsYou, actions)
@@ -199,7 +230,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
 }
 
 @Composable
-private fun Glance(modifier: Modifier = Modifier) {
+private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -213,10 +244,13 @@ private fun Glance(modifier: Modifier = Modifier) {
     val date = Date(now)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock, modifier = Modifier.weight(1f))
-        Text(
-            android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
-            style = NgType.title, textAlign = TextAlign.End,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
+                style = NgType.title, textAlign = TextAlign.End,
+            )
+            WeatherLine(weather, now)
+        }
     }
 }
 
@@ -228,8 +262,7 @@ private fun DockRow(tune: Tune, actions: Actions) {
             Box(
                 Modifier
                     .size(Dimen.tile)
-                    .glass(CircleShape)
-                    .clickable(role = Role.Button) { actions.dock(d) }
+                    .pressGlass(CircleShape) { actions.dock(d) }
                     .semantics { contentDescription = label },
                 contentAlignment = Alignment.Center,
             ) {
@@ -256,7 +289,7 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
             .fillMaxWidth()
             .height(Dimen.tile)
             .glass(RoundedCornerShape(Dimen.radiusCard))
-            .combinedClickable(onClick = onOpen, onLongClick = onMic)
+            .plainClickable(onLongClick = onMic, onClick = onOpen)
             .padding(start = Dimen.space4, end = Dimen.space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -273,9 +306,9 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
         Box(
             Modifier
                 .size(Dimen.target)
+                .pressable(onClick = onMic)
                 .clip(CircleShape)
                 .background(Ng.accent)
-                .clickable(role = Role.Button, onClick = onMic)
                 .semantics { contentDescription = word },
             contentAlignment = Alignment.Center,
         ) {
@@ -313,14 +346,9 @@ private fun Dots(scale: Float) {
     }
 }
 
-/** System animator duration scale; 0 is reduced motion. */
+/** System animator duration scale, live; 0 is reduced motion. */
 @Composable
-fun animatorScale(): Float {
-    val resolver = LocalContext.current.contentResolver
-    return remember {
-        android.provider.Settings.Global.getFloat(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-    }
-}
+fun animatorScale(): Float = rememberAnimatorScale()
 
 /** Keeps [key] steady for a frame so a just-opened layer can request focus after it is attached. */
 @Composable
