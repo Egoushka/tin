@@ -30,6 +30,9 @@
 - Speech: `cd android && ./gradlew :speech:testDebugUnitTest` (no phone). On the phone: `[speech] enabled = true` in
   the policy, `./scripts/speech-push-model.sh`, open tin, then `uv run scripts/speech-check.py` (S7) and
   `--mic 5` (S8). Both scripts exit 2 with "no device" when no phone is attached.
+- Home's mic: the debug build keeps a scripted engine; `./gradlew :home:installDebug -Ptin.voice=real` makes it bind tin's
+  `VoiceService`. Both APKs need one signer or the `VOICE` permission is not granted and the mic falls back to the
+  assistant. `tin.voice.uses` (a count, never text) lives in Home's DataStore `tin.voice`.
 - CI (`.github/workflows/ci.yml`): `cargo test`, `scripts/build.sh` (APK), `:speech:testDebugUnitTest`.
 
 ## Rules
