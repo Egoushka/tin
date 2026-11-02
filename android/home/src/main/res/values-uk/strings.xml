@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tin Home</string>
+    <string name="date_skeleton">EEEdMMMM</string>
+    <string name="search_hint">Шукай або спитай</string>
+    <string name="search_web">Шукати в мережі «%1$s»</string>
+    <string name="all_apps">Усі застосунки</string>
+    <string name="no_apps">Жоден застосунок не збігається</string>
+    <string name="mic">Говорити</string>
+    <string name="open_failed">Не вдалося відкрити %1$s</string>
+    <string name="close">Закрити</string>
+    <string name="dock_phone">Телефон</string>
+    <string name="dock_messages">Повідомлення</string>
+    <string name="dock_camera">Камера</string>
+    <string name="dock_browser">Браузер</string>
+    <string name="dock_maps">Карти</string>
+    <string name="tune">Налаштувати</string>
+    <string name="tune_preset">Набір</string>
+    <string name="preset_default">Типово</string>
+    <string name="preset_bedside">Біля ліжка</string>
+    <string name="preset_battery">Батарея</string>
+    <string name="preset_deep">Глибока робота</string>
+    <string name="tune_attention">Колір уваги</string>
+    <string name="attn_violet">Фіолетовий</string>
+    <string name="attn_blue">Синій</string>
+    <string name="attn_rose">Рожевий</string>
+    <string name="attn_amber">Бурштиновий</string>
+    <string name="tune_room">Світло кімнати</string>
+    <string name="tune_frost">Матовість</string>
+    <string name="tune_tint">Тонування скла</string>
+    <string name="tune_density">Щільність</string>
+    <string name="tune_stroke">Товщина іконок</string>
+    <string name="tune_focus">Фокус</string>
+    <string name="tune_reset">Скинути</string>
+    <plurals name="tune_changed">
+        <item quantity="one">%d зміна від типових</item>
+        <item quantity="few">%d зміни від типових</item>
+        <item quantity="many">%d змін від типових</item>
+        <item quantity="other">%d зміни від типових</item>
+    </plurals>
+</resources>
