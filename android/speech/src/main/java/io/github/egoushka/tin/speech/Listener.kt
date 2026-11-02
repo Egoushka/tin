@@ -13,15 +13,26 @@ class Listener(
     /**
      * One voice command: reads [source] until the first speech segment ends or [maxSeconds] of audio have passed,
      * whichever comes first; a segment still open at the limit is cut there. Silence gives empty text.
+     * [onSegment] runs once, when the segment is closed and before it is decoded. [cancelled] is checked before
+     * every chunk; once it is true the command ends with empty text and nothing is decoded.
      */
     @Synchronized
-    fun command(source: AudioSource, maxSeconds: Double): Heard {
+    fun command(
+        source: AudioSource,
+        maxSeconds: Double,
+        onSegment: () -> Unit = {},
+        cancelled: () -> Boolean = { false },
+    ): Heard {
         vad.reset()
         val limit = (maxSeconds * SAMPLE_RATE).toLong()
         val buffer = FloatArray(chunkSamples)
         var read = 0L
         var segment: FloatArray? = null
         while (segment == null && read < limit) {
+            if (cancelled()) {
+                vad.reset()
+                return Heard("", 0.0, 0)
+            }
             val n = source.read(buffer)
             if (n <= 0) break
             vad.accept(buffer.copyOf(n))
@@ -33,7 +44,9 @@ class Listener(
             segment = vad.poll()
         }
         vad.reset()
-        return segment?.let(::decode) ?: Heard("", 0.0, 0)
+        if (segment == null) return Heard("", 0.0, 0)
+        onSegment()
+        return decode(segment)
     }
 
     /**
