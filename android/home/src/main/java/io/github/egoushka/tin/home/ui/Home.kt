@@ -258,8 +258,9 @@ private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier, action
         },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock, modifier = Modifier.weight(1f))
-        Column(horizontalAlignment = Alignment.End) {
+        // The clock is measured first: weighted, the wide uk date left it too little room at font scale 2.0 ("01:3|0").
+        Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock)
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text(
                 android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
                 style = NgType.title, textAlign = TextAlign.End,

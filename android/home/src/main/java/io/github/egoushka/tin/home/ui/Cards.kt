@@ -331,7 +331,9 @@ fun AlarmCard(alarm: AlarmSource) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(Lucide.icon("alarm", 20f, tune.strokeDp), null, Modifier.size(Dimen.glyph))
             Spacer(Modifier.width(Dimen.space3))
-            Text(stringResource(R.string.alarm), style = NgType.body, modifier = Modifier.weight(1f))
+            // Measured first: at font scale 2.0 a weighted label got the leftovers and broke mid-word ("Alar|m").
+            Text(stringResource(R.string.alarm), style = NgType.body)
+            Spacer(Modifier.weight(1f))
             Text(at, style = NgType.title)
             if (relative != null) {
                 Spacer(Modifier.width(Dimen.space2))
