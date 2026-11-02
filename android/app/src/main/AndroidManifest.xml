@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Binding VoiceService (Home's mic): only apps signed with tin's key. -->
+    <permission
+        android:name="io.github.egoushka.tin.permission.VOICE"
+        android:protectionLevel="signature" />
+
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
@@ -23,6 +28,11 @@
             android:name=".SpeechService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".VoiceService"
+            android:exported="true"
+            android:permission="io.github.egoushka.tin.permission.VOICE" />
 
         <service
             android:name=".PushToTalkTile"
