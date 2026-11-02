@@ -38,8 +38,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import io.github.egoushka.tin.home.voice.Voice
-import io.github.egoushka.tin.home.voice.VoiceIntent
 import io.github.egoushka.tin.home.voice.VoiceState
+import io.github.egoushka.tin.home.voice.ask
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -73,6 +73,7 @@ import io.github.egoushka.tin.home.Dock
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.signals.Signals
+import io.github.egoushka.tin.home.signals.WeatherSource
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Frost
 import io.github.egoushka.tin.home.theme.FrostRenderer
@@ -133,6 +134,7 @@ fun HomeScreen(
                     focusSearch = layer == Layer.Search,
                     onClose = { onLayer(Layer.Home) },
                     onTune = { onLayer(Layer.Tune) },
+                    onAsk = { said -> actions.ask(said, signals.needsYou.state.value.needs) },
                 )
             }
         }
@@ -180,13 +182,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
     val voice = remember { Voice() }
     val scope = rememberCoroutineScope()
     val listen = {
-        val started = voice.start(scope) { said ->
-            when (val intent = VoiceIntent.of(said, signals.needsYou.state.value.needs)) {
-                is VoiceIntent.OpenItem -> actions.openItem(intent.deepLink)
-                VoiceIntent.OpenQueue -> actions.openApprovals()
-                is VoiceIntent.Search -> actions.webSearch(intent.query)
-            }
-        }
+        val started = voice.start(scope) { said -> actions.ask(said, signals.needsYou.state.value.needs) }
         if (!started && !actions.voice()) onLayer(Layer.Search)
     }
     Column(
@@ -215,7 +211,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
             .navigationBarsPadding()
             .padding(horizontal = Dimen.gutter),
     ) {
-        Glance(Modifier.padding(top = Dimen.space6), actions, onLayer)
+        Glance(signals.weather, Modifier.padding(top = Dimen.space6), actions, onLayer)
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
         Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
             NeedsYouCard(signals.needsYou, actions)
@@ -234,7 +230,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
 }
 
 @Composable
-private fun Glance(modifier: Modifier = Modifier, actions: Actions, onLayer: (Layer) -> Unit) {
+private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier, actions: Actions, onLayer: (Layer) -> Unit) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -263,10 +259,13 @@ private fun Glance(modifier: Modifier = Modifier, actions: Actions, onLayer: (La
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock, modifier = Modifier.weight(1f))
-        Text(
-            android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
-            style = NgType.title, textAlign = TextAlign.End,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
+                style = NgType.title, textAlign = TextAlign.End,
+            )
+            WeatherLine(weather, now)
+        }
     }
 }
 

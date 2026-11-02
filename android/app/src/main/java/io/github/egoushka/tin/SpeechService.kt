@@ -123,6 +123,35 @@ class SpeechService : Service() {
 
     @Volatile private var recordStartedAt = 0L
 
+    /** Whether a voice command can run now: the model is loaded. */
+    fun ready(): Boolean = listener != null
+
+    sealed interface Command {
+        data class Heard(val text: String) : Command
+        data class Failed(val reason: String) : Command
+    }
+
+    /**
+     * One voice command for [VoiceService]: holds [SpeechServer.micBusy] like the shell's transcribe, so it never
+     * overlaps push-to-talk. [onRecording] runs once the mic is open; [onSegment] and [cancelled] go to
+     * [Listener.command]. Neither audio nor text is logged.
+     */
+    fun command(seconds: Double, onRecording: () -> Unit, onSegment: () -> Unit, cancelled: () -> Boolean): Command {
+        val engine = listener ?: return Command.Failed("speech model not loaded")
+        if (!server.micBusy.compareAndSet(false, true)) return Command.Failed("mic busy")
+        return try {
+            MicSource().use { mic ->
+                onRecording()
+                Command.Heard(engine.command(mic, seconds, onSegment, cancelled).text)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "voice command failed: ${e.javaClass.simpleName}")
+            Command.Failed("voice command failed")
+        } finally {
+            server.micBusy.set(false)
+        }
+    }
+
     private fun decode(audio: FloatArray) {
         update("decoding")
         thread(name = "ptt-decode") {
