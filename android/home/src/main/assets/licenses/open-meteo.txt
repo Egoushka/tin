@@ -1,0 +1,6 @@
+Weather data by Open-Meteo.com (https://open-meteo.com), licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/).
+
+Tin Home reads the current temperature, weather code and day/night flag for Kyiv from
+https://api.open-meteo.com/v1/forecast, for private, non-commercial use under Open-Meteo's free-tier terms
+(https://open-meteo.com/en/terms).
