@@ -74,6 +74,7 @@ import io.github.egoushka.tin.home.Dock
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.signals.Signals
+import io.github.egoushka.tin.home.signals.WeatherSource
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Frost
 import io.github.egoushka.tin.home.theme.FrostRenderer
@@ -207,7 +208,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
             .navigationBarsPadding()
             .padding(horizontal = Dimen.gutter),
     ) {
-        Glance(Modifier.padding(top = Dimen.space6))
+        Glance(signals.weather, Modifier.padding(top = Dimen.space6))
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
         Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
             NeedsYouCard(signals.needsYou, actions)
@@ -226,7 +227,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
 }
 
 @Composable
-private fun Glance(modifier: Modifier = Modifier) {
+private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -240,10 +241,13 @@ private fun Glance(modifier: Modifier = Modifier) {
     val date = Date(now)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock, modifier = Modifier.weight(1f))
-        Text(
-            android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
-            style = NgType.title, textAlign = TextAlign.End,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
+                style = NgType.title, textAlign = TextAlign.End,
+            )
+            WeatherLine(weather, now)
+        }
     }
 }
 
