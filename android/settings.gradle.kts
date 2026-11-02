@@ -13,3 +13,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "tin"
 include(":app")
+include(":home")
