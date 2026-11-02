@@ -1,0 +1,44 @@
+# Policy for the Mac checks M1-M3 (scripts/mac-check.py): the four read tools and one App Intent run at once; kill,
+# quit_app and unload_agent wait for a tap in the approvals app. Fill in the [approvals] table before using a write
+# verb; without it they are refused. Copy to ~/.config/tin/policy.toml.
+
+[[allow]]
+package = "system"
+function = "memory"
+
+[[allow]]
+package = "system"
+function = "processes"
+
+[[allow]]
+package = "system"
+function = "stale_processes"
+
+[[allow]]
+package = "system"
+function = "launch_agents"
+
+[[allow]]                     # write verbs: always held for approval
+package = "system"
+function = "kill"
+
+[[allow]]
+package = "system"
+function = "quit_app"
+
+[[allow]]
+package = "system"
+function = "unload_agent"
+
+[[allow]]                     # M2: imported once with `tin shortcut com.sindresorhus.Week-Number GetWeekNumberIntent`
+package = "com.sindresorhus.Week-Number"
+function = "GetWeekNumberIntent"
+read_only = true
+
+# [approvals]
+# url = "http://<approvals server tailnet ip>:<port>"
+# source = "tin"
+# token_file = "~/.config/tin/approvals.token"   # the approvals source token for "tin", mode 600
+# key_file = "~/.config/tin/approvals.key"       # APPROVAL_HMAC_KEY, mode 600
+# callback = "https://tin.mac.invalid/approvals/"
+# callback_listen = "<mac tailnet ip>:7382"

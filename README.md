@@ -7,7 +7,7 @@
 
 # tin
 
-> Lets AI agents use an Android phone through MCP: every app's AppFunctions and the phone's own state (notifications, usage, screen text) become typed tools, nothing changes without a tap in the approvals app, and payments never run.
+> Lets AI agents use an Android phone or a Mac through MCP: every app's AppFunctions or App Intents and the device's own state (notifications, screen text, memory, stale processes) become typed tools, nothing changes without a tap in the approvals app, and payments never run.
 
 <!-- readme:status:start -->
 **Active**. I work on it this month.
@@ -53,6 +53,17 @@ computer to call those same typed functions on my own phone, with a hard rule th
   the phone's owner taps Run in the [approvals](https://github.com/Egoushka/approvals) app. The decision comes back
   signed (HMAC-SHA256) to a listener that serves nothing else. Without an approvals server such calls are refused.
 
+On a Mac the same core serves a second backend:
+
+- Every App Intent that installed apps publish (`extract.actionsdata` under `/Applications` and
+  `/System/Applications`) becomes a tool with a JSON Schema: 232 tools from 32 bundles on my Mac. An intent runs
+  through a one-action shortcut that `tin shortcut` writes and signs; it has to be added to Shortcuts once, by hand.
+  Intent parameters are not passed yet.
+- Mac system tools: `system__memory` (RAM, pressure, swap), `system__processes` (top by resident memory),
+  `system__stale_processes` (leftover MSBuild nodes, VBCSCompiler, vstest and test hosts; above a swap threshold it
+  proposes kills), `system__launch_agents`, and the held write verbs `system__kill` (checks the process start time
+  again, so a reused pid is never killed), `system__quit_app` and `system__unload_agent` (never `com.apple.`).
+
 Not here: the phone dialing out to a server, other users or work profiles, iOS.
 
 ## Quick start
@@ -80,6 +91,22 @@ uv run scripts/accept.py --policy demo --alarm 13:37
 
 Without the app, `adb shell /data/local/tmp/tin/bin/tin serve --stdio` speaks MCP over stdin and stdout, and
 `tin list --all` shows every function and what the policy decides for it.
+
+On a Mac, with Rust installed:
+
+```bash
+cargo build
+mkdir -p ~/.config/tin && cp examples/macos-policy.toml ~/.config/tin/policy.toml
+./target/debug/tin list --all                        # every App Intent and system verb, and the policy's verdict
+uv run scripts/mac-check.py --count --read           # M1 and M3
+```
+
+An MCP client runs `target/debug/tin serve --stdio`. To call an intent, write its shortcut and add it once:
+
+```bash
+./target/debug/tin shortcut com.sindresorhus.Week-Number GetWeekNumberIntent --out .
+open "tin com.sindresorhus.Week-Number.GetWeekNumberIntent.shortcut"   # tap Add Shortcut
+```
 
 ## How it works
 
@@ -124,6 +151,10 @@ the 1.4 s is the function itself: an unknown function fails in 89–129 ms, so `
   function and one money function that stays refused.
 - [examples/system-policy.toml](examples/system-policy.toml): the six read tools, one held write verb and the
   `[approvals]` table, for `scripts/system-check.py`.
+- [docs/specs/2026-11-02-macos-backend.md](docs/specs/2026-11-02-macos-backend.md): the macOS backend, checks M1–M5
+  and their results.
+- [examples/macos-policy.toml](examples/macos-policy.toml): the Mac read tools, the held write verbs and one intent,
+  for `scripts/mac-check.py`.
 - [AGENTS.md](AGENTS.md): build and test commands, rules for changing the code.
 
 <!-- readme:footer:start -->

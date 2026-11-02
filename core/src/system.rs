@@ -13,22 +13,25 @@ pub struct Verb {
     pub name: &'static str,
     pub read_only: bool,
     pub description: &'static str,
+    pub ops: &'static Ops,
 }
 
 pub const VERBS: &[Verb] = &[
-    Verb { name: "notifications", read_only: true, description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter." },
-    Verb { name: "usage", read_only: true, description: "Today's foreground time and last use per app, most used first (`limit`, default 20)." },
-    Verb { name: "foreground_app", read_only: true, description: "The app and activity on screen now." },
-    Verb { name: "screen_text", read_only: true, description: "Text and content descriptions on screen now (uiautomator), with bounds. Refused while a banking app is in front." },
-    Verb { name: "battery", read_only: true, description: "Battery level, status, plug, temperature, health, voltage." },
-    Verb { name: "connectivity", read_only: true, description: "Default network's transports and validation, every network's transports, airplane mode." },
-    Verb { name: "tap", read_only: false, description: "Tap the screen at x, y (pixels)." },
-    Verb { name: "swipe", read_only: false, description: "Swipe from x1, y1 to x2, y2 over `ms` milliseconds (default 300)." },
-    Verb { name: "type_text", read_only: false, description: "Type text into the focused field (ASCII; `input text`)." },
-    Verb { name: "key", read_only: false, description: "Press a key: KEYCODE_HOME, KEYCODE_BACK, KEYCODE_ENTER, ..." },
-    Verb { name: "launch", read_only: false, description: "Open an app by package name." },
-    Verb { name: "settings_put", read_only: false, description: "Set a value in Android settings (namespace system, secure or global)." },
+    Verb { name: "notifications", read_only: true, description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter.", ops: &ANDROID },
+    Verb { name: "usage", read_only: true, description: "Today's foreground time and last use per app, most used first (`limit`, default 20).", ops: &ANDROID },
+    Verb { name: "foreground_app", read_only: true, description: "The app and activity on screen now.", ops: &ANDROID },
+    Verb { name: "screen_text", read_only: true, description: "Text and content descriptions on screen now (uiautomator), with bounds. Refused while a banking app is in front.", ops: &ANDROID },
+    Verb { name: "battery", read_only: true, description: "Battery level, status, plug, temperature, health, voltage.", ops: &ANDROID },
+    Verb { name: "connectivity", read_only: true, description: "Default network's transports and validation, every network's transports, airplane mode.", ops: &ANDROID },
+    Verb { name: "tap", read_only: false, description: "Tap the screen at x, y (pixels).", ops: &ANDROID },
+    Verb { name: "swipe", read_only: false, description: "Swipe from x1, y1 to x2, y2 over `ms` milliseconds (default 300).", ops: &ANDROID },
+    Verb { name: "type_text", read_only: false, description: "Type text into the focused field (ASCII; `input text`).", ops: &ANDROID },
+    Verb { name: "key", read_only: false, description: "Press a key: KEYCODE_HOME, KEYCODE_BACK, KEYCODE_ENTER, ...", ops: &ANDROID },
+    Verb { name: "launch", read_only: false, description: "Open an app by package name.", ops: &ANDROID },
+    Verb { name: "settings_put", read_only: false, description: "Set a value in Android settings (namespace system, secure or global).", ops: &ANDROID },
 ];
+
+pub const INSTRUCTIONS: &str = "Android AppFunctions and system tools on this phone. Only what the phone's policy allows is listed. Read-only tools run at once; anything that changes state waits for a tap in the approvals app (call approval__wait with the ticket if the first wait runs out). Functions that move money are refused.";
 
 pub fn verb(name: &str) -> Option<&'static Verb> {
     VERBS.iter().find(|v| v.name == name)
@@ -46,8 +49,47 @@ impl Verb {
     }
 
     pub fn input_schema(&self) -> Value {
+        (self.ops.schema)(self)
+    }
+
+    /// The argv a write verb runs, after validating every argument. Read verbs have no single argv.
+    pub fn argv(&self, args: &Value) -> Result<Vec<String>, String> {
+        (self.ops.argv)(self, args)
+    }
+
+    /// One line for the approvals item's title: what will happen. May read state through `shell` to name the target.
+    pub fn describe(&self, args: &Value, shell: Shell) -> String {
+        (self.ops.describe)(self, args, shell)
+    }
+
+    /// Runs the verb. Write verbs must only be reached after an approval; the server enforces that.
+    pub fn run(&self, args: &Value, shell: Shell) -> Result<Value, String> {
+        (self.ops.run)(self, args, shell)
+    }
+}
+
+/// How one platform's verbs build their schema and argv, describe a held call, and run.
+pub struct Ops {
+    pub schema: fn(&Verb) -> Value,
+    pub argv: fn(&Verb, &Value) -> Result<Vec<String>, String>,
+    pub describe: fn(&Verb, &Value, Shell) -> String,
+    pub run: fn(&Verb, &Value, Shell) -> Result<Value, String>,
+}
+
+impl std::fmt::Debug for Ops {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("Ops")
+    }
+}
+
+const ANDROID: Ops = Ops { schema: android::schema, argv: android::argv, describe: android::describe, run: android::run };
+
+mod android {
+    use super::*;
+
+    pub(super) fn schema(v: &Verb) -> Value {
         let int = |d: &str| json!({ "type": "integer", "minimum": 0, "maximum": MAX_COORD, "description": d });
-        let (props, required): (Value, &[&str]) = match self.name {
+        let (props, required): (Value, &[&str]) = match v.name {
             "notifications" => (json!({ "package": { "type": "string", "description": "only this app's notifications" } }), &[]),
             "usage" => (json!({ "limit": { "type": "integer", "minimum": 1, "maximum": 200 } }), &[]),
             "tap" => (json!({ "x": int("pixels from the left"), "y": int("pixels from the top") }), &["x", "y"]),
@@ -72,9 +114,9 @@ impl Verb {
     }
 
     /// The argv a write verb runs, after validating every argument. Read verbs have no single argv.
-    pub fn argv(&self, args: &Value) -> Result<Vec<String>, String> {
+    pub(super) fn argv(v: &Verb, args: &Value) -> Result<Vec<String>, String> {
         let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        match self.name {
+        match v.name {
             "tap" => Ok(a(&["input", "tap", &coord(args, "x")?, &coord(args, "y")?])),
             "swipe" => {
                 let ms = if args.get("ms").is_some() { coord(args, "ms")? } else { "300".into() };
@@ -112,9 +154,9 @@ impl Verb {
     }
 
     /// One line for the approvals item's title: what will happen on the phone.
-    pub fn describe(&self, args: &Value) -> String {
+    pub(super) fn describe(v: &Verb, args: &Value, _: Shell) -> String {
         let s = |k: &str| args.get(k).map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())).unwrap_or_default();
-        match self.name {
+        match v.name {
             "tap" => format!("tap at ({}, {})", s("x"), s("y")),
             "swipe" => format!("swipe from ({}, {}) to ({}, {})", s("x1"), s("y1"), s("x2"), s("y2")),
             "type_text" => format!("type \"{}\"", clip(&s("text"), 120)),
@@ -126,9 +168,9 @@ impl Verb {
     }
 
     /// Runs the verb. Write verbs must only be reached after an approval; the server enforces that.
-    pub fn run(&self, args: &Value, shell: Shell) -> Result<Value, String> {
+    pub(super) fn run(v: &Verb, args: &Value, shell: Shell) -> Result<Value, String> {
         let run = |argv: &[&str]| shell(argv[0], &argv[1..].iter().map(|s| s.to_string()).collect::<Vec<_>>());
-        match self.name {
+        match v.name {
             "notifications" => {
                 let only = args.get("package").and_then(Value::as_str);
                 let list: Vec<Value> = parse_notifications(&run(&["dumpsys", "notification", "--noredact"])?)
@@ -170,9 +212,9 @@ impl Verb {
                 Ok(c)
             }
             _ => {
-                let argv = self.argv(args)?;
+                let argv = argv(v, args)?;
                 let out = shell(&argv[0], &argv[1..])?;
-                if self.name == "launch" && out.contains("No activities found") {
+                if v.name == "launch" && out.contains("No activities found") {
                     return Err(format!("no launcher activity in {}", argv[2]));
                 }
                 Ok(json!({ "ok": true, "output": out.trim() }))
