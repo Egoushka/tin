@@ -14,37 +14,17 @@ import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.LruCache
-import java.text.Normalizer
-import java.util.Locale
+import io.github.egoushka.tin.home.search.Fold
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.withContext
 
 data class AppEntry(val label: String, val component: ComponentName, val user: UserHandle?) {
     val key: String get() = "${component.flattenToShortString()}#${user?.hashCode() ?: 0}"
-}
-
-/** Search over app labels: prefix beats word start beats substring; case and diacritics are ignored. */
-object AppSearch {
-    fun normalize(s: String): String =
-        Normalizer.normalize(s.lowercase(Locale.ROOT), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
-
-    fun rank(label: String, query: String): Int? {
-        val l = normalize(label)
-        val q = normalize(query.trim())
-        if (q.isEmpty()) return 3
-        return when {
-            l.startsWith(q) -> 0
-            l.split(Regex("[\\s\\-_.:]+")).any { it.startsWith(q) } -> 1
-            l.contains(q) -> 2
-            else -> null
-        }
-    }
-
-    fun <T> filter(items: List<T>, query: String, label: (T) -> String): List<T> =
-        items.mapNotNull { item -> rank(label(item), query)?.let { it to item } }
-            .sortedWith(compareBy<Pair<Int, T>> { it.first }.thenBy { normalize(label(it.second)) })
-            .map { it.second }
 }
 
 class AppRepository(private val context: Context) {
@@ -56,7 +36,17 @@ class AppRepository(private val context: Context) {
         launcherApps.getActivityList(null, user)
             .filter { it.componentName.packageName != context.packageName }
             .map { AppEntry(it.label.toString(), it.componentName, user.takeIf { u -> u != Process.myUserHandle() }) }
-    }.sortedBy { AppSearch.normalize(it.label) }
+    }.sortedBy { Fold.of(it.label) }
+
+    private val loaded = MutableStateFlow<List<AppEntry>>(emptyList())
+
+    /** The app list, kept current by [keepLoaded] so the drawer opens with it instead of loading on first open. */
+    val list: StateFlow<List<AppEntry>> = loaded
+
+    suspend fun keepLoaded() = changes().collect { loaded.value = withContext(Dispatchers.IO) { load() } }
+
+    /** Draws every icon into the cache ahead of the drawer. */
+    suspend fun warm(px: Int, tint: Int) = withContext(Dispatchers.IO) { loaded.value.forEach { icon(it, px, tint) } }
 
     /** Emits once now and again on every install, removal or change. */
     fun changes(): Flow<Unit> = callbackFlow {
@@ -77,6 +67,9 @@ class AppRepository(private val context: Context) {
     }
 
     private val icons = LruCache<String, Bitmap>(256)
+
+    /** The icon if it is already drawn; never blocks. */
+    fun cachedIcon(app: AppEntry, px: Int): Bitmap? = icons.get("${app.key}@$px")
 
     /**
      * The themed monochrome icon drawn in [tint] (Icons card: third-party apps in `ink` on the glass tile); apps
