@@ -5,8 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.combinedClickable
@@ -44,16 +43,21 @@ import io.github.egoushka.tin.home.voice.VoiceState
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -108,20 +112,26 @@ fun HomeScreen(
         FrostRenderer(tune, size, frost)
         Home(tune, onLayer, actions, signals)
 
-        AnimatedVisibility(
-            visible = layer == Layer.Apps || layer == Layer.Search,
-            enter = slideInVertically(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))) { it / 3 } +
-                fadeIn(tween(Motion.duration(Motion.NEEDS_YOU_IN, scale))),
-            exit = slideOutVertically(tween(Motion.duration(Motion.BROKEN_IN, scale))) { it / 3 } +
-                fadeOut(tween(Motion.duration(Motion.BROKEN_IN, scale))),
-        ) {
-            Drawer(
-                apps = apps,
-                actions = actions,
-                focusSearch = layer == Layer.Search,
-                onClose = { onLayer(Layer.Home) },
-                onTune = { onLayer(Layer.Tune) },
-            )
+        // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
+        val open = layer == Layer.Apps || layer == Layer.Search
+        var drawerReady by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            withFrameNanos { }
+            drawerReady = true
+        }
+        LaunchedEffect(apps) { apps.keepLoaded() }
+        if (drawerReady || open) {
+            DrawerHost(open, scale) {
+                Drawer(
+                    apps = apps,
+                    actions = actions,
+                    open = open,
+                    focusSearch = layer == Layer.Search,
+                    onClose = { onLayer(Layer.Home) },
+                    onTune = { onLayer(Layer.Tune) },
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -132,6 +142,30 @@ fun HomeScreen(
             TuneSheet(tune = tune, onChange = onTune, onClose = { onLayer(Layer.Home) })
         }
     }
+}
+
+/** Slides and fades [content] in and out with the layer motion; closed, it is measured but not placed or hit. */
+@Composable
+private fun DrawerHost(open: Boolean, scale: Float, content: @Composable () -> Unit) {
+    val shown by animateFloatAsState(
+        targetValue = if (open) 1f else 0f,
+        animationSpec = tween(Motion.duration(if (open) Motion.NEEDS_YOU_IN else Motion.BROKEN_IN, scale)),
+        label = "drawer",
+    )
+    val isOpen by rememberUpdatedState(open)
+    val placed by remember { derivedStateOf { isOpen || shown > 0f } }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .layout { measurable, constraints ->
+                val p = measurable.measure(constraints)
+                layout(p.width, p.height) { if (placed) p.place(0, 0) }
+            }
+            .graphicsLayer {
+                alpha = shown
+                translationY = (1f - shown) * size.height / 3f
+            },
+    ) { content() }
 }
 
 /** The stock launcher's job: glance, dock, search bar; gestures on empty space only. */
