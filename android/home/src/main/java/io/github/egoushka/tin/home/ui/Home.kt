@@ -28,6 +28,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import io.github.egoushka.tin.home.voice.Voice
+import io.github.egoushka.tin.home.voice.VoiceIntent
+import io.github.egoushka.tin.home.voice.VoiceState
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -126,6 +140,18 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
     val density = LocalDensity.current
     val edge = with(density) { Dimen.backEdge.toPx() }
     val travel = with(density) { Dimen.target.toPx() } // one target's travel opens a layer
+    val voice = remember { Voice() }
+    val scope = rememberCoroutineScope()
+    val listen = {
+        val started = voice.start(scope) { said ->
+            when (val intent = VoiceIntent.of(said, signals.needsYou.state.value.needs)) {
+                is VoiceIntent.OpenItem -> actions.openItem(intent.deepLink)
+                VoiceIntent.OpenQueue -> actions.openApprovals()
+                is VoiceIntent.Search -> actions.webSearch(intent.query)
+            }
+        }
+        if (!started && !actions.voice()) onLayer(Layer.Search)
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -165,7 +191,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
         Spacer(Modifier.weight(1f))
         DockRow(tune, actions)
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
-        SearchBar(tune, onOpen = { onLayer(Layer.Search) }, onMic = { if (!actions.voice()) onLayer(Layer.Search) })
+        SearchBar(tune, voice.state, onOpen = { onLayer(Layer.Search) }, onMic = listen)
         Spacer(Modifier.height(Dimen.space2))
     }
 }
@@ -212,20 +238,35 @@ private fun DockRow(tune: Tune, actions: Actions) {
 }
 
 @Composable
-private fun SearchBar(tune: Tune, onOpen: () -> Unit, onMic: () -> Unit) {
-    val mic = stringResource(R.string.mic)
+private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () -> Unit, onMic: () -> Unit) {
+    val state by voiceState.collectAsState()
+    val scale = animatorScale()
+    val word = when (state) {
+        VoiceState.Idle -> stringResource(R.string.mic)
+        VoiceState.Listening -> stringResource(R.string.voice_listening)
+        VoiceState.Thinking -> stringResource(R.string.voice_thinking)
+        VoiceState.Error -> stringResource(R.string.voice_error)
+    }
+    // Shape and speed carry the state; colour only marks an error (cards/VoiceStates.md).
+    val ink = if (state == VoiceState.Error) Ng.bad else Ng.ink2
     Row(
         Modifier
             .fillMaxWidth()
             .height(Dimen.tile)
             .glass(RoundedCornerShape(Dimen.radiusCard))
-            .clickable(onClick = onOpen)
+            .combinedClickable(onClick = onOpen, onLongClick = onMic)
             .padding(start = Dimen.space4, end = Dimen.space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Image(Lucide.icon("search", 20f, tune.strokeDp), contentDescription = null, Modifier.size(Dimen.glyph))
         Spacer(Modifier.width(Dimen.space3))
-        Text(stringResource(R.string.search_hint), style = NgType.title.copy(color = Ng.ink2), modifier = Modifier.weight(1f))
+        Text(
+            if (state == VoiceState.Idle) stringResource(R.string.search_hint) else word,
+            style = NgType.title.copy(color = ink),
+            modifier = Modifier.weight(1f).semantics { if (state != VoiceState.Idle) liveRegion = LiveRegionMode.Polite },
+        )
+        if (state == VoiceState.Listening) Bars(scale) else if (state == VoiceState.Thinking) Dots(scale)
+        Spacer(Modifier.width(Dimen.space2))
         // The mic is white at rest: primary actions carry no colour (Night glass README).
         Box(
             Modifier
@@ -233,10 +274,39 @@ private fun SearchBar(tune: Tune, onOpen: () -> Unit, onMic: () -> Unit) {
                 .clip(CircleShape)
                 .background(Ng.accent)
                 .clickable(role = Role.Button, onClick = onMic)
-                .semantics { contentDescription = mic },
+                .semantics { contentDescription = word },
             contentAlignment = Alignment.Center,
         ) {
             Image(Lucide.icon("mic", 20f, tune.strokeDp, Ng.onAccent), contentDescription = null, Modifier.size(Dimen.glyph))
+        }
+    }
+}
+
+/** Listening: four bars rising and falling out of step. Still, at mid height, with reduced motion. */
+@Composable
+private fun Bars(scale: Float) {
+    val t = rememberInfiniteTransition(label = "bars")
+    Row(Modifier.height(Dimen.glyph), horizontalArrangement = Arrangement.spacedBy(Dimen.space1), verticalAlignment = Alignment.CenterVertically) {
+        repeat(4) { i ->
+            val h by t.animateFloat(
+                0.3f, 1f,
+                infiniteRepeatable(tween(400 + i * 90, easing = LinearEasing), RepeatMode.Reverse),
+                label = "bar$i",
+            )
+            Box(Modifier.width(3.dp).height(Dimen.glyph * (if (scale == 0f) 0.6f else h)).clip(CircleShape).background(Ng.ink))
+        }
+    }
+}
+
+/** Thinking: three dots lighting one after another (slower than the bars). Still with reduced motion. */
+@Composable
+private fun Dots(scale: Float) {
+    val t = rememberInfiniteTransition(label = "dots")
+    val phase by t.animateFloat(0f, 3f, infiniteRepeatable(tween(1200, easing = LinearEasing)), label = "phase")
+    Row(horizontalArrangement = Arrangement.spacedBy(Dimen.space1), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { i ->
+            val lit = scale == 0f || phase.toInt() == i
+            Box(Modifier.size(Dimen.space1 + 2.dp).clip(CircleShape).background(Ng.ink.copy(alpha = if (lit) 1f else 0.35f)))
         }
     }
 }

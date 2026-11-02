@@ -65,4 +65,7 @@
     <string name="homelab">Homelab</string>
     <string name="homelab_ok">All %d up</string>
     <string name="homelab_unavailable">Homelab not reachable</string>
+    <string name="voice_listening">Listening…</string>
+    <string name="voice_thinking">Thinking…</string>
+    <string name="voice_error">Didn\'t catch that</string>
 </resources>
