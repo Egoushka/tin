@@ -103,7 +103,8 @@ failed fetch. Open-Meteo sees the phone's IP address like any website.
 
 1. `signals/Weather.kt`: the model, `parse`, the WMO mapping, the request URL. `signals/WeatherSource.kt`.
 2. `Lucide.bodies` gains `sun`, `moon`, `cloud`, `drop`, `zap`, copied from `lucide-icons.json`.
-3. `ui/WeatherLine.kt`; one call and a `Column` in `Glance`; one line in the glance's minute tick; `weather` in `Signals`.
+3. `ui/WeatherLine.kt` (it calls `refreshIfDue()` from Home's minute tick, so `Glance`'s own tick is untouched); one
+   call and a `Column` in `Glance`; `weather` in `Signals`.
 4. Strings in `values/` and `values-uk/`; the attribution file.
 5. Tests below. `testImplementation("org.json:json")` so `Weather.parse` runs on real JSON in unit tests (the Android
    stub of `org.json` returns defaults under `isReturnDefaultValues`).
