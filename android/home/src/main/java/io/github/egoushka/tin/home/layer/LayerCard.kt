@@ -1,7 +1,6 @@
 package io.github.egoushka.tin.home.layer
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,28 +9,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.theme.Dimen
+import io.github.egoushka.tin.home.theme.GlassPaint
+import io.github.egoushka.tin.home.theme.LightKind
+import io.github.egoushka.tin.home.theme.LightMotion
 import io.github.egoushka.tin.home.theme.LocalTune
 import io.github.egoushka.tin.home.theme.Motion
+import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
-import io.github.egoushka.tin.home.theme.glass
-import io.github.egoushka.tin.home.ui.animatorScale
+import io.github.egoushka.tin.home.theme.glassBody
+import io.github.egoushka.tin.home.theme.lerpColor
+import io.github.egoushka.tin.home.theme.rememberAnimatorScale
+import io.github.egoushka.tin.home.theme.softShadow
 import kotlinx.coroutines.delay
+import kotlin.math.min
 
-/** What a card says about itself; [light] is the attention ladder (null calm, glow-1 needs you, bad broken, signal now). */
-data class CardLight(val color: Color?, val stale: Boolean = false)
+/** What a card says about itself: its place on the attention ladder, and whether its source has gone quiet. */
+data class CardLight(val kind: LightKind = LightKind.Calm, val stale: Boolean = false)
+
+private val CardShape = RoundedCornerShape(Dimen.radiusCard)
 
 /** The wall clock, advancing every 30 s so ages and "in 18 min" stay true without a per-card timer. */
 @Composable
@@ -51,8 +55,9 @@ fun ageText(age: Age): String = when (age.unit) {
 }
 
 /**
- * The shared glass card: label and source age on the first line, then [content]. Light eases in and out with the
- * durations of Light.md; stale fades to 55%; focus dims calm cards to 40%.
+ * The shared glass card: label and source age on the first line, then [content]. Light moves with the table of
+ * cards/Light.md (theme/Motion.kt); stale fades to 55%; focus dims calm cards to 40% unless [keepBright] (Today).
+ * Every animated value is read while drawing, so a light changing redraws the card and recomposes nothing.
  */
 @Composable
 fun LayerCard(
@@ -60,35 +65,49 @@ fun LayerCard(
     age: Age?,
     light: CardLight,
     modifier: Modifier = Modifier,
+    keepBright: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val tune = LocalTune.current
-    val scale = animatorScale()
-    val lit = light.color != null
-    val tween = tween<Float>(Motion.duration(if (lit) Motion.NEEDS_YOU_IN else Motion.NEEDS_YOU_OUT, scale))
-    val glow by animateFloatAsState(if (lit) 1f else 0f, tween, label = "light")
-    // The colour outlives the state so the light can fade out instead of vanishing.
-    var lastLight by remember { mutableStateOf(Color.Transparent) }
-    if (light.color != null) lastLight = light.color
-    val fade by animateFloatAsState(
-        if (light.stale) Motion.STALE_ALPHA else 1f,
-        tween(Motion.duration(if (light.stale) Motion.STALE_IN else Motion.FRESH_IN, scale)), label = "stale",
+    val scale = rememberAnimatorScale()
+    val needsYou = animateFloatAsState(
+        if (light.kind == LightKind.NeedsYou) 1f else 0f,
+        Motion.tween(LightMotion.alpha(LightKind.NeedsYou, light.kind == LightKind.NeedsYou), scale), label = "needs you",
     )
-    val dim = if (tune.focus && !lit) Motion.FOCUS_DIM else 1f
+    val broken = animateFloatAsState(
+        if (light.kind == LightKind.Broken) 1f else 0f,
+        Motion.tween(LightMotion.alpha(LightKind.Broken, light.kind == LightKind.Broken), scale), label = "broken",
+    )
+    val fade = animateFloatAsState(
+        if (light.stale) Motion.STALE_ALPHA else 1f, Motion.tween(LightMotion.staleFade(light.stale), scale), label = "stale",
+    )
+    val dim = animateFloatAsState(
+        LightMotion.focusDim(tune.focus, light.kind, keepBright), Motion.tween(LightMotion.focus, scale), label = "focus",
+    )
+    // CSS sets opacity once on the element: the focus rule outranks `.stale`, so the two never multiply.
+    val opacity = { min(fade.value, dim.value) }
+    val attention = tune.attention.color
     Column(
         modifier
             .fillMaxWidth()
-            .alpha(fade * dim)
-            .glass(RoundedCornerShape(Dimen.radiusCard), if (glow > 0f) lastLight.copy(alpha = glow) else null)
-            .padding(tune.padDp.dp + Dimen.space1),
+            .softShadow(CardShape, Color.Black.copy(alpha = GlassPaint.DROP_ALPHA), GlassPaint.DROP_DY, GlassPaint.DROP_BLUR,
+                GlassPaint.DROP_SPREAD, opacity)
+            .softShadow(CardShape, attention, 0f, GlassPaint.HALO_BLUR, GlassPaint.HALO_SPREAD) { needsYou.value * opacity() }
+            .graphicsLayer { alpha = opacity() }
+            .glassBody(CardShape, attention, { needsYou.value }, { broken.value })
+            .padding(tune.padDp.dp),
         verticalArrangement = Arrangement.spacedBy(Dimen.space2),
     ) {
-        if (label.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(label.uppercase(), style = NgType.label)
-                if (age != null) Text(ageText(age), style = NgType.label.copy(letterSpacing = TextUnit.Unspecified))
-            }
-        }
+        if (label.isNotEmpty()) CardHeader(label, age, needsYou)
         content()
+    }
+}
+
+/** A lit card's label turns from ink-2 to ink; reading [lit] here keeps that recomposition off the card body. */
+@Composable
+private fun CardHeader(label: String, age: Age?, lit: State<Float>) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label.uppercase(), style = NgType.label, color = lerpColor(Ng.ink2, Ng.ink, lit.value))
+        if (age != null) Text(ageText(age), style = NgType.meta)
     }
 }

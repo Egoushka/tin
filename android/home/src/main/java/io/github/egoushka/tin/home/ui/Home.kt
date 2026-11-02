@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +31,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -63,7 +61,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -84,6 +81,10 @@ import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
 import io.github.egoushka.tin.home.theme.drawRoom
 import io.github.egoushka.tin.home.theme.glass
+import io.github.egoushka.tin.home.theme.plainClickable
+import io.github.egoushka.tin.home.theme.pressGlass
+import io.github.egoushka.tin.home.theme.pressable
+import io.github.egoushka.tin.home.theme.rememberAnimatorScale
 import io.github.egoushka.tin.home.tune.Tune
 import java.util.Date
 import kotlin.math.abs
@@ -259,8 +260,7 @@ private fun DockRow(tune: Tune, actions: Actions) {
             Box(
                 Modifier
                     .size(Dimen.tile)
-                    .glass(CircleShape)
-                    .clickable(role = Role.Button) { actions.dock(d) }
+                    .pressGlass(CircleShape) { actions.dock(d) }
                     .semantics { contentDescription = label },
                 contentAlignment = Alignment.Center,
             ) {
@@ -287,7 +287,7 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
             .fillMaxWidth()
             .height(Dimen.tile)
             .glass(RoundedCornerShape(Dimen.radiusCard))
-            .combinedClickable(onClick = onOpen, onLongClick = onMic)
+            .plainClickable(onLongClick = onMic, onClick = onOpen)
             .padding(start = Dimen.space4, end = Dimen.space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -304,9 +304,9 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
         Box(
             Modifier
                 .size(Dimen.target)
+                .pressable(onClick = onMic)
                 .clip(CircleShape)
                 .background(Ng.accent)
-                .clickable(role = Role.Button, onClick = onMic)
                 .semantics { contentDescription = word },
             contentAlignment = Alignment.Center,
         ) {
@@ -344,14 +344,9 @@ private fun Dots(scale: Float) {
     }
 }
 
-/** System animator duration scale; 0 is reduced motion. */
+/** System animator duration scale, live; 0 is reduced motion. */
 @Composable
-fun animatorScale(): Float {
-    val resolver = LocalContext.current.contentResolver
-    return remember {
-        android.provider.Settings.Global.getFloat(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-    }
-}
+fun animatorScale(): Float = rememberAnimatorScale()
 
 /** Keeps [key] steady for a frame so a just-opened layer can request focus after it is attached. */
 @Composable
