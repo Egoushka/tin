@@ -94,20 +94,9 @@ object NgType {
     val label = TextStyle(fontFamily = family, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight(600),
         letterSpacing = 0.07.em, fontFeatureSettings = TNUM, color = Ng.ink2)
 
+    /** `--t-meta`: ages and trailing figures. Shares the label's 11/16, so it is not a sixth size. */
+    val meta = TextStyle(fontFamily = family, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight(500),
+        fontFeatureSettings = TNUM, color = Ng.ink2)
+
     val all = listOf(clock, figure, title, body, label)
-}
-
-/** Material 3 motion durations (ms) for the light ladder; starting values to calibrate on the phone. */
-object Motion {
-    const val NEEDS_YOU_IN = 300   // medium2
-    const val NEEDS_YOU_OUT = 500  // long2
-    const val NOW_IN = 300         // medium2
-    const val BROKEN_IN = 200      // short4
-    const val STALE_IN = 1000      // extraLong4
-    const val FRESH_IN = 100       // short2
-    const val STALE_ALPHA = 0.55f
-    const val FOCUS_DIM = 0.4f
-
-    /** Reduced motion (animator scale 0) makes every transition instant. */
-    fun duration(ms: Int, animatorScale: Float): Int = if (animatorScale == 0f) 0 else ms
 }

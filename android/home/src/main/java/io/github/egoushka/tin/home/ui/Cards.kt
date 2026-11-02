@@ -2,15 +2,16 @@ package io.github.egoushka.tin.home.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +28,6 @@ import android.text.format.DateFormat
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,9 +50,13 @@ import io.github.egoushka.tin.home.signals.MusicSource
 import io.github.egoushka.tin.home.signals.NoteKind
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Dimen
+import io.github.egoushka.tin.home.theme.LightKind
 import io.github.egoushka.tin.home.theme.Lucide
 import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
+import io.github.egoushka.tin.home.theme.nowLight
+import io.github.egoushka.tin.home.theme.plainClickable
+import io.github.egoushka.tin.home.theme.pressable
 import io.github.egoushka.tin.home.theme.LocalTune
 import kotlinx.coroutines.delay
 
@@ -66,9 +70,9 @@ fun GlanceCard(signals: Signals, actions: Actions) {
     val tune = LocalTune.current
     val now = rememberNow()
     if (!connected) {
-        LayerCard("", null, CardLight(null)) {
+        LayerCard("", null, CardLight()) {
             Row(
-                Modifier.clickable(role = Role.Button) { actions.openListenerSettings() },
+                Modifier.plainClickable { actions.openListenerSettings() },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(Lucide.icon("bell", 20f, tune.strokeDp), null, Modifier.size(Dimen.glyph))
@@ -83,7 +87,7 @@ fun GlanceCard(signals: Signals, actions: Actions) {
     }
     val glance: Glance = state.glance
     val latest = glance.latest ?: return
-    LayerCard("", null, CardLight(null), Modifier.clickable(role = Role.Button) { actions.openNotifications() }) {
+    LayerCard("", null, CardLight(), Modifier.plainClickable { actions.openNotifications() }) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimen.space3)) {
             glance.apps.forEach { a ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -116,7 +120,7 @@ fun MusicCard(music: MusicSource) {
     LaunchedEffect(Unit) {
         while (true) { music.refreshBuds(); delay(60_000) } // the earbuds' battery is polled, not pushed
     }
-    LayerCard("", null, CardLight(null)) {
+    LayerCard("", null, CardLight()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val art = state.art
             Box(
@@ -157,8 +161,7 @@ private fun Transport(icon: String, label: String, onClick: () -> Unit) {
     Box(
         Modifier
             .size(Dimen.target)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick)
+            .pressable(onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
@@ -179,7 +182,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
     val label = stringResource(R.string.today)
     if (!state.granted) {
         if (state.at == 0L) return // first read not back yet; no flash of the prompt
-        LayerCard(label, null, CardLight(null), Modifier.clickable(role = Role.Button) { actions.askCalendar() }) {
+        LayerCard(label, null, CardLight(), Modifier.plainClickable { actions.askCalendar() }) {
             Text(stringResource(R.string.calendar_access), style = NgType.title)
             Text(stringResource(R.string.calendar_access_hint), style = NgType.body)
         }
@@ -189,14 +192,22 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
     val stale = Freshness.isStale(now, state.at, CalendarSource.INTERVAL_MS)
     LayerCard(
         label, Freshness.age(now, state.at),
-        CardLight(if (agenda.hasCurrent) Ng.signal else null, stale),
+        CardLight(stale = stale),
+        keepBright = true,
     ) {
         if (agenda.items.isEmpty()) {
             Text(stringResource(R.string.today_empty), style = NgType.body)
         } else {
             agenda.items.forEach { row ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.signal else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space2))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Dimen.space6 + Dimen.space3)
+                        .nowLight(row.current)
+                        .padding(horizontal = Dimen.space2),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.ink else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space2))
                     Text(
                         row.event.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -205,7 +216,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
                         val clash = stringResource(R.string.clash)
                         Spacer(Modifier.width(Dimen.space2))
                         Image(
-                            Lucide.icon("warn", 16f, tune.strokeDp, Ng.warn), null,
+                            Lucide.icon("warn", 16f, tune.strokeDp, tune.attention.color), null,
                             Modifier.size(Dimen.glyphSmall).semantics { contentDescription = clash },
                         )
                     }
@@ -228,8 +239,8 @@ fun NeedsYouCard(source: NeedsYouSource, actions: Actions) {
     val stale = !unavailable && Freshness.isStale(now, state.at, NeedsYouSource.INTERVAL_MS)
     LayerCard(
         label, if (unavailable) null else Freshness.age(now, state.at),
-        CardLight(if (needs.lit) Ng.glow1 else null, stale),
-        Modifier.clickable(role = Role.Button) { actions.openApprovals() },
+        CardLight(if (needs.lit) LightKind.NeedsYou else LightKind.Calm, stale),
+        Modifier.plainClickable { actions.openApprovals() },
     ) {
         when {
             unavailable -> Text(stringResource(R.string.needs_unavailable), style = NgType.body)
@@ -267,7 +278,7 @@ fun HomelabCard(source: HomelabSource) {
     val stale = !unavailable && Freshness.isStale(now, state.at, HomelabSource.INTERVAL_MS)
     LayerCard(
         stringResource(R.string.homelab), if (unavailable) null else Freshness.age(now, state.at),
-        CardLight(if (lab.lit) Ng.bad else null, stale),
+        CardLight(if (lab.lit) LightKind.Broken else LightKind.Calm, stale),
     ) {
         when {
             unavailable -> Text(stringResource(R.string.homelab_unavailable), style = NgType.body)
@@ -306,7 +317,7 @@ fun AlarmCard(alarm: AlarmSource) {
         val pattern = DateFormat.getBestDateTimePattern(locale, if (DateFormat.is24HourFormat(context)) "EEEHm" else "EEEjm")
         android.icu.text.SimpleDateFormat(pattern, locale).format(java.util.Date(next))
     }
-    LayerCard("", null, CardLight(null)) {
+    LayerCard("", null, CardLight()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(Lucide.icon("alarm", 20f, tune.strokeDp), null, Modifier.size(Dimen.glyph))
             Spacer(Modifier.width(Dimen.space3))
