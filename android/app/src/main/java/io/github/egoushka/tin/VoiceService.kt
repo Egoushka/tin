@@ -7,6 +7,7 @@ import android.os.RemoteException
 import android.util.Log
 import io.github.egoushka.tin.voice.IVoice
 import io.github.egoushka.tin.voice.IVoiceCallback
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
@@ -16,18 +17,19 @@ import kotlin.concurrent.thread
  * Audio and text are never logged.
  */
 class VoiceService : Service() {
-    @Volatile private var cancelled = false
+    /** The latest listen's cancel flag, read by Listener.command's `cancelled` once per chunk. */
+    @Volatile private var cancelled = AtomicBoolean(false)
 
     private val binder = object : IVoice.Stub() {
         override fun listen(maxSeconds: Double, cb: IVoiceCallback) {
             val speech = SpeechService.instance ?: return answer { cb.onError("speech off") }
             val seconds = maxSeconds.coerceIn(1.0, MAX_SECONDS)
-            cancelled = false
-            thread(name = "voice-listen") { speech.voiceCommand(seconds, cb) }
+            val flag = AtomicBoolean(false).also { cancelled = it }
+            thread(name = "voice-listen") { speech.voiceCommand(seconds, cb, flag) }
         }
 
         override fun cancel() {
-            cancelled = true
+            cancelled.set(true)
         }
 
         override fun ready(): Boolean = SpeechService.instance?.ready() == true
@@ -35,8 +37,8 @@ class VoiceService : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
-    private fun SpeechService.voiceCommand(seconds: Double, cb: IVoiceCallback) {
-        when (val result = command(seconds, { answer { cb.onState(1) } }, { answer { cb.onState(2) } }, { cancelled })) {
+    private fun SpeechService.voiceCommand(seconds: Double, cb: IVoiceCallback, cancelled: AtomicBoolean) {
+        when (val result = command(seconds, { answer { cb.onState(1) } }, { answer { cb.onState(2) } }, cancelled::get)) {
             is SpeechService.Command.Heard -> answer { cb.onHeard(result.text) }
             is SpeechService.Command.Failed -> answer { cb.onError(result.reason) }
         }
