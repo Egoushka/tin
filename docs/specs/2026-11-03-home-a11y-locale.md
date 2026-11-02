@@ -12,11 +12,11 @@ Deferred, because the surface is in an open PR and not on main: the scrolling ca
 
 | ID | Gap | Check | Fix | Status |
 |---|---|---|---|---|
-| A1 | A card's label, its age and its rows are separate focus stops on cards that are not clickable (Homelab, Alarm, Music, Today when granted); the age is not spoken with the label | device `uiautomator dump`, one node per card | the card is one merged node; its header reads "Needs you, 1 minute ago" | fixed |
-| A2 | The age is spoken as its visible abbreviation ("1 d" is read "1 D"); it has no plural forms | `StringsTest` (spoken-age plurals exist, every CLDR form) | spoken age plurals | fixed |
-| A3 | The search bar has a click label but no long-press label: TalkBack does not say that a long press speaks | device dump | `onLongClickLabel` = the mic's label | fixed |
-| A4 | Vertical drags (apps, notifications), double-tap torch and long-press Tune have no accessibility action | device dump of the root | four custom actions on the glance, the first stop | fixed |
-| A5 | The mic's label is already the state word; keep it | device dump of the mic in each state | none | pinned |
+| A1 | A card's label, its age and its rows are separate focus stops on cards that are not clickable (Homelab, Alarm, Music, Today when granted); the age is not spoken with the label | the semantics code (merged card, one `text` on the header); the spoken strings by `StringsTest`; not listened to | the card is one merged node; its header reads "Needs you, 1 minute ago" | fixed |
+| A2 | The age is spoken as its visible abbreviation ("1 d" may be read "1 D"); it has no plural forms | `StringsTest` (spoken-age plurals exist, every CLDR form) | spoken age plurals | fixed |
+| A3 | The search bar has a click label but no long-press label: TalkBack does not say that a long press speaks | the semantics code (`onLongClickLabel`); not listened to | `onLongClickLabel` = the mic's label | fixed |
+| A4 | Vertical drags (apps, notifications), double-tap torch and long-press Tune have no accessibility action | the semantics code (`customActions`); not listened to | four custom actions on the glance, the first stop | fixed |
+| A5 | The mic's label is already the state word; keep it | reading `SearchBar` in `Home.kt`: the mic's `contentDescription` is the state word (`mic`, `voice_listening`, `voice_thinking`, `voice_error`) and the hint is a polite live region | none | pinned |
 | A6 | A search result row (`HitRow`) and an app tile in the drawer (`AppTile`) are clickable with no role, so TalkBack does not say "button" | reading the semantics; the clickables on Home and in the drawer and search already set a role (`plainClickable`, `pressGlass` and `IconButton` default to button), A7 aside | `role = Role.Button` | fixed |
 | A7 | The Tune sheet's scrim (`clickable`, no label, no role) and its swallow-tap panel (`clickable {}`, merges its descendants) may be an unlabeled stop and one merged node | device dump of the sheet | scrim label and role; panel `pointerInput` instead of `clickable` | open: needs the device |
 | F1 | Large text: the clock, the alarm label and the fixed rows may clip, wrap or overlap at scale 1.3 and 2.0 | device check at 412×915 dp, scale 1.3 and 2.0, English and Ukrainian: no node leaves the screen, none overlaps, every clickable is at least 48 dp | see F2 to F4 | see below |
