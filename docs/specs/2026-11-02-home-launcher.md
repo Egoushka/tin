@@ -37,7 +37,7 @@ the stock launcher comes back, or a meeting or an approval is missed because Hom
 | Notification glance, music, earbuds battery | `NotificationListenerService` in `:home` (also unlocks `MediaSessionManager.getActiveSessions`); battery from the media route / `BluetoothDevice` battery level | slice 2 |
 | Today, travel time | `CalendarContract` (`READ_CALENDAR`), on the phone; travel time UNKNOWN (no source in the map) and left out until one exists | slice 3 |
 | Alarm | `AlarmManager.getNextAlarmClock()` | slice 3 |
-| Needs you | approvals server `GET /api/items?view=open` → `counts` (`personal/approvals/server/README.md`), with a device token Home registers like the approvals client does. Not a copy of the approvals app: Home shows the count and opens the approvals app. | slice 4 |
+| Needs you | approvals ContentProvider `content://com.yehor.approvals.needsyou/` (`items`: id, title, source, created_at, held, deep_link; `counts`: open, held; permission `signature\|knownSigner` on Tin's signing digest). Read-only; no token, no network. Not a copy of the approvals app: Home shows the count and the two oldest items and opens the approvals app. | slice 4 |
 | Homelab | Gatus endpoint statuses on the tailnet (the homelab gateway already reads them); broken after 2 failed polls | slice 5 |
 | Readiness | oura-platform warehouse (`personal/oura-platform`); its API has only OAuth routes today (`OuraPlatform.Api/Program.cs`), so the read endpoint is UNKNOWN and is specified in that repo first | slice 5 |
 | Weather | UNKNOWN; no source in the map. Left out rather than invented. | later |
@@ -103,7 +103,9 @@ The 7-day stop condition above is the check of the whole project, not of a slice
   shows within a calendar change (no restart); the current event is teal; a clash marks its icon with the warn colour
   (the card `HomeNightGlass.md` says warn; `glow-1` is reserved for "needs you"); with the permission revoked the card
   asks for access and Home still starts; `adb shell am start -a android.intent.action.SET_ALARM` shows the alarm row.
-- Slice 4, Needs you: an item `PUT` to the approvals server lights the card within one poll; deciding it on the laptop
-  clears it (500 ms out).
+- Slice 4, Needs you: against the debug fake provider (`...home.needsyou.fake`), `content insert` lights the card within
+  one change and shows the oldest two rows; `content delete` of the last open item clears it (500 ms out); with no
+  provider installed the card says approvals is not sharing and Home still starts. The release authority
+  `com.yehor.approvals.needsyou` is untested until approvals ships its N1 provider.
 - Slice 5, homelab and readiness: one failed Gatus poll keeps calm, two make it red; three missed refreshes fade it.
 - Slice 6, voice: states from `cards/VoiceStates.md`; "approve" by voice opens the item and changes nothing.

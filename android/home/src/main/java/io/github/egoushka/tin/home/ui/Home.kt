@@ -155,6 +155,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
         Glance(Modifier.padding(top = Dimen.space6))
         Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
         Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
+            NeedsYouCard(signals.needsYou, actions)
             TodayCard(signals.calendar, actions)
             GlanceCard(signals, actions)
             MusicCard(signals.music)
