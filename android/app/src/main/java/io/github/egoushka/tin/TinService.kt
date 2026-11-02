@@ -1,6 +1,7 @@
 package io.github.egoushka.tin
 
 import android.content.Context
+import android.os.IBinder
 import android.system.Os
 import android.util.Log
 import java.io.File
@@ -15,9 +16,11 @@ class TinService(private val context: Context) : ITinService.Stub() {
     @Volatile private var stopped = false
     @Volatile private var child: Process? = null
     @Volatile private var starts = 0
+    private val speech = SpeechBridge()
 
     init {
         thread(name = "tin-supervisor", isDaemon = true) { supervise() }
+        speech.start()
     }
 
     private fun supervise() {
@@ -72,6 +75,8 @@ class TinService(private val context: Context) : ITinService.Stub() {
     }
 
     override fun status(): String = "alive=${child?.isAlive ?: false} starts=$starts"
+
+    override fun setSpeech(binder: IBinder?) = speech.set(binder)
 
     override fun destroy() {
         stopped = true

@@ -6,4 +6,7 @@ interface ITinService {
 
     // One line: whether the tin child is alive and how many times it has been started.
     String status() = 1;
+
+    // The app's ISpeech binder; @tin-speech forwards to it. The app calls this again after every restart.
+    void setSpeech(IBinder speech) = 2;
 }
