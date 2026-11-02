@@ -24,8 +24,15 @@ android {
     buildTypes {
         // Needs you reads the approvals app's provider; the debug build reads a fake with the same wire shape
         // (src/debug) until the approvals repo ships its side.
-        debug { buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"io.github.egoushka.tin.home.needsyou.fake\"") }
-        release { buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"com.yehor.approvals.needsyou\"") }
+        // Homelab reads Gatus on the tailnet; debug reads localhost (`adb reverse tcp:8095 tcp:8095` to a fixture server).
+        debug {
+            buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"io.github.egoushka.tin.home.needsyou.fake\"")
+            buildConfigField("String", "GATUS_URL", "\"http://127.0.0.1:8095\"")
+        }
+        release {
+            buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"com.yehor.approvals.needsyou\"")
+            buildConfigField("String", "GATUS_URL", "\"http://100.64.0.2:8095\"")
+        }
     }
 
     compileOptions {

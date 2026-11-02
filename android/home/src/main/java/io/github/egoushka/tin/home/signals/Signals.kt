@@ -15,6 +15,7 @@ class Signals private constructor(context: Context) {
     val calendar = CalendarSource(app)
     val alarm = AlarmSource(app)
     val needsYou = NeedsYouSource(app)
+    val homelab = HomelabSource()
     val glance: StateFlow<GlanceBus.State> = GlanceBus.state
     val listenerConnected: StateFlow<Boolean> = GlanceBus.connected
 
@@ -22,6 +23,7 @@ class Signals private constructor(context: Context) {
         calendar.start(scope)
         alarm.start()
         needsYou.start(scope)
+        homelab.start(scope)
         scope.launch {
             GlanceBus.connected.collect { if (it) music.start() else music.stop() }
         }

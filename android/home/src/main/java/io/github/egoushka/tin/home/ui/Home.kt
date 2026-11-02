@@ -160,6 +160,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
             GlanceCard(signals, actions)
             MusicCard(signals.music)
             AlarmCard(signals.alarm)
+            HomelabCard(signals.homelab)
         }
         Spacer(Modifier.weight(1f))
         DockRow(tune, actions)
