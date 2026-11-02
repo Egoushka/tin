@@ -40,6 +40,8 @@ import io.github.egoushka.tin.home.layer.LayerCard
 import io.github.egoushka.tin.home.layer.ageText
 import io.github.egoushka.tin.home.layer.rememberNow
 import io.github.egoushka.tin.home.signals.AlarmSource
+import io.github.egoushka.tin.home.signals.Homelab
+import io.github.egoushka.tin.home.signals.HomelabSource
 import io.github.egoushka.tin.home.signals.NeedsYouSource
 import io.github.egoushka.tin.home.signals.Agenda
 import io.github.egoushka.tin.home.signals.CalendarSource
@@ -248,6 +250,37 @@ fun NeedsYouCard(source: NeedsYouSource, actions: Actions) {
                         needs.held.takeIf { it > 0 }?.let { stringResource(R.string.needs_held, it) },
                     )
                     if (tail.isNotEmpty()) Text(tail.joinToString(" · "), style = NgType.body)
+                }
+            }
+        }
+    }
+}
+
+/** Gatus on the tailnet: calm while everything passes, `bad` once an endpoint has failed two checks in a row. */
+@Composable
+fun HomelabCard(source: HomelabSource) {
+    val state by source.state.collectAsState()
+    if (state.status == HomelabSource.Status.Loading) return // first fetch not back yet
+    val now = rememberNow()
+    val unavailable = state.status == HomelabSource.Status.Unavailable
+    val lab = state.homelab
+    val stale = !unavailable && Freshness.isStale(now, state.at, HomelabSource.INTERVAL_MS)
+    LayerCard(
+        stringResource(R.string.homelab), if (unavailable) null else Freshness.age(now, state.at),
+        CardLight(if (lab.lit) Ng.bad else null, stale),
+    ) {
+        when {
+            unavailable -> Text(stringResource(R.string.homelab_unavailable), style = NgType.body)
+            !lab.lit -> Text(stringResource(R.string.homelab_ok, lab.total), style = NgType.body)
+            else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(lab.broken.size.toString(), style = NgType.figure, color = Ng.bad)
+                Spacer(Modifier.width(Dimen.space4))
+                Column(Modifier.weight(1f)) {
+                    lab.broken.take(Homelab.MAX_ROWS).forEach {
+                        Text(it.name, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    val more = lab.broken.size - Homelab.MAX_ROWS
+                    if (more > 0) Text(stringResource(R.string.needs_more, more), style = NgType.body)
                 }
             }
         }

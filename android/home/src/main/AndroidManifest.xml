@@ -11,6 +11,9 @@
          it is signature-protected there, so it is granted only when both apps share a signer. -->
     <uses-permission android:name="com.yehor.approvals.permission.READ_NEEDS_YOU" />
 
+    <!-- Homelab card: one read-only GET to Gatus on the tailnet (see res/xml/network_security_config.xml). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Earbud battery of the current audio output; asked once, the card works without it. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
@@ -33,6 +36,7 @@
 
     <application
         android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
