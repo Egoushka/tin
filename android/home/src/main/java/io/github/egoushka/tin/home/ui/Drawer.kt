@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -29,6 +30,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -45,6 +48,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -71,16 +75,26 @@ import kotlinx.coroutines.withContext
 
 /** All apps (swipe up) and search (tap the bar): A–Z grid, search field at the bottom, Enter opens the top result. */
 @Composable
-fun Drawer(apps: AppRepository, actions: Actions, focusSearch: Boolean, onClose: () -> Unit, onTune: () -> Unit) {
+fun Drawer(apps: AppRepository, actions: Actions, open: Boolean, focusSearch: Boolean, onClose: () -> Unit, onTune: () -> Unit) {
     val tune = LocalTune.current
-    val all by produceState(emptyList<AppEntry>(), apps) {
-        apps.changes().collect { value = withContext(Dispatchers.IO) { apps.load() } }
-    }
+    val all by apps.list.collectAsState()
+    val iconPx = with(LocalDensity.current) { Dimen.glyphTile.roundToPx() * 2 }
+    LaunchedEffect(all, iconPx) { apps.warm(iconPx, Ng.ink.toArgb()) }
     var query by remember { mutableStateOf("") }
     val shown = remember(all, query) { AppSearch.filter(all, query) { it.label } }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    if (focusSearch) AfterAttach(Unit) { runCatching { focus.requestFocus() } }
+    val focusManager = LocalFocusManager.current
+    val grid = rememberLazyGridState()
+    // The drawer stays composed while closed; it comes back fresh.
+    LaunchedEffect(open) {
+        if (open) return@LaunchedEffect
+        focusManager.clearFocus()
+        keyboard?.hide()
+        query = ""
+        grid.scrollToItem(0)
+    }
+    if (open && focusSearch) AfterAttach(Unit) { runCatching { focus.requestFocus() } }
 
     fun open(app: AppEntry) {
         keyboard?.hide()
@@ -105,6 +119,7 @@ fun Drawer(apps: AppRepository, actions: Actions, focusSearch: Boolean, onClose:
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
+            state = grid,
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(vertical = Dimen.space2),
             verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp + Dimen.space2),
@@ -158,8 +173,9 @@ fun Drawer(apps: AppRepository, actions: Actions, focusSearch: Boolean, onClose:
 @Composable
 private fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
     val px = with(LocalDensity.current) { Dimen.glyphTile.roundToPx() * 2 }
-    val icon by produceState<ImageBitmap?>(null, app.key, px) {
-        value = withContext(Dispatchers.IO) { apps.icon(app, px, Ng.ink.toArgb())?.let(Bitmap::asImageBitmap) }
+    val cached = remember(app.key, px) { apps.cachedIcon(app, px)?.asImageBitmap() }
+    val icon by produceState(cached, app.key, px) {
+        if (value == null) value = withContext(Dispatchers.IO) { apps.icon(app, px, Ng.ink.toArgb())?.let(Bitmap::asImageBitmap) }
     }
     Column(
         Modifier.clip(RoundedCornerShape(Dimen.radiusRow)).clickable(onClick = onClick).padding(vertical = Dimen.space1),
