@@ -436,12 +436,121 @@ fn gate_expiry_withdraws_and_never_runs() {
 #[test]
 fn gate_caps_undecided_tickets() {
     let (s, _, inbox) = gated(Duration::from_millis(1), Duration::from_secs(60));
-    for _ in 0..gate::MAX_PENDING {
-        assert_eq!(call(&s, "system__key", json!({ "key": "KEYCODE_HOME" }))["isError"], false);
+    for x in 0..gate::MAX_PENDING as i64 {
+        assert_eq!(call(&s, "system__tap", tap(x, 0))["isError"], false);
     }
-    let r = call(&s, "system__key", json!({ "key": "KEYCODE_HOME" }));
+    let r = call(&s, "system__tap", tap(99, 0));
     assert_eq!(r["isError"], true);
     assert_eq!(inbox.items.lock().unwrap().len(), gate::MAX_PENDING);
+}
+
+// I1–I7: a repeat of a pending call returns its ticket (docs/specs/2026-11-02-idempotent-holds.md).
+
+fn tap(x: i64, y: i64) -> Value {
+    json!({ "x": x, "y": y })
+}
+
+fn is_repeat(r: &Value) -> bool {
+    r["structuredContent"]["note"] == "already pending"
+}
+
+fn direct_gate(ttl: Duration) -> (Gate, Inbox) {
+    let inbox = Inbox::default();
+    let cfg = GateConfig { source: "tin".into(), callback: "https://x/cb/decision".into(), wait: Duration::from_millis(5), ttl };
+    (Gate::new(Box::new(inbox.clone()), KEY, cfg), inbox)
+}
+
+#[test]
+fn gate_repeat_returns_the_pending_ticket() {
+    let (s, _, inbox) = gated(Duration::from_millis(1), Duration::from_secs(60));
+    let first = call(&s, "system__tap", tap(10, 20));
+    assert!(!is_repeat(&first));
+    let second = call(&s, "system__tap", tap(10, 20));
+    assert!(is_repeat(&second), "{second}");
+    assert!(text(&second).starts_with("Already pending"), "{second}");
+    assert_eq!(second["isError"], false);
+    assert_eq!(second["structuredContent"]["ticket"], first["structuredContent"]["ticket"]);
+    let reordered = call(&s, "system__tap", json!({ "y": 20, "x": 10 }));
+    assert!(is_repeat(&reordered), "key order does not make a different call");
+    assert_eq!(inbox.items.lock().unwrap().len(), 1);
+}
+
+#[test]
+fn gate_repeat_loop_opens_one_item() {
+    let (s, phone, inbox) = gated(Duration::from_millis(1), Duration::from_secs(60));
+    let answers: Vec<Value> = (0..12).map(|_| call(&s, "system__tap", tap(10, 20))).collect();
+    assert_eq!(inbox.items.lock().unwrap().len(), 1);
+    assert_eq!(answers.iter().filter(|r| is_repeat(r)).count(), 11);
+    assert!(answers.iter().all(|r| r["isError"] == false), "a loop above MAX_PENDING is not refused");
+    assert!(phone.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn gate_repeat_different_call_opens_its_own() {
+    let (s, _, inbox) = gated(Duration::from_millis(1), Duration::from_secs(60));
+    let a = call(&s, "system__tap", tap(10, 20));
+    let b = call(&s, "system__tap", tap(10, 21));
+    assert!(!is_repeat(&b));
+    assert_ne!(a["structuredContent"]["ticket"], b["structuredContent"]["ticket"]);
+    let c = call(&s, "system__swipe", json!({ "x1": 10, "y1": 20, "x2": 10, "y2": 20 }));
+    assert!(!is_repeat(&c), "{c}");
+    assert_eq!(inbox.items.lock().unwrap().len(), 3);
+}
+
+#[test]
+fn gate_repeat_after_ttl_opens_a_new_ticket() {
+    let (s, _, inbox) = gated(Duration::from_millis(1), Duration::from_millis(100));
+    let first = call(&s, "system__tap", tap(10, 20));
+    std::thread::sleep(Duration::from_millis(150));
+    let again = call(&s, "system__tap", tap(10, 20));
+    assert!(!is_repeat(&again), "{again}");
+    assert_ne!(first["structuredContent"]["ticket"], again["structuredContent"]["ticket"]);
+    assert_eq!(inbox.items.lock().unwrap().len(), 2);
+    assert_eq!(inbox.withdrawn.lock().unwrap().len(), 1, "the first item was withdrawn when it expired");
+}
+
+#[test]
+fn gate_repeat_cap_counts_distinct_tickets() {
+    let (s, _, inbox) = gated(Duration::from_millis(1), Duration::from_secs(60));
+    for x in 0..gate::MAX_PENDING as i64 {
+        assert_eq!(call(&s, "system__tap", tap(x, 0))["isError"], false);
+    }
+    let repeat = call(&s, "system__tap", tap(3, 0));
+    assert!(is_repeat(&repeat), "{repeat}");
+    assert_eq!(call(&s, "system__tap", tap(99, 0))["isError"], true);
+    assert_eq!(inbox.items.lock().unwrap().len(), gate::MAX_PENDING);
+}
+
+#[test]
+fn gate_repeat_decided_ticket_is_not_reused() {
+    let (g, inbox) = direct_gate(Duration::from_secs(60));
+    let args = tap(10, 20);
+    let denied = g.hold("system__tap", &args, "t", "s").unwrap();
+    assert_eq!(g.decide(&signed(&denied.ticket, "deny")).0, 200);
+    let after_deny = g.hold("system__tap", &args, "t", "s").unwrap();
+    assert!(!after_deny.existing);
+    assert_ne!(after_deny.ticket, denied.ticket);
+
+    assert_eq!(g.decide(&signed(&after_deny.ticket, "run")).0, 200);
+    assert!(matches!(g.wait(&after_deny.ticket), Outcome::Run { .. }));
+    g.finish(&after_deny.ticket, json!({}));
+    let after_run = g.hold("system__tap", &args, "t", "s").unwrap();
+    assert!(!after_run.existing);
+    assert_ne!(after_run.ticket, after_deny.ticket);
+    assert_eq!(inbox.items.lock().unwrap().len(), 3);
+}
+
+#[test]
+fn gate_repeat_race_opens_one_ticket() {
+    let (g, inbox) = direct_gate(Duration::from_secs(60));
+    let args = tap(10, 20);
+    let held: Vec<_> = std::thread::scope(|sc| {
+        let threads: Vec<_> = (0..8).map(|_| sc.spawn(|| g.hold("system__tap", &args, "t", "s").unwrap())).collect();
+        threads.into_iter().map(|t| t.join().unwrap()).collect()
+    });
+    assert_eq!(inbox.items.lock().unwrap().len(), 1);
+    assert!(held.iter().all(|h| h.ticket == held[0].ticket));
+    assert_eq!(held.iter().filter(|h| !h.existing).count(), 1);
 }
 
 #[test]
@@ -450,7 +559,7 @@ fn gate_wait_outcomes_direct() {
     let cfg = GateConfig { source: "tin".into(), callback: "https://x/cb/decision".into(), wait: Duration::from_millis(5), ttl: Duration::from_secs(60) };
     let g = Gate::new(Box::new(inbox), KEY, cfg);
     assert_eq!(g.wait("tin:nope"), Outcome::Unknown);
-    let t = g.hold("system__key", &json!({ "key": "KEYCODE_HOME" }), "t", "s").unwrap();
+    let t = g.hold("system__key", &json!({ "key": "KEYCODE_HOME" }), "t", "s").unwrap().ticket;
     assert_eq!(g.wait(&t), Outcome::Pending);
     g.decide(&signed(&t, "run"));
     assert_eq!(g.wait(&t), Outcome::Run { tool: "system__key".into(), args: json!({ "key": "KEYCODE_HOME" }) });
