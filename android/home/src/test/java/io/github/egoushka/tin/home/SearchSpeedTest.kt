@@ -1,6 +1,5 @@
 package io.github.egoushka.tin.home
 
-import android.content.ComponentName
 import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.search.Access
 import io.github.egoushka.tin.home.search.Contact
@@ -16,7 +15,7 @@ class SearchSpeedTest {
     private val last = listOf("Kovalenko", "Шевченко", "García", "Мельник", "O'Brien", "Мар'яненко", "Smith", "Бондаренко", "Müller", "Ткачук")
     private val words = listOf("Mail", "Maps", "Камера", "Notes", "Music", "Погода", "Photos", "Calendar", "Files", "Clock", "Chat", "Banking")
 
-    private val apps = Index(List(300) { AppEntry("${words[it % words.size]} ${it / words.size + 1}", ComponentName("p", "c$it"), null) }) { it.label }
+    private val apps = Index(List(300) { AppEntry("${words[it % words.size]} ${it / words.size + 1}", "p", "c$it", 0) }) { it.label }
     private val shortcuts = Index(List(50) { ShortcutEntry("s$it", "p$it", "${words[(it * 5) % words.size]} shortcut $it", null) }) { it.label }
     private val people = Index(List(1000) { Contact(it + 1L, "k$it", "${first[it % first.size]} ${last[(it / first.size) % last.size]} ${it}", it % 3 != 0) }) { it.name }
 
