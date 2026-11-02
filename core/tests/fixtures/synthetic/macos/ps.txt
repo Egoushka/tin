@@ -1,0 +1,13 @@
+    1     0  12000 3-01:00:00 Fri Oct 30 09:00:00 2026     /sbin/launchd
+  401     1 900000 3-00:59:00 Fri Oct 30 09:01:00 2026     /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer -daemon
+  512     1 650000    05:10:00 Mon Nov  2 04:00:00 2026     /Applications/Safari.app/Contents/MacOS/Safari
+ 2001     1 420000 1-02:00:00 Sun Nov  1 07:00:00 2026     /usr/local/share/dotnet/dotnet /usr/local/share/dotnet/sdk/10.0.100/MSBuild.dll /nologo /nodemode:1 /nodeReuse:true /low:false
+ 2002     1 380000 1-02:00:01 Sun Nov  1 06:59:59 2026     /usr/local/share/dotnet/dotnet /usr/local/share/dotnet/sdk/10.0.100/MSBuild.dll /nologo /nodemode:1 /nodeReuse:true /low:false
+ 2003     1 300000       05:00 Mon Nov  2 09:05:00 2026     /usr/local/share/dotnet/dotnet /usr/local/share/dotnet/sdk/10.0.100/MSBuild.dll /nologo /nodemode:1 /nodeReuse:true /low:false
+ 2010  2100 250000    01:00:00 Mon Nov  2 08:10:00 2026     /usr/local/share/dotnet/dotnet /usr/local/share/dotnet/sdk/10.0.100/MSBuild.dll -maxcpucount -verbosity:m -restore build App.sln
+ 2020     1 510000    08:00:00 Mon Nov  2 01:10:00 2026     /usr/local/share/dotnet/dotnet /usr/local/share/dotnet/sdk/10.0.100/Roslyn/bincore/VBCSCompiler.dll -pipename:synthetic
+ 2030     1 200000    02:00:00 Mon Nov  2 07:10:00 2026     /usr/local/share/dotnet/dotnet exec /usr/local/share/dotnet/sdk/10.0.100/vstest.console.dll --port:50001 --parentprocessid:1999
+ 2031  2030 610000    02:00:00 Mon Nov  2 07:10:00 2026     /usr/local/share/dotnet/dotnet exec --runtimeconfig /Users/dev/src/app/tests/App.Tests/bin/Debug/net10.0/App.Tests.runtimeconfig.json /Users/dev/.nuget/packages/microsoft.testplatform.testhost/17.14.0/build/netcoreapp3.1/x64/testhost.dll --port 50002
+ 2040     1 880000 2-00:00:00 Sat Oct 31 09:10:00 2026     /Users/dev/src/app/tests/App.Claims.Tests/bin/Debug/net10.0/App.Claims.Tests --server dotnettestcli --dotnet-test-pipe /tmp/synthetic-pipe
+ 2100   600  90000    01:00:05 Mon Nov  2 08:09:55 2026     /usr/local/share/dotnet/dotnet build App.sln
+ 2200     1 150000    10:00:00 Sun Nov  1 23:10:00 2026     /Applications/Visual Studio Code.app/Contents/MacOS/Electron

@@ -2,9 +2,9 @@
 
 use crate::backend::Backend;
 use crate::gate::{Gate, Outcome};
-use crate::metadata::{self, Function};
+use crate::metadata::Function;
 use crate::policy::{Decision, Policy, SYSTEM, Subject};
-use crate::system::{self, Verb};
+use crate::system::Verb;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -98,7 +98,8 @@ impl Server {
 
     /// System verbs the policy names, in table order.
     pub fn system_tools(&self) -> Vec<Tool> {
-        system::VERBS
+        self.backend
+            .verbs()
             .iter()
             .filter_map(|v| {
                 let decision = self.policy.decide_subject(&Subject { package: SYSTEM, id: v.name, read_only: Some(v.read_only) });
@@ -108,12 +109,12 @@ impl Server {
     }
 
     /// Re-reads the function list. Apps add and drop functions on update, so `tools/list` always refreshes. System
-    /// tools are named first; when the AppFunction listing fails they are still served.
+    /// tools are named first; when the app function listing fails they are still served.
     pub fn refresh(&self) -> Result<usize, String> {
         let mut tools: HashMap<String, Tool> = self.system_tools().into_iter().map(|t| (t.name.clone(), t)).collect();
-        match self.backend.list() {
-            Ok(listing) => {
-                for (name, function) in name_all(metadata::parse(&listing)) {
+        match self.backend.functions() {
+            Ok(functions) => {
+                for (name, function) in name_all(functions) {
                     let decision = self.policy.decide(&function);
                     if decision != Decision::Deny && !tools.contains_key(&name) {
                         tools.insert(name.clone(), Tool { name, source: Source::App(function), decision });
@@ -121,7 +122,7 @@ impl Server {
                 }
             }
             Err(e) if tools.is_empty() => return Err(e),
-            Err(e) => eprintln!("tin: listing AppFunctions failed, serving system tools only: {e}"),
+            Err(e) => eprintln!("tin: listing app functions failed, serving system tools only: {e}"),
         }
         let n = tools.len();
         *self.tools.write().unwrap() = tools;
@@ -145,7 +146,7 @@ impl Server {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": { "tools": { "listChanged": false } },
                 "serverInfo": { "name": "tin", "version": env!("CARGO_PKG_VERSION") },
-                "instructions": "Android AppFunctions and system tools on this phone. Only what the phone's policy allows is listed. Read-only tools run at once; anything that changes state waits for a tap in the approvals app (call approval__wait with the ticket if the first wait runs out). Functions that move money are refused."
+                "instructions": self.backend.instructions()
             })),
             "ping" => Ok(json!({})),
             "tools/list" => self.list_tools(),
@@ -180,7 +181,7 @@ impl Server {
             out.push(json!({
                 "name": WAIT_TOOL,
                 "title": "Wait for an approval",
-                "description": "Keeps waiting for the phone owner's decision on a held call, and returns the call's result once it ran.",
+                "description": "Keeps waiting for the owner's decision on a held call, and returns the call's result once it ran.",
                 "inputSchema": { "type": "object", "properties": { "ticket": { "type": "string" } }, "required": ["ticket"] },
             }));
         }
@@ -211,7 +212,7 @@ impl Server {
             Decision::Refuse => {
                 eprintln!("tin: refused {name}: money");
                 tool_error(&format!(
-                    "refused: {} moves money, and tin never runs such functions, approval or not. Open it on the phone instead.",
+                    "refused: {} moves money, and tin never runs such functions, approval or not. Open the app yourself instead.",
                     tool.id()
                 ))
             }
@@ -220,13 +221,13 @@ impl Server {
                 let Some(gate) = &self.gate else {
                     eprintln!("tin: refused {name}: needs approval, no approvals server");
                     return tool_error(&format!(
-                        "approval required: {name} changes state, and no approvals server is configured to ask the phone's owner, so tin does not run it."
+                        "approval required: {name} changes state, and no approvals server is configured to ask the owner, so tin does not run it."
                     ));
                 };
                 // Bad arguments fail here, before anyone is asked to approve a call that cannot run.
                 let (title, summary) = match &tool.source {
                     Source::System(v) => match v.argv(&args) {
-                        Ok(argv) => (format!("tin: {}", v.describe(&args)), argv.join(" ")),
+                        Ok(argv) => (format!("tin: {}", v.describe(&args, &|p, a| self.backend.shell(p, a))), argv.join(" ")),
                         Err(e) => return tool_error(&e),
                     },
                     Source::App(f) => (format!("tin: {} in {}", f.method(), f.package), args.to_string()),
@@ -257,7 +258,7 @@ impl Server {
                 "isError": false,
             }),
             Outcome::Running => tool_error(&format!("{ticket} was approved and is running for another caller")),
-            Outcome::Denied(action) => tool_error(&format!("denied on the phone ({action}); not run")),
+            Outcome::Denied(action) => tool_error(&format!("denied in the approvals app ({action}); not run")),
             Outcome::Expired => tool_error(&format!("{ticket} expired without a decision; not run")),
             Outcome::Unknown => tool_error(&format!("no such ticket: {ticket}")),
         }

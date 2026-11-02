@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "generator": { "name": "synthetic" },
+  "entities": { "NoteEntity": { "typeName": "NoteEntity" } },
+  "queries": {},
+  "enums": [
+    { "identifier": "Unit_AppEnum", "cases": [
+      { "identifier": "week", "displayRepresentation": { "title": { "key": "Week" } } },
+      { "identifier": "day", "displayRepresentation": { "title": { "key": "Day" } } }
+    ] }
+  ],
+  "actions": {
+    "GetCountIntent": {
+      "identifier": "GetCountIntent",
+      "title": { "key": "Get Count" },
+      "descriptionMetadata": { "descriptionText": { "key": "Counts things." } },
+      "openAppWhenRun": false,
+      "isDiscoverable": true,
+      "visibilityMetadata": { "isDiscoverable": true },
+      "parameters": [
+        { "name": "text", "title": { "key": "Text" }, "isOptional": false,
+          "valueType": { "primitive": { "wrapper": { "typeIdentifier": 0 } } },
+          "typeSpecificMetadata": ["LNValueTypeSpecificMetadataKeyDefaultValue", { "string": { "wrapper": "" } }] },
+        { "name": "flag", "title": { "key": "Flag" }, "isOptional": true,
+          "valueType": { "primitive": { "wrapper": { "typeIdentifier": 1 } } },
+          "typeSpecificMetadata": ["LNValueTypeSpecificMetadataKeyDefaultValue", { "bool": { "wrapper": true } }] },
+        { "name": "count", "title": { "key": "Count" }, "parameterDescription": { "key": "How many." }, "isOptional": true,
+          "valueType": { "primitive": { "wrapper": { "typeIdentifier": 2 } } },
+          "typeSpecificMetadata": [
+            "LNValueTypeMetadataKeyNumberLowerBound", { "int": { "wrapper": 1 } },
+            "LNValueTypeMetadataKeyNumberUpperBound", { "int": { "wrapper": 52 } },
+            "LNValueTypeSpecificMetadataKeyDefaultValue", { "int": { "wrapper": 7 } }
+          ] },
+        { "name": "ratio", "isOptional": true, "valueType": { "primitive": { "wrapper": { "typeIdentifier": 7 } } } },
+        { "name": "when", "isOptional": true, "valueType": { "primitive": { "wrapper": { "typeIdentifier": 8 } } } },
+        { "name": "day", "isOptional": true, "valueType": { "primitive": { "wrapper": { "typeIdentifier": 9 } } } },
+        { "name": "link", "isOptional": true, "valueType": { "primitive": { "wrapper": { "typeIdentifier": 11 } } } },
+        { "name": "rich", "isOptional": true, "valueType": { "primitive": { "wrapper": { "typeIdentifier": 12 } } } },
+        { "name": "unit", "title": { "key": "Unit" }, "isOptional": true,
+          "valueType": { "linkEnumeration": { "wrapper": { "identifier": "Unit_AppEnum" } } },
+          "typeSpecificMetadata": ["LNValueTypeSpecificMetadataKeyDefaultValue", { "string": { "wrapper": "week" } }] },
+        { "name": "note", "isOptional": true, "valueType": { "entity": { "wrapper": { "typeName": "NoteEntity" } } } },
+        { "name": "days", "isOptional": true,
+          "valueType": { "array": { "wrapper": { "capabilities": 3, "memberValueType": { "linkEnumeration": { "wrapper": { "identifier": "Unit_AppEnum" } } } } } } },
+        { "name": "either", "isOptional": true,
+          "valueType": { "alternative": { "wrapper": { "appEnumIdentifier": "Either", "memberValueTypes": [
+            { "entity": { "wrapper": { "typeName": "NoteEntity" } } },
+            { "primitive": { "wrapper": { "typeIdentifier": 0 } } }
+          ] } } } },
+        { "name": "query", "isOptional": true, "valueType": { "searchCriteria": { "wrapper": { "typeIdentifier": 0 } } } },
+        { "name": "file", "title": { "key": "File" }, "isOptional": true, "valueType": { "intents": { "wrapper": { "typeIdentifier": 12 } } },
+          "typeSpecificMetadata": ["LNValueTypeMetadataKeyFileSupportedTypes", { "array": { "elements": [{ "string": { "wrapper": "public.image" } }] } }] },
+        { "name": "app", "isOptional": true, "valueType": { "intents": { "wrapper": { "typeIdentifier": 0 } } } },
+        { "name": "builtin", "isOptional": true, "valueType": { "builtIn": { "wrapper": { "builtInType": 2 } } } },
+        { "name": "length", "isOptional": true, "valueType": { "measurement": { "wrapper": { "unitType": 7 } } } },
+        { "name": "odd", "isOptional": true, "valueType": { "somethingNew": { "wrapper": {} } } }
+      ],
+      "outputType": { "primitive": { "wrapper": { "typeIdentifier": 2 } } }
+    },
+    "OpenThingIntent": {
+      "identifier": "OpenThingIntent",
+      "title": { "key": "Open Thing" },
+      "descriptionMetadata": { "descriptionText": { "key": "" } },
+      "openAppWhenRun": true,
+      "isDiscoverable": true,
+      "parameters": []
+    },
+    "HiddenIntent": {
+      "identifier": "HiddenIntent",
+      "title": { "key": "Hidden" },
+      "isDiscoverable": false,
+      "parameters": []
+    },
+    "WidgetOnlyIntent": {
+      "identifier": "WidgetOnlyIntent",
+      "title": { "key": "Widget Only" },
+      "isDiscoverable": true,
+      "visibilityMetadata": { "isDiscoverable": false },
+      "parameters": []
+    }
+  }
+}
