@@ -1,0 +1,12 @@
+{
+  "mac": "27.0.1",
+  "rows": [
+    {
+      "tool": "sindresorhus_Week-Number__GetWeekNumberIntent",
+      "n": 20,
+      "p50": 483,
+      "p95": 786,
+      "max": 842
+    }
+  ]
+}
