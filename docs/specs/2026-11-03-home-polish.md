@@ -108,13 +108,16 @@ against AGP 9.4.1. More to the point, the two things this PR adds, the blurred s
 that either library renders them. A golden that silently misses the halo would be evidence of the wrong thing, so there is
 none. The machine check is the CSS-derived tests above.
 
-**Device.** adb works outside the sandbox and the Pixel 8a is attached and running Home, but the build on it is Yehor's
-daily launcher, so this PR does not install over it. The "before" is the screenshot of that build (Needs you calm,
-Homelab broken with no red, flat cards, no shadows). For the "after", from the repo root:
+**Device.** adb works outside the sandbox and the Pixel 8a is attached and running Home. The "before" is the screenshot
+of the build that was on it (cards flat, no shadows, a 16 dp inset; Needs you and Homelab calm, Homelab showing "not
+reachable", which is the unavailable state and not the broken light). Other sessions drive the same phone and install their
+own builds, so a device check starts with the install, from the repo root:
 
 1. `cd android && ./gradlew :home:installDebug` on this branch.
-2. Calm, needs you, broken, stale: let the live signals produce them (Homelab unreachable is the broken state already
-   showing), or flip the Tune sheet; a stale card needs a source that stops updating.
+2. Calm shows live. Needs you: the debug build has a stand-in provider, `adb shell content insert --uri
+   content://io.github.egoushka.tin.home.needsyou.fake/items --bind id:s:a1 --bind title:s:Deploy --bind source:s:pr`
+   (remove it with `content delete` and `--where "id='a1'"`). Broken needs Gatus to report a failing check, and stale a
+   source that stops updating, so those two are not producible without a fake feed (not added here).
 3. Press and hold the dock tile and the mic; switch on Accessibility > Remove animations and trigger a light
    change (M4, S2).
 
