@@ -100,7 +100,9 @@ The 7-day stop condition above is the check of the whole project, not of a slice
 - Slice 2, glance and music: a posted test notification (`adb shell cmd notification post`) appears in the glance
   within one listener callback; play/pause works on the active session.
 - Slice 3, Today and alarm: an event inserted with `adb shell content insert --uri content://com.android.calendar/events`
-  shows; the current event is teal; a clash marks its icon with `glow-1`.
+  shows within a calendar change (no restart); the current event is teal; a clash marks its icon with the warn colour
+  (the card `HomeNightGlass.md` says warn; `glow-1` is reserved for "needs you"); with the permission revoked the card
+  asks for access and Home still starts; `adb shell am start -a android.intent.action.SET_ALARM` shows the alarm row.
 - Slice 4, Needs you: an item `PUT` to the approvals server lights the card within one poll; deciding it on the laptop
   clears it (500 ms out).
 - Slice 5, homelab and readiness: one failed Gatus poll keeps calm, two make it red; three missed refreshes fade it.

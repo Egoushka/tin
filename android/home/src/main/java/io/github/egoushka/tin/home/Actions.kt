@@ -26,7 +26,7 @@ enum class Dock(val icon: String, @StringRes val label: Int, val intent: () -> I
         { Intent(Intent.ACTION_VIEW, Uri.parse("https://www.openstreetmap.org/")) }),
 }
 
-class Actions(private val context: Context) {
+class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
     fun start(intent: Intent, what: String) {
         try {
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -48,6 +48,11 @@ class Actions(private val context: Context) {
             Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ComponentName(context, TinListener::class.java).flattenToString(),
         ),
         context.getString(R.string.notif_access),
+    )
+
+    fun openAppSettings() = start(
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+        context.getString(R.string.app_name),
     )
 
     fun webSearch(query: String) = start(Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, query), query)
