@@ -1,5 +1,8 @@
 package io.github.egoushka.tin.home.theme
 
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.RenderEffect as PlatformRenderEffect
+import android.graphics.Shader
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -7,7 +10,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -21,22 +23,27 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.RenderEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.GlobalPositionAwareModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Density
@@ -81,7 +88,12 @@ class Frost {
 val LocalFrost = staticCompositionLocalOf { Frost() }
 val LocalTune = staticCompositionLocalOf { Tune() }
 
-private val saturate = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.6f) })
+/** `blur(frost) saturate(160%)` as one RenderEffect, so the saturation is baked into the shared bitmap once. */
+private fun frostEffect(radius: Float): RenderEffect {
+    val saturate = ColorMatrixColorFilter(android.graphics.ColorMatrix().apply { setSaturation(1.6f) })
+    val blur = PlatformRenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
+    return PlatformRenderEffect.createColorFilterEffect(saturate, blur).asComposeRenderEffect()
+}
 
 /** Renders the room through `blur(frost) saturate(160%)` into [frost]. Frost 0 records no RenderEffect at all. */
 @Composable
@@ -93,7 +105,7 @@ fun FrostRenderer(tune: Tune, size: IntSize, frost: Frost) {
         if (size.width == 0 || size.height == 0) return@LaunchedEffect
         val screen = Size(size.width.toFloat(), size.height.toFloat())
         val radius = with(density) { tune.frostDp.dp.toPx() }
-        layer.renderEffect = if (tune.usesFrost) BlurEffect(radius, radius, TileMode.Clamp) else null
+        layer.renderEffect = if (tune.usesFrost) frostEffect(radius) else null
         layer.record(density, direction, size) { drawRoom(tune.roomLight, screen) }
         frost.screen = screen
         frost.bitmap = layer.toImageBitmap()
@@ -157,61 +169,116 @@ fun lerpColor(a: Color, b: Color, t: Float) = colorMix(b, t, a)
  * Night glass without a card's light: the frosted room behind, `surface` at the tint knob's alpha, a 1 dp edge and the
  * 1 dp line of light along the top. Dock tiles, the search bar and sheets use this.
  */
+@Composable
 fun Modifier.glass(shape: Shape): Modifier = glassBody(shape)
+
+private val Off: () -> Float = { 0f }
 
 /**
  * The card body. [needsYou] and [broken] (0..1) are read while drawing, so a light animating never recomposes; they
  * paint the attention colour or red over the glass and tint the edge. Both 0 is calm. [pressed] (0..1) is the dock
  * tile's pressed look.
  */
+@Composable
 fun Modifier.glassBody(
     shape: Shape,
     attention: Color = Ng.glow1,
-    needsYou: () -> Float = { 0f },
-    broken: () -> Float = { 0f },
-    pressed: () -> Float = { 0f },
-): Modifier = composed {
-    val frost = LocalFrost.current
-    val tune = LocalTune.current
-    var pos by remember { mutableStateOf(Offset.Zero) }
-    this
-        .onGloballyPositioned { pos = it.positionInRoot() }
-        .drawWithCache {
-            val outer = shape.round(size, layoutDirection, this)
-            val inner = outer.inset(GlassPaint.BORDER_WIDTH.dp.toPx())
-            val outerPath = Path().apply { addRoundRect(outer) }
-            val innerPath = Path().apply { addRoundRect(inner) }
-            val ring = Path.combine(PathOperation.Difference, outerPath, innerPath)
-            val shifted = Path().apply {
-                addRoundRect(inner)
-                translate(Offset(0f, GlassPaint.EDGE_LIT_DY.dp.toPx()))
-            }
-            val crescent = Path.combine(PathOperation.Difference, innerPath, shifted)
-            onDrawBehind {
-                val n = needsYou()
-                val b = broken()
-                val p = pressed()
-                clipPath(outerPath) {
-                    drawFrost(frost, tune, pos)
-                    // `.ic:active i`: the tint gives way to surface-2 and the border to edge-hi.
-                    drawRect(lerpColor(Ng.surface.copy(alpha = tune.glassTint), Ng.surface2, p))
-                    if (n > 0f) drawLight(attention, GlassPaint.NEEDS_ALPHA * n, GlassPaint.NEEDS_FADE,
-                        GlassPaint.NEEDS_CX, GlassPaint.NEEDS_CY, GlassPaint.NEEDS_RX, GlassPaint.NEEDS_RY)
-                    if (b > 0f) drawLight(Ng.bad, GlassPaint.BROKEN_ALPHA * b, GlassPaint.BROKEN_FADE,
-                        GlassPaint.BROKEN_CX, GlassPaint.BROKEN_CY, GlassPaint.BROKEN_RX, GlassPaint.BROKEN_RY)
-                }
-                var edge = Ng.edge
-                var line = Ng.edgeHi
-                if (n > 0f) {
-                    edge = lerpColor(edge, colorMix(attention, GlassPaint.NEEDS_BORDER, Ng.edge), n)
-                    line = lerpColor(line, colorMix(attention, GlassPaint.NEEDS_LINE, Ng.edgeHi), n)
-                }
-                if (b > 0f) edge = lerpColor(edge, colorMix(Ng.bad, GlassPaint.BROKEN_BORDER, Ng.edge), b)
-                edge = lerpColor(edge, Ng.edgeHi, p)
-                drawPath(ring, edge)
-                drawPath(crescent, line)
-            }
+    needsYou: () -> Float = Off,
+    broken: () -> Float = Off,
+    pressed: () -> Float = Off,
+): Modifier = this.then(GlassElement(shape, attention, needsYou, broken, pressed, LocalFrost.current, LocalTune.current))
+
+private data class GlassElement(
+    val shape: Shape,
+    val attention: Color,
+    val needsYou: () -> Float,
+    val broken: () -> Float,
+    val pressed: () -> Float,
+    val frost: Frost,
+    val tune: Tune,
+) : ModifierNodeElement<GlassNode>() {
+    override fun create() = GlassNode(shape, attention, needsYou, broken, pressed, frost, tune)
+
+    override fun update(node: GlassNode) {
+        node.shape = shape
+        node.attention = attention
+        node.needsYou = needsYou
+        node.broken = broken
+        node.pressed = pressed
+        node.frost = frost
+        node.tune = tune
+        node.outlines = null
+        node.invalidateDraw()
+    }
+}
+
+/** The card's outer clip, its 1 dp border ring and the 1 dp crescent of light along the top, for one size. */
+private class Outlines(val size: Size, val direction: LayoutDirection, val density: Float, val outer: Path, val ring: Path, val crescent: Path)
+
+private fun outlines(shape: Shape, size: Size, direction: LayoutDirection, density: Density): Outlines = with(density) {
+    val outer = shape.round(size, direction, density)
+    val inner = outer.inset(GlassPaint.BORDER_WIDTH.dp.toPx())
+    val outerPath = Path().apply { addRoundRect(outer) }
+    val innerPath = Path().apply { addRoundRect(inner) }
+    val shifted = Path().apply {
+        addRoundRect(inner)
+        translate(Offset(0f, GlassPaint.EDGE_LIT_DY.dp.toPx()))
+    }
+    Outlines(size, direction, density.density, outerPath,
+        Path.combine(PathOperation.Difference, outerPath, innerPath),
+        Path.combine(PathOperation.Difference, innerPath, shifted))
+}
+
+/**
+ * Draws the card's crop of the shared frost bitmap, the tint, the light and the edge. The position is a plain field and
+ * the light amounts are read in [draw], so tracking the position and animating a light cost no recomposition.
+ */
+private class GlassNode(
+    var shape: Shape,
+    var attention: Color,
+    var needsYou: () -> Float,
+    var broken: () -> Float,
+    var pressed: () -> Float,
+    var frost: Frost,
+    var tune: Tune,
+) : Modifier.Node(), DrawModifierNode, GlobalPositionAwareModifierNode {
+    private var pos = Offset.Zero
+    var outlines: Outlines? = null
+
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
+        val p = coordinates.positionInRoot()
+        if (p == pos) return
+        pos = p
+        invalidateDraw()
+    }
+
+    override fun ContentDrawScope.draw() {
+        val o = outlines?.takeIf { it.size == size && it.direction == layoutDirection && it.density == density }
+            ?: outlines(shape, size, layoutDirection, this).also { outlines = it }
+        val n = needsYou()
+        val b = broken()
+        val p = pressed()
+        clipPath(o.outer) {
+            drawFrost(frost, tune, pos)
+            // `.ic:active i`: the tint gives way to surface-2 and the border to edge-hi.
+            drawRect(lerpColor(Ng.surface.copy(alpha = tune.glassTint), Ng.surface2, p))
+            if (n > 0f) drawLight(attention, GlassPaint.NEEDS_ALPHA * n, GlassPaint.NEEDS_FADE,
+                GlassPaint.NEEDS_CX, GlassPaint.NEEDS_CY, GlassPaint.NEEDS_RX, GlassPaint.NEEDS_RY)
+            if (b > 0f) drawLight(Ng.bad, GlassPaint.BROKEN_ALPHA * b, GlassPaint.BROKEN_FADE,
+                GlassPaint.BROKEN_CX, GlassPaint.BROKEN_CY, GlassPaint.BROKEN_RX, GlassPaint.BROKEN_RY)
         }
+        var edge = Ng.edge
+        var line = Ng.edgeHi
+        if (n > 0f) {
+            edge = lerpColor(edge, colorMix(attention, GlassPaint.NEEDS_BORDER, Ng.edge), n)
+            line = lerpColor(line, colorMix(attention, GlassPaint.NEEDS_LINE, Ng.edgeHi), n)
+        }
+        if (b > 0f) edge = lerpColor(edge, colorMix(Ng.bad, GlassPaint.BROKEN_BORDER, Ng.edge), b)
+        edge = lerpColor(edge, Ng.edgeHi, p)
+        drawPath(o.ring, edge)
+        drawPath(o.crescent, line)
+        drawContent()
+    }
 }
 
 private val RowShape = RoundedCornerShape(Dimen.radiusRow)
@@ -238,14 +305,14 @@ fun Modifier.nowLight(current: Boolean): Modifier = composed {
     }
 }
 
+/** The frost bitmap already has `saturate(160%)` baked in (see [frostEffect]); this only crops it to the card. */
 private fun DrawScope.drawFrost(frost: Frost, tune: Tune, pos: Offset) {
     val b = frost.bitmap
     if (b != null) {
         val src = IntOffset(pos.x.roundToInt().coerceAtLeast(0), pos.y.roundToInt().coerceAtLeast(0))
         val w = size.width.roundToInt().coerceAtMost(b.width - src.x).coerceAtLeast(0)
         val h = size.height.roundToInt().coerceAtMost(b.height - src.y).coerceAtLeast(0)
-        drawImage(b, srcOffset = src, srcSize = IntSize(w, h), dstSize = IntSize(w, h),
-            colorFilter = if (tune.usesFrost) saturate else null)
+        drawImage(b, srcOffset = src, srcSize = IntSize(w, h), dstSize = IntSize(w, h))
     } else {
         translate(-pos.x, -pos.y) { drawRoom(tune.roomLight, frost.screen) }
     }
