@@ -42,7 +42,10 @@ object Ng {
     )
 }
 
-/** The attention colour (`glow-1`): only hues that keep ink-2 at 4.5:1 on a lit card. Green is excluded. */
+/**
+ * The attention colour (`glow-1`). Violet and rose keep ink-2 at 4.5:1 on a lit card at every Tune setting; blue falls to
+ * 4.1:1 and amber to 3.7:1 with the room at 1.4 and the glass at 35% (spec 2026-11-03-home-a11y-locale, C1). Green is excluded.
+ */
 enum class Attention(val color: Color) {
     Violet(Color(0xFF7C5CFF)), Blue(Color(0xFF4C8DFF)), Rose(Color(0xFFFF5C93)), Amber(Color(0xFFFF9F43)),
 }

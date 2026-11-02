@@ -58,6 +58,7 @@ import io.github.egoushka.tin.home.theme.LightKind
 import io.github.egoushka.tin.home.theme.Lucide
 import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
+import io.github.egoushka.tin.home.theme.lerpColor
 import io.github.egoushka.tin.home.theme.nowLight
 import io.github.egoushka.tin.home.theme.plainClickable
 import io.github.egoushka.tin.home.theme.pressable
@@ -65,6 +66,9 @@ import io.github.egoushka.tin.home.theme.LocalTune
 import kotlinx.coroutines.delay
 
 private fun icon(kind: NoteKind) = when (kind) { NoteKind.Message -> "msg"; NoteKind.Mail -> "mail"; NoteKind.Other -> "bell" }
+
+/** How far the clash icon's attention hue moves toward ink: violet at tint 35% is 2.2:1 on the now row, this keeps 3:1 (ContrastTest). */
+internal const val CLASH_ICON_INK_MIX = 0.35f
 
 /** Unread counts per app and the latest message; asks for the listener grant while it is missing. */
 @Composable
@@ -222,7 +226,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
                         val clash = stringResource(R.string.clash)
                         Spacer(Modifier.width(Dimen.space2))
                         Image(
-                            Lucide.icon("warn", 16f, tune.strokeDp, tune.attention.color), null,
+                            Lucide.icon("warn", 16f, tune.strokeDp, lerpColor(tune.attention.color, Ng.ink, CLASH_ICON_INK_MIX)), null,
                             Modifier.size(Dimen.glyphSmall).semantics { contentDescription = clash },
                         )
                     }
