@@ -1,14 +1,16 @@
 package io.github.egoushka.tin.home
 
-import io.github.egoushka.tin.home.apps.AppSearch
+import io.github.egoushka.tin.home.search.Fold
+import io.github.egoushka.tin.home.search.Index
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /** H6: app search ranking. */
 class AppSearchTest {
     private val apps = listOf("Signal", "Google Maps", "Messages", "Gmail", "Café Kyiv", "Камера", "Settings")
+    private val index = Index(apps) { it }
 
-    private fun search(q: String) = AppSearch.filter(apps, q) { it }
+    private fun search(q: String) = index.match(q).map { it.item }
 
     @Test
     fun prefixBeatsWordStartBeatsSubstring() {
@@ -25,7 +27,7 @@ class AppSearchTest {
 
     @Test
     fun emptyQueryKeepsEverythingAToZ() {
-        assertEquals(apps.sortedBy { AppSearch.normalize(it) }, search("  "))
+        assertEquals(apps.sortedBy { Fold.of(it) }, search("  "))
     }
 
     @Test

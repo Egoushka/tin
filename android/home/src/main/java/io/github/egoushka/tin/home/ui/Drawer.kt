@@ -1,6 +1,9 @@
 package io.github.egoushka.tin.home.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -35,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,8 +50,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -62,7 +67,9 @@ import io.github.egoushka.tin.home.Actions
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
-import io.github.egoushka.tin.home.apps.AppSearch
+import io.github.egoushka.tin.home.search.Contact
+import io.github.egoushka.tin.home.search.Hit
+import io.github.egoushka.tin.home.search.Results
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.LocalTune
 import io.github.egoushka.tin.home.theme.Lucide
@@ -71,17 +78,35 @@ import io.github.egoushka.tin.home.theme.NgType
 import io.github.egoushka.tin.home.theme.drawRoom
 import io.github.egoushka.tin.home.theme.glass
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** All apps (swipe up) and search (tap the bar): A–Z grid, search field at the bottom, Enter opens the top result. */
+/**
+ * All apps (swipe up) and search (tap the bar): A–Z grid, search field at the bottom. Typing swaps the grid for the
+ * results card (apps, people, ask Tin, the web) and Enter opens its top row; [onAsk] hands a line to the voice path.
+ */
 @Composable
-fun Drawer(apps: AppRepository, actions: Actions, open: Boolean, focusSearch: Boolean, onClose: () -> Unit, onTune: () -> Unit) {
+fun Drawer(
+    apps: AppRepository,
+    actions: Actions,
+    open: Boolean,
+    focusSearch: Boolean,
+    onClose: () -> Unit,
+    onTune: () -> Unit,
+    onAsk: (String) -> Unit,
+) {
     val tune = LocalTune.current
+    val context = LocalContext.current
+    val resources = LocalResources.current
     val all by apps.list.collectAsState()
     val iconPx = with(LocalDensity.current) { Dimen.glyphTile.roundToPx() * 2 }
     LaunchedEffect(all, iconPx) { apps.warm(iconPx, Ng.ink.toArgb()) }
     var query by remember { mutableStateOf("") }
-    val shown = remember(all, query) { AppSearch.filter(all, query) { it.label } }
+    val sources = rememberSearchSources(all, open)
+    val results = remember(query, sources.apps, sources.shortcutIndex, sources.people, sources.access) {
+        Results.of(query, sources.apps, sources.shortcutIndex, sources.people, sources.access)
+    }
+    val scope = rememberCoroutineScope()
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -96,10 +121,30 @@ fun Drawer(apps: AppRepository, actions: Actions, open: Boolean, focusSearch: Bo
     }
     if (open && focusSearch) AfterAttach(Unit) { runCatching { focus.requestFocus() } }
 
-    fun open(app: AppEntry) {
+    fun run(hit: Hit) {
+        when (hit) {
+            // These two keep the drawer: the dialog and the settings page both come back to it.
+            Hit.Allow -> return sources.allow()
+            Hit.Off -> return actions.openAppSettings()
+            is Hit.App -> apps.launch(hit.app)
+            is Hit.Shortcut -> if (!sources.shortcuts.start(hit.shortcut)) {
+                Toast.makeText(context, resources.getString(R.string.open_failed, hit.shortcut.label), Toast.LENGTH_SHORT).show()
+            }
+            is Hit.Person -> actions.start(Intent(Intent.ACTION_VIEW, sources.contacts.uri(hit.contact)), hit.contact.name)
+            is Hit.Ask -> onAsk(hit.query)
+            is Hit.Web -> actions.webSearch(hit.query)
+        }
         keyboard?.hide()
-        apps.launch(app)
         onClose()
+    }
+
+    fun call(person: Contact) {
+        scope.launch {
+            val number = withContext(Dispatchers.IO) { sources.contacts.phone(person) } ?: return@launch
+            actions.start(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)), person.name)
+            keyboard?.hide()
+            onClose()
+        }
     }
 
     Column(
@@ -117,25 +162,21 @@ fun Drawer(apps: AppRepository, actions: Actions, open: Boolean, focusSearch: Bo
             IconButton("x", stringResource(R.string.close), onClose)
         }
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            state = grid,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(vertical = Dimen.space2),
-            verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp + Dimen.space2),
-            horizontalArrangement = Arrangement.spacedBy(tune.gapDp.dp),
-        ) {
-            if (query.isNotBlank()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    WebRow(query) { keyboard?.hide(); actions.webSearch(query.trim()); onClose() }
-                }
+        if (query.isBlank()) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                state = grid,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(vertical = Dimen.space2),
+                verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp + Dimen.space2),
+                horizontalArrangement = Arrangement.spacedBy(tune.gapDp.dp),
+            ) {
+                items(all, key = { it.key }) { app -> AppTile(app, apps) { run(Hit.App(app)) } }
             }
-            if (shown.isEmpty() && all.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(stringResource(R.string.no_apps), style = NgType.body, modifier = Modifier.padding(Dimen.space4))
-                }
+        } else {
+            Box(Modifier.weight(1f).padding(vertical = Dimen.space2), contentAlignment = Alignment.TopCenter) {
+                SearchPanel(results, apps, onOpen = ::run, onCall = ::call)
             }
-            items(shown, key = { it.key }) { app -> AppTile(app, apps) { open(app) } }
         }
 
         Row(
@@ -158,11 +199,7 @@ fun Drawer(apps: AppRepository, actions: Actions, open: Boolean, focusSearch: Bo
                     textStyle = NgType.title,
                     cursorBrush = SolidColor(Ng.ink),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = {
-                        val top = shown.firstOrNull()
-                        if (top != null && query.isNotBlank()) open(top)
-                        else if (query.isNotBlank()) { keyboard?.hide(); actions.webSearch(query.trim()); onClose() }
-                    }),
+                    keyboardActions = KeyboardActions(onGo = { results.top?.let(::run) }),
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 )
             }
@@ -187,25 +224,6 @@ private fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
         Spacer(Modifier.height(Dimen.space1))
         Text(app.label, style = NgType.body.copy(color = Ng.ink), maxLines = 1, overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-    }
-}
-
-@Composable
-private fun WebRow(query: String, onClick: () -> Unit) {
-    val tune = LocalTune.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(Dimen.target)
-            .glass(RoundedCornerShape(Dimen.radiusRow))
-            .clickable(onClick = onClick)
-            .padding(horizontal = Dimen.space4),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(Lucide.icon("globe", 16f, tune.strokeDp), contentDescription = null, Modifier.size(Dimen.glyphSmall))
-        Spacer(Modifier.width(Dimen.space3))
-        Text(stringResource(R.string.search_web, query.trim()), style = NgType.title, maxLines = 1,
-            overflow = TextOverflow.Ellipsis)
     }
 }
 
