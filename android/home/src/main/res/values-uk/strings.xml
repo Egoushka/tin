@@ -66,4 +66,7 @@
     <string name="homelab">Домашній сервер</string>
     <string name="homelab_ok">Усі %d працюють</string>
     <string name="homelab_unavailable">Домашній сервер недоступний</string>
+    <string name="voice_listening">Слухаю…</string>
+    <string name="voice_thinking">Думаю…</string>
+    <string name="voice_error">Не розчув</string>
 </resources>

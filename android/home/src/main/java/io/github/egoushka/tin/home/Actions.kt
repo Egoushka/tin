@@ -59,6 +59,9 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
         else start(intent, context.getString(R.string.needs_you))
     }
 
+    /** An item's own link (`approvals://item/<id>`), so a spoken "approve" lands on the item and waits for a tap. */
+    fun openItem(deepLink: String) = start(Intent(Intent.ACTION_VIEW, Uri.parse(deepLink)), context.getString(R.string.needs_you))
+
     fun openAppSettings() = start(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
         context.getString(R.string.app_name),
