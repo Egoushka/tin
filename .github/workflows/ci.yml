@@ -44,6 +44,7 @@ jobs:
       # build.sh cross-compiles tin into libtin.so and runs :app:assembleDebug.
       - name: Build the APK
         run: ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}" scripts/build.sh
-      - name: Speech module tests
+      # Home's release build is where its real voice engine is wired; debug keeps the scripted one.
+      - name: Module tests and Home release build
         working-directory: android
-        run: ./gradlew --no-daemon :speech:testDebugUnitTest
+        run: ./gradlew --no-daemon :speech:testDebugUnitTest :home:testDebugUnitTest :home:assembleRelease
