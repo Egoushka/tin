@@ -17,11 +17,14 @@
     <!-- Earbud battery of the current audio output; asked once, the card works without it. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-    <!-- LauncherApps only returns activities this package can see. -->
+    <!-- LauncherApps only returns activities this package can see; the widget picker names the app of each provider. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
         </intent>
         <intent>
             <action android:name="android.intent.action.DIAL" />

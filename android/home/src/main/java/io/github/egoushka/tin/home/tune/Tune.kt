@@ -59,7 +59,8 @@ data class Tune(
     }
 }
 
-private val Context.tuneStore: DataStore<Preferences> by preferencesDataStore(name = "tin.tune")
+// One DataStore per file per process: the layout and the pins live here under keys of their own.
+internal val Context.tuneStore: DataStore<Preferences> by preferencesDataStore(name = "tin.tune")
 
 class TuneStore(private val context: Context) {
     private object K {

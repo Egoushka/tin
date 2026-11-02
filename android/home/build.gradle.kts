@@ -49,7 +49,11 @@ android {
     }
 
     testOptions {
-        unitTests.isReturnDefaultValues = true
+        unitTests {
+            isReturnDefaultValues = true
+            // The layout check composes Home's frame under Robolectric, which needs the merged resources.
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -62,6 +66,8 @@ kotlin {
 // The design tokens are the spec; TokensTest reads them from the repo (docs/design/night-glass).
 tasks.withType<Test>().configureEach {
     systemProperty("tin.design", rootProject.file("../docs/design/night-glass").absolutePath)
+    // Robolectric's SDK 36 sandbox reaches into java.base on JDK 21.
+    jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
 }
 
 dependencies {
@@ -77,4 +83,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
