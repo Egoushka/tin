@@ -38,8 +38,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import io.github.egoushka.tin.home.voice.Voice
-import io.github.egoushka.tin.home.voice.VoiceIntent
 import io.github.egoushka.tin.home.voice.VoiceState
+import io.github.egoushka.tin.home.voice.ask
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -130,6 +130,7 @@ fun HomeScreen(
                     focusSearch = layer == Layer.Search,
                     onClose = { onLayer(Layer.Home) },
                     onTune = { onLayer(Layer.Tune) },
+                    onAsk = { said -> actions.ask(said, signals.needsYou.state.value.needs) },
                 )
             }
         }
@@ -177,13 +178,7 @@ private fun Home(tune: Tune, onLayer: (Layer) -> Unit, actions: Actions, signals
     val voice = remember { Voice() }
     val scope = rememberCoroutineScope()
     val listen = {
-        val started = voice.start(scope) { said ->
-            when (val intent = VoiceIntent.of(said, signals.needsYou.state.value.needs)) {
-                is VoiceIntent.OpenItem -> actions.openItem(intent.deepLink)
-                VoiceIntent.OpenQueue -> actions.openApprovals()
-                is VoiceIntent.Search -> actions.webSearch(intent.query)
-            }
-        }
+        val started = voice.start(scope) { said -> actions.ask(said, signals.needsYou.state.value.needs) }
         if (!started && !actions.voice()) onLayer(Layer.Search)
     }
     Column(

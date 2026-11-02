@@ -14,8 +14,7 @@ import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.LruCache
-import java.text.Normalizer
-import java.util.Locale
+import io.github.egoushka.tin.home.search.Fold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -28,29 +27,6 @@ data class AppEntry(val label: String, val component: ComponentName, val user: U
     val key: String get() = "${component.flattenToShortString()}#${user?.hashCode() ?: 0}"
 }
 
-/** Search over app labels: prefix beats word start beats substring; case and diacritics are ignored. */
-object AppSearch {
-    fun normalize(s: String): String =
-        Normalizer.normalize(s.lowercase(Locale.ROOT), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
-
-    fun rank(label: String, query: String): Int? {
-        val l = normalize(label)
-        val q = normalize(query.trim())
-        if (q.isEmpty()) return 3
-        return when {
-            l.startsWith(q) -> 0
-            l.split(Regex("[\\s\\-_.:]+")).any { it.startsWith(q) } -> 1
-            l.contains(q) -> 2
-            else -> null
-        }
-    }
-
-    fun <T> filter(items: List<T>, query: String, label: (T) -> String): List<T> =
-        items.mapNotNull { item -> rank(label(item), query)?.let { it to item } }
-            .sortedWith(compareBy<Pair<Int, T>> { it.first }.thenBy { normalize(label(it.second)) })
-            .map { it.second }
-}
-
 class AppRepository(private val context: Context) {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
     private val users = context.getSystemService(UserManager::class.java)
@@ -60,7 +36,7 @@ class AppRepository(private val context: Context) {
         launcherApps.getActivityList(null, user)
             .filter { it.componentName.packageName != context.packageName }
             .map { AppEntry(it.label.toString(), it.componentName, user.takeIf { u -> u != Process.myUserHandle() }) }
-    }.sortedBy { AppSearch.normalize(it.label) }
+    }.sortedBy { Fold.of(it.label) }
 
     private val loaded = MutableStateFlow<List<AppEntry>>(emptyList())
 
