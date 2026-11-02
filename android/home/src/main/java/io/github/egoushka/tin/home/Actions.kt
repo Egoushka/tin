@@ -16,6 +16,8 @@ import androidx.annotation.StringRes
 import io.github.egoushka.tin.home.signals.TinListener
 
 /** A dock slot: a Lucide icon and the default handler for one job, so the dock follows the user's app choices. */
+private const val APPROVALS_PACKAGE = "com.yehor.approvals"
+
 enum class Dock(val icon: String, @StringRes val label: Int, val intent: () -> Intent, val fallback: (() -> Intent)? = null) {
     Phone("phone", R.string.dock_phone, { Intent(Intent.ACTION_DIAL) }),
     Messages("msg", R.string.dock_messages, { Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MESSAGING) }),
@@ -49,6 +51,13 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
         ),
         context.getString(R.string.notif_access),
     )
+
+    /** Opens the approvals app on its queue; the card never decides anything itself. */
+    fun openApprovals() {
+        val intent = context.packageManager.getLaunchIntentForPackage(APPROVALS_PACKAGE)
+        if (intent == null) Toast.makeText(context, context.getString(R.string.open_failed, context.getString(R.string.needs_you)), Toast.LENGTH_SHORT).show()
+        else start(intent, context.getString(R.string.needs_you))
+    }
 
     fun openAppSettings() = start(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),

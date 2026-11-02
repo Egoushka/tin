@@ -18,6 +18,14 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    buildTypes {
+        // Needs you reads the approvals app's provider; the debug build reads a fake with the same wire shape
+        // (src/debug) until the approvals repo ships its side.
+        debug { buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"io.github.egoushka.tin.home.needsyou.fake\"") }
+        release { buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"com.yehor.approvals.needsyou\"") }
     }
 
     compileOptions {

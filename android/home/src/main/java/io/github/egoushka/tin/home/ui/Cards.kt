@@ -40,6 +40,7 @@ import io.github.egoushka.tin.home.layer.LayerCard
 import io.github.egoushka.tin.home.layer.ageText
 import io.github.egoushka.tin.home.layer.rememberNow
 import io.github.egoushka.tin.home.signals.AlarmSource
+import io.github.egoushka.tin.home.signals.NeedsYouSource
 import io.github.egoushka.tin.home.signals.Agenda
 import io.github.egoushka.tin.home.signals.CalendarSource
 import io.github.egoushka.tin.home.signals.Glance
@@ -209,6 +210,46 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
                 }
             }
             if (agenda.more > 0) Text(stringResource(R.string.today_more, agenda.more), style = NgType.body)
+        }
+    }
+}
+
+/** What waits for Yehor in the approvals app: lit while anything is open, oldest first, tap opens the queue. */
+@Composable
+fun NeedsYouCard(source: NeedsYouSource, actions: Actions) {
+    val state by source.state.collectAsState()
+    if (state.status == NeedsYouSource.Status.Loading) return // first read not back yet
+    val now = rememberNow()
+    val label = stringResource(R.string.needs_you)
+    val needs = state.needs
+    val unavailable = state.status == NeedsYouSource.Status.Unavailable
+    val stale = !unavailable && Freshness.isStale(now, state.at, NeedsYouSource.INTERVAL_MS)
+    LayerCard(
+        label, if (unavailable) null else Freshness.age(now, state.at),
+        CardLight(if (needs.lit) Ng.glow1 else null, stale),
+        Modifier.clickable(role = Role.Button) { actions.openApprovals() },
+    ) {
+        when {
+            unavailable -> Text(stringResource(R.string.needs_unavailable), style = NgType.body)
+            !needs.lit -> Text(stringResource(R.string.needs_empty), style = NgType.body)
+            else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(needs.open.toString(), style = NgType.figure)
+                Spacer(Modifier.width(Dimen.space4))
+                Column(Modifier.weight(1f)) {
+                    needs.rows.forEach { item ->
+                        Row {
+                            Text(item.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            Spacer(Modifier.width(Dimen.space2))
+                            Text(item.source, style = NgType.body)
+                        }
+                    }
+                    val tail = listOfNotNull(
+                        needs.more.takeIf { it > 0 }?.let { stringResource(R.string.needs_more, it) },
+                        needs.held.takeIf { it > 0 }?.let { stringResource(R.string.needs_held, it) },
+                    )
+                    if (tail.isNotEmpty()) Text(tail.joinToString(" · "), style = NgType.body)
+                }
+            }
         }
     }
 }

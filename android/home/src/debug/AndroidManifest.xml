@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Debug only: stands in for the approvals app's Needs-you provider until its N1 lands. -->
+        <provider
+            android:name=".signals.FakeNeedsYouProvider"
+            android:authorities="io.github.egoushka.tin.home.needsyou.fake"
+            android:exported="true" />
+    </application>
+</manifest>
