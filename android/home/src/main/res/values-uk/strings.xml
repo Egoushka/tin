@@ -41,7 +41,7 @@
     <string name="age_now">зараз</string>
     <string name="age_min">%d хв</string>
     <string name="age_hour">%d год</string>
-    <string name="age_day">%d д</string>
+    <string name="age_day">%d дн</string>
     <string name="notif_access">Дозволити доступ до сповіщень</string>
     <string name="notif_access_hint">Покаже лічильники сповіщень і музику тут</string>
     <string name="music_play">Грати</string>
@@ -51,7 +51,7 @@
     <string name="buds_battery">Заряд навушників %1$s</string>
     <string name="today">Сьогодні</string>
     <string name="today_empty">Більше нічого на сьогодні</string>
-    <string name="today_more">ще %d</string>
+    <string name="today_more">+%d ще</string>
     <string name="calendar_access">Дозволити доступ до календаря</string>
     <string name="calendar_access_hint">Покаже, що далі сьогодні</string>
     <string name="clash">Перетинається з іншою подією</string>
@@ -68,5 +68,5 @@
     <string name="homelab_unavailable">Домашній сервер недоступний</string>
     <string name="voice_listening">Слухаю…</string>
     <string name="voice_thinking">Думаю…</string>
-    <string name="voice_error">Не розчув</string>
+    <string name="voice_error">Не вдалося розчути</string>
 </resources>
