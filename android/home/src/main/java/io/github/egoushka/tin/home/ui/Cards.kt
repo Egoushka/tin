@@ -249,23 +249,24 @@ fun TodayCard(calendar: CalendarSource, actions: Actions, onOpen: () -> Unit = {
     }
 }
 
-/** What waits for Yehor in the approvals app: lit while anything is open, oldest first, tap opens the queue. */
+/**
+ * What waits for Yehor in the approvals app: lit while anything is open, oldest first, tap opens the queue. While the
+ * provider refuses us (Approvals does not list Home's signing certificate) there is nothing to show or to act on, so no card.
+ */
 @Composable
 fun NeedsYouCard(source: NeedsYouSource, actions: Actions) {
     val state by source.state.collectAsState()
-    if (state.status == NeedsYouSource.Status.Loading) return // first read not back yet
+    if (state.status != NeedsYouSource.Status.Ok) return // first read not back yet, or the provider says no
     val now = rememberNow()
     val label = stringResource(R.string.needs_you)
     val needs = state.needs
-    val unavailable = state.status == NeedsYouSource.Status.Unavailable
-    val stale = !unavailable && Freshness.isStale(now, state.at, NeedsYouSource.INTERVAL_MS)
+    val stale = Freshness.isStale(now, state.at, NeedsYouSource.INTERVAL_MS)
     LayerCard(
-        label, if (unavailable) null else Freshness.age(now, state.at),
+        label, Freshness.age(now, state.at),
         CardLight(if (needs.lit) LightKind.NeedsYou else LightKind.Calm, stale),
         Modifier.plainClickable { actions.openApprovals() },
     ) {
         when {
-            unavailable -> Text(stringResource(R.string.needs_unavailable), style = NgType.body)
             !needs.lit -> Text(stringResource(R.string.needs_empty), style = NgType.body)
             else -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(needs.open.toString(), style = NgType.figure)

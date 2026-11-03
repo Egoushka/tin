@@ -70,7 +70,6 @@
     <string name="alarm_in_hm">за %1$d год %2$d хв</string>
     <string name="needs_you">Чекає на тебе</string>
     <string name="needs_empty">Ніщо не чекає</string>
-    <string name="needs_unavailable">Approvals ще не ділиться даними</string>
     <string name="needs_more">+%d ще</string>
     <string name="needs_held">%d утримано</string>
     <string name="homelab">Домашній сервер</string>

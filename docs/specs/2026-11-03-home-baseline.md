@@ -48,4 +48,4 @@ Approvals guards its provider with `signature|knownSigner`; Home's release certi
 
 | ID | Claim | Test | Result |
 |---|---|---|---|
-| B7 | While reading the Needs-you provider is refused, the Home stack has no Needs-you card; once it is readable the card is back | `HomeStackTest` | pending |
+| B7 | While reading the Needs-you provider is refused, Home shows no Needs-you card; once it is readable the card is back | `NeedsYouCardTest` | pass |

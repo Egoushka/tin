@@ -69,7 +69,6 @@
     <string name="alarm_in_hm">in %1$d h %2$d min</string>
     <string name="needs_you">Needs you</string>
     <string name="needs_empty">Nothing waiting</string>
-    <string name="needs_unavailable">Approvals isn\'t sharing yet</string>
     <string name="needs_more">+%d more</string>
     <string name="needs_held">%d held</string>
     <string name="homelab">Homelab</string>
