@@ -8,10 +8,6 @@ import android.content.IntentFilter
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.graphics.drawable.AdaptiveIconDrawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -193,19 +189,7 @@ open class AppRepository(context: Context, private val prefs: AppPrefs) {
         val key = cacheKey(app, px)
         icons.get(key)?.let { return it }
         val drawable = system.icon(app) ?: return null
-        val mono = (drawable as? AdaptiveIconDrawable)?.monochrome
-        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        if (mono != null) {
-            // The adaptive foreground spans 108 dp around a 72 dp safe zone; draw it so the zone fills the tile.
-            val extra = (px * 0.25f).toInt()
-            mono.setBounds(-extra, -extra, px + extra, px + extra)
-            mono.colorFilter = PorterDuffColorFilter(tint, PorterDuff.Mode.SRC_IN)
-            mono.draw(canvas)
-        } else {
-            drawable.setBounds(0, 0, px, px)
-            drawable.draw(canvas)
-        }
+        val bmp = renderIcon(drawable, px, tint)
         icons.put(key, bmp)
         return bmp
     }

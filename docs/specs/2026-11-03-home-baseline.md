@@ -70,3 +70,14 @@ Tune, Hidden apps, Gestures and the pickers (Add widget, Choose an app) paint th
 |---|---|---|---|
 | B13 | Over a white backdrop, the top padding of the Tune, Hidden apps, Gestures and picker panels is exactly `Ng.surface`: no backdrop colour reaches the panel | `SheetOpaqueTest` | pass |
 | B14 | With a 48 dp status bar, the Tune panel starts at or below it | `SheetOpaqueTest` | pass |
+
+## Layer 6: icons
+
+An app whose adaptive icon has no monochrome layer showed a white blank on the glass tile (F8). The drawer now draws its full-colour icon, clipped to the disc. Tin's own apps declared no launcher icon, so they showed the stock Android robot; Tin Home, tin and Tin Fixture now ship an adaptive icon with a monochrome layer, so they are themed like any other app. Approvals lives in another repo: its icon is the follow-up named in the PR.
+
+| ID | Claim | Test | Result |
+|---|---|---|---|
+| B15 | An adaptive icon with a monochrome layer is drawn in the tint, as before | `IconRenderTest` | pass |
+| B16 | An adaptive icon with no monochrome layer is drawn in its own colours, inside the disc: the centre is its colour, the corner of the square is empty | `IconRenderTest` | pass |
+| B17 | Tin Home's launcher icon is an adaptive icon with a monochrome layer | `IconRenderTest` | pass |
+
