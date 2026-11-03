@@ -13,10 +13,12 @@ import io.github.egoushka.tin.home.pages.Pages
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -38,6 +40,9 @@ class PageStoreTest {
         return Stores(PageStore(ds), LayoutStore(ds), PinStore(ds))
     }
 
+    /** DataStore lets go of the file only once its scope has completed, so open again after that, not right after cancel. */
+    private suspend fun stop() = scopes.removeAt(0).coroutineContext[Job]!!.cancelAndJoin()
+
     @After fun close() {
         scopes.forEach { it.cancel() }
         dir.deleteRecursively()
@@ -53,7 +58,7 @@ class PageStoreTest {
         val first = open().pages
         first.update { it.addPage().addPage().add(1, app(1)).add(1, PageItem.Shortcut("p", "s", 0, "S")).add(0, PageItem.Widget(11, 2)) }
         val expected = first.pages.first()
-        scopes.removeAt(0).cancel()
+        stop()
         assertEquals(expected, open().pages.pages.first())
         assertEquals(2, expected.count)
     }
@@ -107,7 +112,7 @@ class PageStoreTest {
         val first = open().pages
         first.updateBoard { Board(it.layout.addWidget(7, 2), it.pages.addPage()) }
         first.updateBoard { it.moveWidgetToPage(7, 0) }
-        scopes.removeAt(0).cancel()
+        stop()
         val board = open().pages.board.first()
         assertEquals(setOf(7), board.widgetIds)
         assertEquals(emptySet<Int>(), board.layout.widgetIds)
