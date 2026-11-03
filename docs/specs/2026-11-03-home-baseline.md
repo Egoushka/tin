@@ -92,3 +92,22 @@ The drawer is a long list with no index, and two-word labels end in "..." (F9). 
 | B20 | A dragged y position maps to the letter under the finger, clamped to the first and last letter | `AzIndexTest` | pass |
 | B21 | A two-word label that needs two lines in a drawer tile is shown whole | `AzScrollerTest` | pass |
 
+
+## Layer 8: a covered Home is not in the screen-reader tree
+
+With the drawer or a sheet open, the dock, search bar and flashlight stayed reachable by TalkBack although nothing shows them (F11). Home's content now leaves the accessibility tree while any layer other than Home is up. The A to Z strip is a drag handle first; it is 48dp wide, and each letter is also a "Jump to X" button for a screen reader.
+
+| ID | Claim | Test | Result |
+|---|---|---|---|
+| B22 | While the layer is Apps, Search, Tune or Hidden, a dock tile under it is not in the semantics tree | `CoveredHomeTest` | pass |
+| B23 | While the layer is Home, the dock tile is in the semantics tree | `CoveredHomeTest` | pass |
+| B24 | The A to Z strip is at least 48dp wide | `AzScrollerTest` | pass |
+
+## Layer 9: an empty dock slot with no handler
+
+An empty slot whose default app cannot be opened did nothing on tap (F13). It now offers "Choose an app", the same picker a long press opens. A slot whose default has a handler still starts it.
+
+| ID | Claim | Test | Result |
+|---|---|---|---|
+| B25 | A tap on an empty slot whose default has no handler opens the picker for that slot and starts nothing | `DockTileTest` | pass |
+| B26 | A tap on an empty slot whose default has a handler starts that handler and opens no picker | `DockTileTest` | pass |

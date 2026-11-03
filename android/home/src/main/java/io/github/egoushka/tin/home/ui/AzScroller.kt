@@ -41,7 +41,7 @@ fun AzScroller(index: AzIndex, onJump: (position: Int) -> Unit, modifier: Modifi
     var size by remember { mutableStateOf(IntSize.Zero) }
     Box(
         modifier
-            .width(Dimen.target / 2)
+            .width(Dimen.target)
             .fillMaxHeight()
             .pointerInput(index) {
                 detectTapGestures { at -> index.at(at.y, size.height.toFloat())?.let { onJump(it.position) } }
@@ -60,7 +60,7 @@ fun AzScroller(index: AzIndex, onJump: (position: Int) -> Unit, modifier: Modifi
                     style = NgType.meta.copy(color = Ng.ink2),
                     textAlign = TextAlign.Center,
                     modifier = Modifier
-                        .width(Dimen.target / 2)
+                        .width(Dimen.target)
                         .semantics {
                             contentDescription = description
                             role = Role.Button

@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
@@ -126,6 +127,9 @@ import kotlinx.coroutines.launch
 
 enum class Layer { Home, Apps, Search, Tune, Hidden }
 
+/** Home under the drawer or a sheet: still composed, so it is there when the layer closes, but no screen reader can land on it. */
+internal fun Modifier.coveredBy(layer: Layer): Modifier = if (layer != Layer.Home) clearAndSetSemantics {} else this
+
 /** The app whose menu is open, its dock slot when the press was on the dock, and its place when it was on an extra page. */
 private data class SheetFor(val app: AppEntry, val dockSlot: Int?, val place: PagePlace? = null)
 
@@ -188,7 +192,9 @@ fun HomeScreen(
                 .drawBehind { drawRoom(tune.roomLight, this.size) },
         ) {
             FrostRenderer(tune, size, frost)
-            Home(tune, layer, onLayer, dock, apps, actions, signals, home, gestureMap, onGestures = { gesturesOpen = true }, onToday = { todayOpen = true })
+            Box(Modifier.fillMaxSize().coveredBy(layer)) {
+                Home(tune, layer, onLayer, dock, apps, actions, signals, home, gestureMap, onGestures = { gesturesOpen = true }, onToday = { todayOpen = true })
+            }
 
             // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
             val open = layer == Layer.Apps || layer == Layer.Search
@@ -509,7 +515,7 @@ internal fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, rea
                 CircleShape,
                 onLongClickLabel = longClickLabel,
                 onLongClick = { if (app != null) menu.open(app, slot) else menu.pick(slot) },
-                onClick = { if (app != null) apps.launch(app) else actions.dock(d) },
+                onClick = { if (app != null) apps.launch(app) else if (actions.canOpen(d)) actions.dock(d) else menu.pick(slot) },
             )
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,

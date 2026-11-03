@@ -124,6 +124,26 @@ class DockTileTest {
         assertEquals(0, frameUp)
     }
 
+    @Test fun `a tap on an empty slot whose default has no handler opens the picker and starts nothing`() {
+        start(DockDefault.Maps, null)
+        rule.onNode(hasContentDescription(context.getString(DockDefault.Maps.label))).performTouchInput { click() }
+        rule.waitForIdle()
+        assertEquals(1, menuOpened)
+        assertEquals(null, shadowOf(context as android.app.Application).nextStartedActivity)
+    }
+
+    @Test fun `a tap on an empty slot whose default has a handler starts it and opens no picker`() {
+        val pm = shadowOf(context.packageManager)
+        pm.addResolveInfoForIntent(DockDefault.Phone.intent(), android.content.pm.ResolveInfo().apply {
+            activityInfo = android.content.pm.ActivityInfo().apply { packageName = "com.dialer"; name = "com.dialer.Main" }
+        })
+        start(DockDefault.Phone, null)
+        rule.onNode(hasContentDescription(context.getString(DockDefault.Phone.label))).performTouchInput { click() }
+        rule.waitForIdle()
+        assertEquals(0, menuOpened)
+        assertEquals(android.content.Intent.ACTION_DIAL, shadowOf(context as android.app.Application).nextStartedActivity?.action)
+    }
+
     @Test fun `an empty slot with no swipe default does nothing and does not open All apps`() {
         start(DockDefault.Maps, null)
         swipeUp()

@@ -59,6 +59,13 @@ class AzScrollerTest {
         assertTrue(jumps.isNotEmpty() && jumps.last() == 2)
     }
 
+    @Test fun `the strip is at least 48dp wide`() {
+        strip()
+        val node = rule.onNode(hasContentDescription(context.getString(R.string.az_jump, "A"))).fetchSemanticsNode()
+        val width = node.size.width / context.resources.displayMetrics.density
+        assertTrue("letter is ${width}dp wide", width >= 48f)
+    }
+
     @Test fun `a strip with one letter is not shown`() {
         rule.setContent { AzScroller(AzIndex.of(listOf("Alarm", "Amazon")), onJump = { jumps += it }) }
         assertEquals(0, rule.onAllNodes(hasContentDescription(context.getString(R.string.az_jump, "A"))).fetchSemanticsNodes().size)
