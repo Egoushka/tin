@@ -31,13 +31,14 @@
   the policy, `./scripts/speech-push-model.sh`, open tin, then `uv run scripts/speech-check.py` (S7) and
   `--mic 5` (S8). Both scripts exit 2 with "no device" when no phone is attached.
 - Home (`android/home`, no phone): `cd android && ./gradlew :home:testDebugUnitTest :home:lintDebug :home:assembleRelease`
-  (JDK 21). The release build is debug-signed, so `android/home/build/outputs/apk/release/home-release.apk` installs.
-- Install Home without a laptop build: CI uploads that APK as the artifact `home-release-<commit sha>`:
+  (JDK 21). The release build is debug-signed unless `tin.signing.*` is set, so `android/home/build/outputs/apk/release/home-release.apk` installs.
+- Install Home without a laptop build: a merge to `main` publishes a GitHub release signed with the Tin release key and
+  the phone follows it with Obtainium (`docs/home-updates.md` has the one-time setup). For a PR's own build, CI uploads
+  the APK as the artifact `home-release-<commit sha>` (debug-signed with the runner's key, so `adb uninstall
+  io.github.egoushka.tin.home` first, which clears Home's data and the Home role):
   `gh run list -R Egoushka/tin --workflow ci --commit <sha> --json databaseId --jq '.[0].databaseId'`, then
   `gh run download <id> -R Egoushka/tin -n home-release-<sha> -D <dir>` and `adb install -r <dir>/home-release.apk`.
-  Every CI build is signed with its runner's fresh debug key, and a laptop build with yours, so installing over a build
-  from another source fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: `adb uninstall io.github.egoushka.tin.home` first
-  (it clears Home's data and the Home role). A stable key would need a repo secret; nothing signs with one today.
+  Home's `versionCode` is the commit count and `versionName` is `0.1.<count>`; `BuildConfig.GIT_SHA` is the short SHA.
 - Home baseline (phone on USB, unlocked, Home installed): `./scripts/home-baseline.sh [launches=20]` starts Home that
   many times, prints the median and p95 `TotalTime`, then the janky-frame percentage after 10 drawer opens, and
   appends them to `docs/results/<date>-home-baseline.md`. `./scripts/home-jank.sh [opens] [apk]` is the drawer half
@@ -48,7 +49,8 @@
   `VoiceService`. Both APKs need one signer or the `VOICE` permission is not granted and the mic falls back to the
   assistant. `tin.voice.uses` (a count, never text) lives in Home's DataStore `tin.voice`.
 - CI (`.github/workflows/ci.yml`): `cargo test`, `scripts/build.sh` (APK), `:speech:testDebugUnitTest`,
-  `:home:testDebugUnitTest`, `:home:assembleRelease` (uploaded as `home-release-<sha>`, kept 30 days).
+  `:home:testDebugUnitTest`, `:home:assembleRelease` (uploaded as `home-release-<sha>`, kept 30 days); on `main` with the signing secrets, a
+  `release` job publishes `v0.1.<count>`.
 
 ## Rules
 

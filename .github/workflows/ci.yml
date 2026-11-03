@@ -26,8 +26,13 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    outputs:
+      signed: ${{ steps.key.outputs.signed }}
+      version: ${{ steps.signer.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # Home's versionCode is the commit count
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: zulu
@@ -44,11 +49,45 @@ jobs:
       # build.sh cross-compiles tin into libtin.so and runs :app:assembleDebug.
       - name: Build the APK
         run: ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}" scripts/build.sh
+      # Only main pushes see the signing key, so a PR's workflow edit cannot read it. Without the secrets the build
+      # stays debug-signed and `release` is skipped (docs/home-updates.md has the one-time setup).
+      - name: Release signing key
+        id: key
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          KEYSTORE_B64: ${{ secrets.TIN_SIGNING_KEYSTORE_B64 }}
+          KEY_PASSWORD: ${{ secrets.TIN_SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::warning::TIN_SIGNING_KEYSTORE_B64 / TIN_SIGNING_PASSWORD are not set; Home is debug-signed and not published"
+            exit 0
+          fi
+          umask 077
+          printf %s "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tin.jks"
+          mkdir -p ~/.gradle
+          {
+            echo "tin.signing.storeFile=$RUNNER_TEMP/tin.jks"
+            echo "tin.signing.storePassword=$KEY_PASSWORD"
+            echo "tin.signing.keyAlias=tin"
+            echo "tin.signing.keyPassword=$KEY_PASSWORD"
+          } >> ~/.gradle/gradle.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
       # Home's release build is where its real voice engine is wired; debug keeps the scripted one.
       - name: Module tests and Home release build
         working-directory: android
         run: ./gradlew --no-daemon :speech:testDebugUnitTest :home:testDebugUnitTest :home:assembleRelease
-      # Debug-signed with this runner's own key, so each build needs `adb uninstall` first (see AGENTS.md).
+      - name: Check Home's signer
+        id: signer
+        run: |
+          apk=android/home/build/outputs/apk/release/home-release.apk
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1); bt=${bt%/}
+          echo "version=$("$bt/aapt2" dump badging "$apk" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")" >> "$GITHUB_OUTPUT"
+          certs=$("$bt/apksigner" verify --print-certs "$apk")
+          echo "$certs" | grep -E 'certificate (DN|SHA-256)'
+          if [ "${{ steps.key.outputs.signed }}" = true ] && echo "$certs" | grep -q 'CN=Android Debug'; then
+            echo "::error::the release key was set up but Home is still debug-signed"; exit 1
+          fi
+      # Without the release key this is signed with the runner's own debug key: `adb uninstall` before installing it.
       - name: Upload Home's release APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -56,3 +95,31 @@ jobs:
           path: android/home/build/outputs/apk/release/home-release.apk
           if-no-files-found: error
           retention-days: 30
+
+  # One release per main commit: Obtainium on the phone follows the latest release (docs/home-updates.md).
+  release:
+    needs: android
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.android.outputs.signed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Queue, never cancel the running one; a newer main commit publishes after it, so "latest" stays the newest.
+    concurrency:
+      group: home-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: home-release-${{ github.sha }}
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.android.outputs.version }}
+        run: |
+          newest=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$newest" != "$GITHUB_SHA" ]; then echo "main moved on to $newest; its run publishes"; exit 0; fi
+          if gh release view "v$VERSION" >/dev/null 2>&1; then echo "v$VERSION is already published"; exit 0; fi
+          gh release create "v$VERSION" "home-release.apk#home-$VERSION.apk" --target "$GITHUB_SHA" \
+            --title "Home $VERSION (${GITHUB_SHA::7})" \
+            --notes "Commit $GITHUB_SHA. The last number of the version is the commit count on main."

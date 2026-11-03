@@ -225,7 +225,7 @@ private fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
     Column(
         Modifier
             .clip(RoundedCornerShape(Dimen.radiusRow))
-            .combinedClickable(onLongClickLabel = longClickLabel, onLongClick = { menu.open(app, null) }, onClick = onClick)
+            .combinedClickable(role = Role.Button, onLongClickLabel = longClickLabel, onLongClick = { menu.open(app, null) }, onClick = onClick)
             .then(if (unread) Modifier.semantics { contentDescription = description } else Modifier)
             .padding(vertical = Dimen.space1),
         horizontalAlignment = Alignment.CenterHorizontally,

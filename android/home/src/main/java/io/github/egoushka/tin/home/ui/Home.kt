@@ -34,7 +34,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import io.github.egoushka.tin.home.voice.Engines
 import io.github.egoushka.tin.home.voice.Voice
@@ -294,7 +296,7 @@ private fun Home(
         onSwipeDown = { actions.openNotifications() },
         onDoubleTap = { actions.toggleTorch() },
         onLongPress = { home.edit(true) },
-        top = { Glance(signals.weather, Modifier.padding(top = Dimen.space6)) },
+        top = { Glance(signals.weather, Modifier.padding(top = Dimen.space6), actions, onLayer) },
         bottom = {
             if (home.editing) {
                 EditBar(home) { onLayer(Layer.Tune) }
@@ -312,7 +314,7 @@ private fun Home(
 }
 
 @Composable
-private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier) {
+private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier, actions: Actions, onLayer: (Layer) -> Unit) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -324,9 +326,25 @@ private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier) {
     val timePattern = if (DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm"
     val datePattern = DateFormat.getBestDateTimePattern(locale, stringResource(R.string.date_skeleton))
     val date = Date(now)
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock, modifier = Modifier.weight(1f))
-        Column(horizontalAlignment = Alignment.End) {
+    // The drags, the double tap and the long press have no screen-reader equivalent; the clock is the first stop.
+    val apps = stringResource(R.string.action_apps)
+    val notifications = stringResource(R.string.action_notifications)
+    val torch = stringResource(R.string.action_torch)
+    val tune = stringResource(R.string.tune)
+    Row(
+        modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            customActions = listOf(
+                CustomAccessibilityAction(apps) { onLayer(Layer.Apps); true },
+                CustomAccessibilityAction(notifications) { actions.openNotifications(); true },
+                CustomAccessibilityAction(torch) { actions.toggleTorch(); true },
+                CustomAccessibilityAction(tune) { onLayer(Layer.Tune); true },
+            )
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The clock is measured first: weighted, the wide uk date left it too little room at font scale 2.0 ("01:3|0").
+        Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock)
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text(
                 android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
                 style = NgType.title, textAlign = TextAlign.End,
@@ -400,7 +418,7 @@ private fun SearchBar(tune: Tune, voiceState: StateFlow<VoiceState>, onOpen: () 
             .fillMaxWidth()
             .height(Dimen.tile)
             .glass(RoundedCornerShape(Dimen.radiusCard))
-            .plainClickable(onLongClick = onMic, onClick = onOpen)
+            .plainClickable(onLongClick = onMic, onLongClickLabel = stringResource(R.string.mic), onClick = onOpen)
             .padding(start = Dimen.space4, end = Dimen.space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {

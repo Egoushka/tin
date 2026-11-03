@@ -28,8 +28,11 @@ import android.text.format.DateFormat
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.egoushka.tin.home.Actions
@@ -39,6 +42,7 @@ import io.github.egoushka.tin.home.layer.Freshness
 import io.github.egoushka.tin.home.layer.LayerCard
 import io.github.egoushka.tin.home.layer.ageText
 import io.github.egoushka.tin.home.layer.rememberNow
+import io.github.egoushka.tin.home.layer.spokenAge
 import io.github.egoushka.tin.home.signals.AlarmSource
 import io.github.egoushka.tin.home.signals.Homelab
 import io.github.egoushka.tin.home.signals.HomelabSource
@@ -54,6 +58,7 @@ import io.github.egoushka.tin.home.theme.LightKind
 import io.github.egoushka.tin.home.theme.Lucide
 import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
+import io.github.egoushka.tin.home.theme.lerpColor
 import io.github.egoushka.tin.home.theme.nowLight
 import io.github.egoushka.tin.home.theme.plainClickable
 import io.github.egoushka.tin.home.theme.pressable
@@ -61,6 +66,9 @@ import io.github.egoushka.tin.home.theme.LocalTune
 import kotlinx.coroutines.delay
 
 private fun icon(kind: NoteKind) = when (kind) { NoteKind.Message -> "msg"; NoteKind.Mail -> "mail"; NoteKind.Other -> "bell" }
+
+/** How far the clash icon's attention hue moves toward ink: violet at tint 35% is 2.2:1 on the now row, this keeps 3:1 (ContrastTest). */
+internal const val CLASH_ICON_INK_MIX = 0.35f
 
 /** Unread counts per app and the latest message; asks for the listener grant while it is missing. */
 @Composable
@@ -107,7 +115,9 @@ fun GlanceCard(signals: Signals, actions: Actions) {
             Spacer(Modifier.width(Dimen.space2))
             Text(latest.text, style = NgType.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(Dimen.space2))
-            Text(ageText(Freshness.age(now, latest.whenMs)), style = NgType.body)
+            val age = Freshness.age(now, latest.whenMs)
+            val spoken = spokenAge(age)
+            Text(ageText(age), style = NgType.body, modifier = Modifier.clearAndSetSemantics { text = AnnotatedString(spoken) })
         }
     }
 }
@@ -216,7 +226,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
                         val clash = stringResource(R.string.clash)
                         Spacer(Modifier.width(Dimen.space2))
                         Image(
-                            Lucide.icon("warn", 16f, tune.strokeDp, tune.attention.color), null,
+                            Lucide.icon("warn", 16f, tune.strokeDp, lerpColor(tune.attention.color, Ng.ink, CLASH_ICON_INK_MIX)), null,
                             Modifier.size(Dimen.glyphSmall).semantics { contentDescription = clash },
                         )
                     }
@@ -321,7 +331,9 @@ fun AlarmCard(alarm: AlarmSource) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(Lucide.icon("alarm", 20f, tune.strokeDp), null, Modifier.size(Dimen.glyph))
             Spacer(Modifier.width(Dimen.space3))
-            Text(stringResource(R.string.alarm), style = NgType.body, modifier = Modifier.weight(1f))
+            // Measured first: at font scale 2.0 a weighted label got the leftovers and broke mid-word ("Alar|m").
+            Text(stringResource(R.string.alarm), style = NgType.body)
+            Spacer(Modifier.weight(1f))
             Text(at, style = NgType.title)
             if (relative != null) {
                 Spacer(Modifier.width(Dimen.space2))

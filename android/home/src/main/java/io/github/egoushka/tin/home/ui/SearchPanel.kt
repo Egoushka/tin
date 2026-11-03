@@ -93,7 +93,7 @@ private fun HitRow(hit: Hit, apps: AppRepository, isTop: Boolean, onOpen: () -> 
             .heightIn(min = Dimen.target)
             .clip(RoundedCornerShape(Dimen.radiusRow))
             .background(if (isTop) Ng.surface2 else Color.Transparent)
-            .clickable(onClick = onOpen)
+            .clickable(role = Role.Button, onClick = onOpen)
             .padding(horizontal = Dimen.space2),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -3,6 +3,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// versionCode is the commit count, so every commit on main is an in-place update; versionName carries it and the
+// short SHA rides in BuildConfig.GIT_SHA (a local build with tracked edits gets "-dirty"; CI never does).
+fun git(vararg args: String): String? = runCatching {
+    providers.exec { commandLine("git", *args); workingDir = rootProject.projectDir }.standardOutput.asText.get().trim()
+}.getOrNull()?.takeIf { it.isNotEmpty() }
+
+val commitCount = git("rev-list", "--count", "HEAD")?.toInt() ?: 1
+val gitSha = (git("rev-parse", "--short=7", "HEAD") ?: "dev") +
+    if (System.getenv("CI") == null && git("status", "--porcelain", "--untracked-files=no") != null) "-dirty" else ""
+
 android {
     namespace = "io.github.egoushka.tin.home"
     compileSdk = 37
@@ -12,8 +22,9 @@ android {
         // Themed monochrome icons and per-app locales arrived in API 33; RenderEffect in 31.
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = commitCount
+        versionName = "0.1.$commitCount"
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
     }
 
     buildFeatures {
@@ -31,9 +42,10 @@ android {
             buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"io.github.egoushka.tin.home.needsyou.fake\"")
             buildConfigField("String", "GATUS_URL", "\"http://127.0.0.1:8095\"")
         }
-        // Debug-signed so CI's release APK installs: Home isn't distributed, and no key material lives in the repo.
+        // The root build creates "release" from tin.signing.* (CI main builds, the Mac's ~/.gradle); without them this is
+        // debug-signed so a PR's release APK still installs. No key material lives in the repo.
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"com.yehor.approvals.needsyou\"")
             buildConfigField("String", "GATUS_URL", "\"http://100.64.0.2:8095\"")
         }
