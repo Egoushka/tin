@@ -40,6 +40,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import io.github.egoushka.tin.home.voice.Engines
 import io.github.egoushka.tin.home.voice.Voice
 import io.github.egoushka.tin.home.voice.VoiceState
 import io.github.egoushka.tin.home.voice.ask
@@ -266,7 +267,8 @@ private fun Home(
     val density = LocalDensity.current
     val edge = with(density) { Dimen.backEdge.toPx() }
     val travel = with(density) { Dimen.target.toPx() } // one target's travel opens a layer
-    val voice = remember { Voice() }
+    val context = LocalContext.current
+    val voice = remember { Voice(Engines.default(context)) }
     val scope = rememberCoroutineScope()
     val listen = {
         val started = voice.start(scope) { said -> actions.ask(said, signals.needsYou.state.value.needs) }

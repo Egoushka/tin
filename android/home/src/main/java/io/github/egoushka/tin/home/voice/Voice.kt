@@ -14,6 +14,15 @@ enum class VoiceState { Idle, Listening, Thinking, Error }
 /** Speech to text. [show] reports Thinking once the user stops talking; null means nothing was understood. */
 fun interface VoiceEngine {
     suspend fun listen(show: (VoiceState) -> Unit): String?
+
+    /** False when the engine cannot listen now (tin missing, model not loaded): the mic then hands over to the assistant. */
+    fun ready(): Boolean = true
+
+    /** Home came to the front: connect to whatever the engine listens through. */
+    fun attach() {}
+
+    /** Home left the front: cancel a listen in flight and let go of the connection. */
+    fun detach() {}
 }
 
 /** What an utterance does. Voice opens things; it never decides them (Night glass README, "Voice limits"). */
@@ -40,13 +49,13 @@ sealed interface VoiceIntent {
 }
 
 /** Runs one listen at a time and publishes the state the search bar draws. */
-class Voice(private val engine: VoiceEngine? = Engines.default()) {
+class Voice(private val engine: VoiceEngine?) {
     private val _state = MutableStateFlow(VoiceState.Idle)
     val state: StateFlow<VoiceState> = _state
 
     private var job: Job? = null
 
-    /** False when there is no engine, so the caller falls back to the system assistant. A second tap cancels. */
+    /** False when there is no engine or it is not ready, so the caller falls back to the system assistant. A second tap cancels. */
     fun start(scope: CoroutineScope, onUtterance: (String) -> Unit): Boolean {
         val engine = engine ?: return false
         if (job?.isActive == true) {
@@ -54,6 +63,7 @@ class Voice(private val engine: VoiceEngine? = Engines.default()) {
             _state.value = VoiceState.Idle
             return true
         }
+        if (!engine.ready()) return false
         job = scope.launch {
             _state.value = VoiceState.Listening
             val said = try {
