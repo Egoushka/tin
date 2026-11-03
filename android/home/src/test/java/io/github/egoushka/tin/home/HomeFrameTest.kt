@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -65,7 +66,6 @@ class HomeFrameTest {
                     gestures = gestures,
                     onSwipeUp = { up++ },
                     onSwipeDown = { down++ },
-                    onDoubleTap = {},
                     onLongPress = { long++ },
                     top = { Text("12:00", style = NgType.clock, modifier = Modifier.testTag("top")) },
                     bottom = {
@@ -208,6 +208,14 @@ class HomeFrameTest {
         val b = bounds("card1")
         rule.onRoot().performTouchInput { longClick(Offset(206.dp.toPx(), ((b.top.value + b.bottom.value) / 2).dp.toPx())) }
         assertEquals(1, long)
+        assertEquals(0 to 0, swipesSeen())
+    }
+
+    @Test fun `a double tap on empty space does nothing`() {
+        settle { cards = 3 }
+        val top = bounds("top")
+        rule.onRoot().performTouchInput { doubleClick(Offset(206.dp.toPx(), ((top.top.value + top.bottom.value) / 2).dp.toPx())) }
+        assertEquals(0, long)
         assertEquals(0 to 0, swipesSeen())
     }
 

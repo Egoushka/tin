@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="torch">Flashlight</string>
+    <string name="music_open">Open %1$s</string>
+    <string name="music_empty">Nothing playing</string>
+</resources>

@@ -52,6 +52,7 @@ import io.github.egoushka.tin.home.signals.CalendarSource
 import io.github.egoushka.tin.home.signals.Glance
 import io.github.egoushka.tin.home.signals.MusicSource
 import io.github.egoushka.tin.home.signals.NoteKind
+import io.github.egoushka.tin.home.signals.openOrder
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.LightKind
@@ -122,38 +123,48 @@ fun GlanceCard(signals: Signals, actions: Actions) {
     }
 }
 
-/** The active media session with transport controls; absent when nothing is playing or paused. */
+/** The active media session with transport controls; a tap on the title opens the app that is playing. */
 @Composable
-fun MusicCard(music: MusicSource) {
+fun MusicCard(music: MusicSource, actions: Actions) {
     val state = music.state.collectAsState().value ?: return
     val tune = LocalTune.current
     LaunchedEffect(Unit) {
         while (true) { music.refreshBuds(); delay(60_000) } // the earbuds' battery is polled, not pushed
     }
+    val canOpen = openOrder(state.sessionActivity != null, state.launchable).isNotEmpty()
+    val openLabel = stringResource(R.string.music_open, state.app.ifBlank { stringResource(R.string.card_music) })
     LayerCard("", null, CardLight()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val art = state.art
-            Box(
+            Row(
                 Modifier
-                    .size(Dimen.tile - Dimen.space3)
-                    .clip(RoundedCornerShape(Dimen.radiusRow))
-                    .background(Brush.linearGradient(listOf(Ng.glow2, Ng.glow1))),
+                    .weight(1f)
+                    .heightIn(min = Dimen.target)
+                    .then(if (canOpen) Modifier.plainClickable(onClickLabel = openLabel) { actions.openMusic(state) } else Modifier),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (art != null) Image(art.asImageBitmap(), null, Modifier.size(Dimen.tile - Dimen.space3), contentScale = ContentScale.Crop)
-            }
-            Spacer(Modifier.width(Dimen.space3))
-            Column(Modifier.weight(1f)) {
-                Text(state.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(state.artist, style = NgType.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                    val buds = state.buds?.label().orEmpty()
-                    if (buds.isNotEmpty()) {
-                        val description = stringResource(R.string.buds_battery, buds)
-                        Row(Modifier.semantics { contentDescription = description }, verticalAlignment = Alignment.CenterVertically) {
-                            Text(" · ", style = NgType.body)
-                            Image(Lucide.icon("buds", 16f, tune.strokeDp, Ng.ink2), null, Modifier.size(Dimen.glyphSmall))
-                            Spacer(Modifier.width(Dimen.space1))
-                            Text(buds, style = NgType.body, maxLines = 1)
+                val art = state.art
+                Box(
+                    Modifier
+                        .size(Dimen.target)
+                        .clip(RoundedCornerShape(Dimen.radiusRow))
+                        .background(Brush.linearGradient(listOf(Ng.glow2, Ng.glow1))),
+                ) {
+                    if (art != null) Image(art.asImageBitmap(), null, Modifier.size(Dimen.target), contentScale = ContentScale.Crop)
+                }
+                Spacer(Modifier.width(Dimen.space3))
+                Column(Modifier.weight(1f)) {
+                    Text(state.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(state.artist, style = NgType.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        val buds = state.buds?.label().orEmpty()
+                        if (buds.isNotEmpty()) {
+                            val description = stringResource(R.string.buds_battery, buds)
+                            Row(Modifier.semantics { contentDescription = description }, verticalAlignment = Alignment.CenterVertically) {
+                                Text(" · ", style = NgType.body)
+                                Image(Lucide.icon("buds", 16f, tune.strokeDp, Ng.ink2), null, Modifier.size(Dimen.glyphSmall))
+                                Spacer(Modifier.width(Dimen.space1))
+                                Text(buds, style = NgType.body, maxLines = 1)
+                            }
                         }
                     }
                 }
@@ -217,7 +228,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
                         .padding(horizontal = Dimen.space2),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.ink else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space2))
+                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.ink else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space1))
                     Text(
                         row.event.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
