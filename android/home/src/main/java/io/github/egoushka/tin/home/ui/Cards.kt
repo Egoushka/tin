@@ -195,7 +195,7 @@ private fun clock(context: android.content.Context, ms: Long): String =
 
 /** The rest of today: current event teal, clashes marked warn; asks for the calendar grant while it is missing. */
 @Composable
-fun TodayCard(calendar: CalendarSource, actions: Actions) {
+fun TodayCard(calendar: CalendarSource, actions: Actions, onOpen: () -> Unit = {}) {
     val state by calendar.state.collectAsState()
     val tune = LocalTune.current
     val context = LocalContext.current
@@ -214,6 +214,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
     LayerCard(
         label, Freshness.age(now, state.at),
         CardLight(stale = stale),
+        Modifier.plainClickable(onClick = onOpen),
         keepBright = true,
     ) {
         if (agenda.items.isEmpty()) {

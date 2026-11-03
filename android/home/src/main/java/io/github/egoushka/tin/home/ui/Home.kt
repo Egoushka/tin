@@ -35,9 +35,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import io.github.egoushka.tin.home.voice.Engines
 import io.github.egoushka.tin.home.voice.Voice
@@ -74,6 +72,14 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.github.egoushka.tin.home.Actions
 import io.github.egoushka.tin.home.DockDefault
+import io.github.egoushka.tin.home.apps.AppShortcut
+import io.github.egoushka.tin.home.gestures.DockSwipe
+import io.github.egoushka.tin.home.gestures.Gesture
+import io.github.egoushka.tin.home.gestures.GestureEffects
+import io.github.egoushka.tin.home.gestures.GestureMap
+import io.github.egoushka.tin.home.gestures.GestureStore
+import io.github.egoushka.tin.home.layout.ownsSwipeUp
+import io.github.egoushka.tin.home.signals.Agenda
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
@@ -163,6 +169,13 @@ fun HomeScreen(
     BackHandler(enabled = home.editing && layer == Layer.Home) { home.edit(false) }
     BackHandler(enabled = home.picker != Picker.None) { home.closePicker() }
     BackHandler(enabled = sheet != null) { sheet = null }
+    val context = LocalContext.current
+    val gestureStore = remember(context) { GestureStore.of(context) }
+    val gestureMap by gestureStore.map.collectAsState(GestureMap())
+    var gesturesOpen by remember { mutableStateOf(false) }
+    var todayOpen by remember { mutableStateOf(false) }
+    BackHandler(enabled = gesturesOpen) { gesturesOpen = false }
+    BackHandler(enabled = todayOpen) { todayOpen = false }
     val glance = signals.glance.collectAsState()
     val unread = remember(glance) { { pkg: String -> (glance.value.glance.byPackage[pkg] ?: 0) > 0 } }
 
@@ -174,7 +187,7 @@ fun HomeScreen(
                 .drawBehind { drawRoom(tune.roomLight, this.size) },
         ) {
             FrostRenderer(tune, size, frost)
-            Home(tune, layer, onLayer, dock, apps, actions, signals, home)
+            Home(tune, layer, onLayer, dock, apps, actions, signals, home, gestureMap, onGestures = { gesturesOpen = true }, onToday = { todayOpen = true })
 
             // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
             val open = layer == Layer.Apps || layer == Layer.Search
@@ -246,6 +259,20 @@ fun HomeScreen(
                 Picker.None -> Unit
             }
 
+            if (gesturesOpen) {
+                GestureSheet(tune, gestureMap, onPick = { g, a -> scope.launch { gestureStore.set(g, a) } }, onClose = { gesturesOpen = false })
+            }
+
+            if (todayOpen) {
+                val calendar by signals.calendar.state.collectAsState()
+                val needs by signals.needsYou.state.collectAsState()
+                val at = remember { System.currentTimeMillis() }
+                TodaySheet(
+                    tune, Agenda.all(calendar.events, at), needs.needs,
+                    onApprovals = { actions.openApprovals() }, onClose = { todayOpen = false },
+                )
+            }
+
             // Last, so the menu opens above the drawer, Tune and the pickers.
             AnimatedContent(
                 targetState = sheet,
@@ -310,6 +337,9 @@ private fun Home(
     actions: Actions,
     signals: Signals,
     home: HomeState,
+    gestureMap: GestureMap,
+    onGestures: () -> Unit,
+    onToday: () -> Unit,
 ) {
     val context = LocalContext.current
     val voice = remember { Voice(Engines.default(context)) }
@@ -323,6 +353,29 @@ private fun Home(
     val pager = rememberPagerState { 1 + extra }
     val drag = remember { PageDrag() }
     val haptic = LocalHapticFeedback.current
+    val layerNow by rememberUpdatedState(onLayer)
+    val todayNow by rememberUpdatedState(onToday)
+    val effects = remember(actions, home) {
+        object : GestureEffects {
+            override fun search() = layerNow(Layer.Search)
+            override fun notifications() = actions.openNotifications()
+            override fun quickSettings() = actions.openQuickSettings()
+            override fun camera() = actions.dock(DockDefault.Camera)
+            override fun torch() = actions.toggleTorch()
+            override fun today() = todayNow()
+            override fun editHome() = home.edit(true)
+        }
+    }
+    val map by rememberUpdatedState(gestureMap)
+    val routes = remember(actions) {
+        GlanceRoutes(
+            apps = { layerNow(Layer.Apps) },
+            notifications = { actions.openNotifications() },
+            quickSettings = { actions.openQuickSettings() },
+            today = { todayNow() },
+            tune = { layerNow(Layer.Tune) },
+        )
+    }
 
     // A page removed under the finger leaves the pager past its end.
     LaunchedEffect(extra) { if (pager.currentPage > extra) pager.scrollToPage(extra) }
@@ -339,13 +392,17 @@ private fun Home(
         HomeFrame(
             gap = gap,
             gestures = layer == Layer.Home && !home.editing,
-            onSwipeUp = { onLayer(Layer.Apps) },
-            onSwipeDown = { actions.openNotifications() },
-            onLongPress = { home.edit(true) },
-            top = { Glance(signals.weather, tune, Modifier.padding(top = Dimen.space6), actions, onLayer) },
+            onSwipeUp = { map.of(Gesture.SwipeUp).run(effects) },
+            onSwipeDown = { map.of(Gesture.SwipeDown).run(effects) },
+            onLongPress = { map.of(Gesture.LongPress).run(effects) },
+            onTwoFingerUp = { map.of(Gesture.TwoFingerUp).run(effects) },
+            onTwoFingerDown = { map.of(Gesture.TwoFingerDown).run(effects) },
+            onPinchIn = { map.of(Gesture.PinchIn).run(effects) },
+            onDoubleTap = { map.of(Gesture.DoubleTap).run(effects) },
+            top = { Glance(signals.weather, tune, Modifier.padding(top = Dimen.space6), actions, routes) },
             bottom = {
                 if (home.editing) {
-                    EditBar(home, (pager.currentPage - 1).takeIf { it >= 0 }) { onLayer(Layer.Tune) }
+                    EditBar(home, (pager.currentPage - 1).takeIf { it >= 0 }, onTune = { onLayer(Layer.Tune) }, onGestures = onGestures)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(gap + Dimen.space2)) {
                         PinsRow(home.pinKeys, apps, Dimen.space3, home::unpin)
@@ -359,14 +416,14 @@ private fun Home(
             swipePages = drag.lifted == null,
             dots = { PageDots(pager, extra, home.editing) { home.addPage() } },
             page = { index -> PageContent(index, home, apps, drag) },
-            stack = { HomeStack(home, signals, actions) },
+            stack = { HomeStack(home, signals, actions, onToday) },
         )
         DragGhost(drag, home, apps)
     }
 }
 
 @Composable
-private fun Glance(weather: WeatherSource, tune: Tune, modifier: Modifier = Modifier, actions: Actions, onLayer: (Layer) -> Unit) {
+private fun Glance(weather: WeatherSource, tune: Tune, modifier: Modifier = Modifier, actions: Actions, routes: GlanceRoutes) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -378,19 +435,9 @@ private fun Glance(weather: WeatherSource, tune: Tune, modifier: Modifier = Modi
     val timePattern = if (DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm"
     val datePattern = DateFormat.getBestDateTimePattern(locale, stringResource(R.string.date_skeleton))
     val date = Date(now)
-    // The drags and the long press have no screen-reader equivalent; the clock is the first stop.
-    val apps = stringResource(R.string.action_apps)
-    val notifications = stringResource(R.string.action_notifications)
-    val tuneLabel = stringResource(R.string.tune)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(
-            Modifier.weight(1f).semantics(mergeDescendants = true) {
-                customActions = listOf(
-                    CustomAccessibilityAction(apps) { onLayer(Layer.Apps); true },
-                    CustomAccessibilityAction(notifications) { actions.openNotifications(); true },
-                    CustomAccessibilityAction(tuneLabel) { onLayer(Layer.Tune); true },
-                )
-            },
+            Modifier.weight(1f).glanceActions(routes),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // The clock is measured first: weighted, the wide uk date left it too little room at font scale 2.0 ("01:3|0").
@@ -440,8 +487,16 @@ private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, read
     val description = if (unread) stringResource(R.string.app_unread, label) else label
     val longClickLabel = stringResource(R.string.app_options)
     val tile = Modifier.size(Dimen.tile)
+    val shortcuts by produceState(emptyList<AppShortcut>(), app?.key) { value = if (app != null) apps.shortcuts(app) else emptyList() }
+    val swipe = DockSwipe.of(app != null, d, shortcuts)
+    val onSwipe: (() -> Unit)? = when (swipe) {
+        null -> null
+        is DockSwipe.Shortcut -> ({ if (app != null) apps.startShortcut(app, swipe.shortcut) })
+        is DockSwipe.Open -> ({ actions.start(swipe.intent, label) })
+    }
     Box(
         if (!ready) tile.glass(CircleShape) else tile
+            .ownsSwipeUp(onSwipe)
             .ownsPress()
             .pressGlass(
                 CircleShape,

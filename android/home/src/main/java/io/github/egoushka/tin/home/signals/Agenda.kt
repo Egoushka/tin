@@ -17,15 +17,20 @@ data class Agenda(val items: List<AgendaItem>, val more: Int) {
 
         /** Events that ended are dropped; two that overlap are both marked, wherever the pair sits in the list. */
         fun of(events: List<Event>, nowMs: Long): Agenda {
+            val rows = all(events, nowMs)
+            return Agenda(rows.take(MAX_ROWS), (rows.size - MAX_ROWS).coerceAtLeast(0))
+        }
+
+        /** The same rows without the card's cap: everything still to come, for the Today sheet. */
+        fun all(events: List<Event>, nowMs: Long): List<AgendaItem> {
             val live = events.filter { it.endMs > nowMs }.sortedWith(compareBy({ it.beginMs }, { it.endMs }))
-            val rows = live.map { e ->
+            return live.map { e ->
                 AgendaItem(
                     e,
                     current = e.beginMs <= nowMs,
                     clash = live.any { o -> o !== e && o.beginMs < e.endMs && e.beginMs < o.endMs },
                 )
             }
-            return Agenda(rows.take(MAX_ROWS), (rows.size - MAX_ROWS).coerceAtLeast(0))
         }
     }
 }

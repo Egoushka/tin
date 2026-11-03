@@ -18,7 +18,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.advanceEventTime
+import androidx.compose.ui.test.down
+import androidx.compose.ui.test.move
+import androidx.compose.ui.test.up
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -52,6 +57,10 @@ class HomeFrameTest {
     private var up = 0
     private var down = 0
     private var long = 0
+    private var twoUp = 0
+    private var twoDown = 0
+    private var pinch = 0
+    private var double = 0
     private var cards by mutableIntStateOf(0)
     private var fontScale by mutableFloatStateOf(1f)
     private var gestures by mutableStateOf(true)
@@ -67,6 +76,10 @@ class HomeFrameTest {
                     onSwipeUp = { up++ },
                     onSwipeDown = { down++ },
                     onLongPress = { long++ },
+                    onTwoFingerUp = { twoUp++ },
+                    onTwoFingerDown = { twoDown++ },
+                    onPinchIn = { pinch++ },
+                    onDoubleTap = { double++ },
                     top = { Text("12:00", style = NgType.clock, modifier = Modifier.testTag("top")) },
                     bottom = {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -211,12 +224,93 @@ class HomeFrameTest {
         assertEquals(0 to 0, swipesSeen())
     }
 
-    @Test fun `a double tap on empty space does nothing`() {
-        settle { cards = 3 }
+    private fun twoFingers(x: Float, yDp: Float, dx0: Float, dy0: Float, dx1: Float, dy1: Float) = rule.onRoot().performTouchInput {
+        val a = Offset((x - 40f).dp.toPx(), yDp.dp.toPx())
+        val b = Offset((x + 40f).dp.toPx(), yDp.dp.toPx())
+        down(0, a); down(1, b)
+        val steps = 10
+        for (i in 1..steps) {
+            advanceEventTime(80)
+            updatePointerTo(0, Offset(a.x + dx0.dp.toPx() * i / steps, a.y + dy0.dp.toPx() * i / steps))
+            updatePointerTo(1, Offset(b.x + dx1.dp.toPx() * i / steps, b.y + dy1.dp.toPx() * i / steps))
+            move()
+        }
+        up(0); up(1)
+    }
+
+    private fun tapsSeen() = listOf(twoUp, twoDown, pinch, double)
+
+    @Test fun `two fingers down and up fire their own callbacks once and no one-finger swipe`() {
+        settle { cards = 0 }
+        val (x, y) = midStack()
+        twoFingers(x, y, 0f, 150f, 0f, 150f)
+        assertEquals(listOf(0, 1, 0, 0), tapsSeen())
+        twoFingers(x, y, 0f, -150f, 0f, -150f)
+        assertEquals(listOf(1, 1, 0, 0), tapsSeen())
+        assertEquals(0 to 0, swipesSeen())
+        assertEquals(0, long)
+    }
+
+    @Test fun `two fingers work on a stack that is scrolled to the middle`() {
+        settle { cards = 12; scrollStackBy(1500f) }
+        val (x, y) = midStack()
+        twoFingers(x, y, 0f, 150f, 0f, 150f)
+        assertEquals(listOf(0, 1, 0, 0), tapsSeen())
+        assertEquals(0 to 0, swipesSeen())
+    }
+
+    @Test fun `a pinch in fires once and opens no layer`() {
+        settle { cards = 0 }
+        val (x, y) = midStack()
+        twoFingers(x, y, 30f, 0f, -30f, 0f)
+        assertEquals(listOf(0, 0, 1, 0), tapsSeen())
+        assertEquals(0 to 0, swipesSeen())
+    }
+
+    @Test fun `spreading two fingers fires nothing`() {
+        settle { cards = 0 }
+        val (x, y) = midStack()
+        twoFingers(x, y, -40f, 0f, 40f, 0f)
+        assertEquals(listOf(0, 0, 0, 0), tapsSeen())
+    }
+
+    @Test fun `a double tap on empty space fires once, a single tap and a long press do not`() {
+        settle { cards = 0 }
         val top = bounds("top")
-        rule.onRoot().performTouchInput { doubleClick(Offset(206.dp.toPx(), ((top.top.value + top.bottom.value) / 2).dp.toPx())) }
+        val midY = (top.top.value + top.bottom.value) / 2
+        rule.onRoot().performTouchInput { click(Offset(206.dp.toPx(), midY.dp.toPx())) }
+        rule.mainClock.advanceTimeBy(1_000)
+        assertEquals(0, double)
+        rule.onRoot().performTouchInput { doubleClick(Offset(206.dp.toPx(), midY.dp.toPx())) }
+        assertEquals(1, double)
         assertEquals(0, long)
         assertEquals(0 to 0, swipesSeen())
+    }
+
+    @Test fun `a double tap in the gaps of the stack fires too`() {
+        settle { cards = 0 }
+        val (x, y) = midStack()
+        rule.onRoot().performTouchInput { doubleClick(Offset(x.dp.toPx(), y.dp.toPx())) }
+        assertEquals(1, double)
+    }
+
+    @Test fun `the new gestures stay out of the side edges, widgets and edit mode`() {
+        settle { cards = 0; zone = true }
+        val (_, y) = midStack()
+        rule.onRoot().performTouchInput { doubleClick(Offset(10.dp.toPx(), y.dp.toPx())) }
+        twoFingers(10f + 40f, y, 0f, 150f, 0f, 150f) // one finger starts at x = 10
+        val z = bounds("zone")
+        val zy = (z.top.value + z.bottom.value) / 2
+        rule.onRoot().performTouchInput { doubleClick(Offset(206.dp.toPx(), zy.dp.toPx())) }
+        twoFingers(206f, zy, 0f, 150f, 0f, 150f)
+        twoFingers(206f, zy, 30f, 0f, -30f, 0f)
+        assertEquals(listOf(0, 0, 0, 0), tapsSeen())
+        settle { gestures = false }
+        val (x, my) = midStack()
+        rule.onRoot().performTouchInput { doubleClick(Offset(x.dp.toPx(), my.dp.toPx())) }
+        twoFingers(x, my, 0f, 150f, 0f, 150f)
+        twoFingers(x, my, 30f, 0f, -30f, 0f)
+        assertEquals(listOf(0, 0, 0, 0), tapsSeen())
     }
 
     @Test fun `a long press on empty space outside the stack opens edit mode once`() {

@@ -71,7 +71,7 @@ object StackTags {
 
 /** The cards and widgets in the order he chose; in edit mode each gets a header with its controls. */
 @Composable
-fun HomeStack(home: HomeState, signals: Signals, actions: Actions) {
+fun HomeStack(home: HomeState, signals: Signals, actions: Actions, onToday: () -> Unit = {}) {
     val layout = home.layout ?: return // the saved layout has not arrived: show nothing rather than the wrong cards
     val visible = layout.visible
     if (home.editing) {
@@ -82,7 +82,7 @@ fun HomeStack(home: HomeState, signals: Signals, actions: Actions) {
             if (home.editing) {
                 EditedSlot(slot, home, layout, signals, actions, first = i == 0, last = i == visible.lastIndex)
             } else {
-                SlotContent(slot, home, layout, signals, actions, editing = false)
+                SlotContent(slot, home, layout, signals, actions, editing = false, onToday = onToday)
             }
         }
     }
@@ -90,7 +90,7 @@ fun HomeStack(home: HomeState, signals: Signals, actions: Actions) {
 }
 
 @Composable
-private fun SlotContent(slot: Slot, home: HomeState, layout: HomeLayout, signals: Signals, actions: Actions, editing: Boolean) {
+private fun SlotContent(slot: Slot, home: HomeState, layout: HomeLayout, signals: Signals, actions: Actions, editing: Boolean, onToday: () -> Unit = {}) {
     when (slot) {
         is Slot.Widget -> WidgetCell(
             slot.id, layout.rows[slot.id], home.widgets, editing,
@@ -104,7 +104,7 @@ private fun SlotContent(slot: Slot, home: HomeState, layout: HomeLayout, signals
                 if (!state.granted && state.at != 0L) {
                     GrantRow("cal", R.string.calendar_access, { actions.askCalendar() }, hide = hideOf(slot, home, editing))
                 } else {
-                    TodayCard(signals.calendar, actions)
+                    TodayCard(signals.calendar, actions, onToday)
                 }
             }
             CardId.Glance -> {
@@ -309,7 +309,7 @@ private fun HiddenTray(hidden: List<Slot>, home: HomeState) {
 
 /** What replaces the pins, dock and search bar while Home is being edited; on an extra page ([page]) it adds to that page. */
 @Composable
-fun EditBar(home: HomeState, page: Int?, onTune: () -> Unit) {
+fun EditBar(home: HomeState, page: Int?, onTune: () -> Unit, onGestures: () -> Unit) {
     val gap = Dimen.space2
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(gap)) {
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
@@ -318,6 +318,7 @@ fun EditBar(home: HomeState, page: Int?, onTune: () -> Unit) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             Pill(stringResource(R.string.tune), Modifier.weight(1f), onClick = onTune)
+            Pill(stringResource(R.string.gestures), Modifier.weight(1f), onClick = onGestures)
             Pill(stringResource(R.string.edit_done), Modifier.weight(1f), accent = true) { home.edit(false) }
         }
     }
