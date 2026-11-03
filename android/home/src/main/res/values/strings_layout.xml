@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_home">Edit Home</string>
+    <string name="edit_hint">Move or hide the cards. Add widgets and pinned apps below.</string>
+    <string name="edit_done">Done</string>
+    <string name="edit_add_widget">Add widget</string>
+    <string name="edit_add_app">Pin app</string>
+    <string name="edit_hidden">Hidden</string>
+    <string name="edit_up">Move %1$s up</string>
+    <string name="edit_down">Move %1$s down</string>
+    <string name="edit_hide">Hide %1$s</string>
+    <string name="edit_show">Show %1$s</string>
+    <string name="edit_remove">Remove %1$s</string>
+    <string name="edit_taller">Make %1$s taller</string>
+    <string name="edit_shorter">Make %1$s shorter</string>
+    <string name="card_notifications">Notifications</string>
+    <string name="card_music">Music</string>
+    <string name="widget_unavailable">Widget unavailable</string>
+    <string name="widget_none">No widgets installed</string>
+    <string name="pins_full">12 apps are pinned. Unpin one first.</string>
+    <string name="pins_none">Every app is pinned</string>
+    <string name="unpin_app">Unpin %1$s</string>
+</resources>

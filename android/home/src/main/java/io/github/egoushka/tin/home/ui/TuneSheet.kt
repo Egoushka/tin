@@ -52,7 +52,7 @@ import kotlin.math.roundToInt
 /** Tune (long press on Home, or the sliders button in All apps): every knob writes `tin.tune` at once. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onClose: () -> Unit) {
+fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, onClose: () -> Unit) {
     val res = LocalContext.current.resources
     Box(
         Modifier
@@ -76,6 +76,8 @@ fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onClose: () -> Unit) {
                 Text(stringResource(R.string.tune), style = NgType.title, modifier = Modifier.weight(1f))
                 IconButton("x", stringResource(R.string.close), onClose)
             }
+
+            Chip(stringResource(R.string.edit_home), selected = false, role = Role.Button, onClick = onEditHome)
 
             Section(R.string.tune_preset)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimen.space2), verticalArrangement = Arrangement.spacedBy(Dimen.space2)) {
@@ -147,7 +149,7 @@ private fun Section(@StringRes label: Int) {
 
 /** Selected chips are white (accent): primary state carries no colour. */
 @Composable
-private fun Chip(label: String, selected: Boolean, dot: Color? = null, onClick: () -> Unit) {
+private fun Chip(label: String, selected: Boolean, dot: Color? = null, role: Role = Role.RadioButton, onClick: () -> Unit) {
     val shape = RoundedCornerShape(Dimen.radiusRow)
     Row(
         Modifier
@@ -155,7 +157,7 @@ private fun Chip(label: String, selected: Boolean, dot: Color? = null, onClick: 
             .clip(shape)
             .background(if (selected) Ng.accent else Ng.surface2)
             .border(1.dp, if (selected) Color.Transparent else Ng.edge, shape)
-            .clickable(role = Role.RadioButton, onClick = onClick)
+            .clickable(role = role, onClick = onClick)
             .padding(horizontal = Dimen.space3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
