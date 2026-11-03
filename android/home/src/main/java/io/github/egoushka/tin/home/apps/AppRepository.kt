@@ -141,7 +141,7 @@ class SystemApps(private val context: Context) : AppSource {
 }
 
 /** What the UI talks to: the live list, the dock, hide, icons and the long-press actions. */
-class AppRepository(context: Context, private val prefs: AppPrefs) {
+open class AppRepository(context: Context, private val prefs: AppPrefs) {
     private val system = SystemApps(context)
     private val model = AppList(system, prefs.saved.map { it.hidden }.distinctUntilChanged())
 
@@ -170,11 +170,11 @@ class AppRepository(context: Context, private val prefs: AppPrefs) {
     suspend fun hide(app: AppEntry) = prefs.hide(app.key)
     suspend fun show(key: String) = prefs.show(key)
 
-    fun launch(app: AppEntry) = system.launch(app)
+    open fun launch(app: AppEntry) = system.launch(app)
     fun appInfo(app: AppEntry) = runCatching { system.appInfo(app) }
     fun uninstall(app: AppEntry) = runCatching { system.uninstall(app) }
-    suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) { system.shortcuts(app) }
-    fun startShortcut(app: AppEntry, shortcut: AppShortcut) = runCatching { system.startShortcut(app, shortcut.id) }
+    open suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) { system.shortcuts(app) }
+    open fun startShortcut(app: AppEntry, shortcut: AppShortcut) = runCatching { system.startShortcut(app, shortcut.id) }
     suspend fun pinShortcuts(pkg: String, user: Long, ids: Set<String>) =
         withContext(Dispatchers.IO) { runCatching { system.pinShortcuts(pkg, user, ids) } }
 

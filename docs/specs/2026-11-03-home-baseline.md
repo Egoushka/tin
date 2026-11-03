@@ -38,9 +38,9 @@ G10 and G11 of the gestures spec say a swipe that starts on a dock tile never op
 
 | ID | Claim | Test | Result |
 |---|---|---|---|
-| B4 | On the real `DockTile` with a docked app that lists no shortcuts, a swipe up opens neither All apps nor the long-press menu and is not a tap; a tap still launches the app | `DockTileTest` | pending |
-| B5 | On the real `DockTile` with a docked app that lists shortcuts, a swipe up starts the first one and nothing else | `DockTileTest` | pending |
-| B6 | On the real `DockTile`, the empty Camera slot starts the video intent on a swipe up, and an empty slot without a swipe default (Maps) does nothing and does not open All apps | `DockTileTest` | pending |
+| B4 | On the real `DockTile` with a docked app that lists no shortcuts, a swipe up opens neither All apps nor the long-press menu and is not a tap; a tap still launches the app | `DockTileTest` | pass |
+| B5 | On the real `DockTile` with a docked app that lists shortcuts, a swipe up starts the first one and nothing else | `DockTileTest` | pass |
+| B6 | On the real `DockTile`, the empty Camera slot starts the video intent on a swipe up, and an empty slot without a swipe default (Maps) does nothing and does not open All apps | `DockTileTest` | pass |
 
 ## Layer 3: the Needs-you card
 

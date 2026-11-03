@@ -480,7 +480,7 @@ private fun Modifier.ownsPress() = pointerInput(Unit) {
 
 /** One dock slot: the chosen app, or the default's glyph while the slot is empty or its app is gone. */
 @Composable
-private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, ready: Boolean, apps: AppRepository, actions: Actions) {
+internal fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, ready: Boolean, apps: AppRepository, actions: Actions) {
     val menu = LocalAppMenu.current
     val unread by rememberUnread(app?.pkg)
     val label = app?.label ?: stringResource(d.label)
@@ -489,8 +489,9 @@ private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, read
     val tile = Modifier.size(Dimen.tile)
     val shortcuts by produceState(emptyList<AppShortcut>(), app?.key) { value = if (app != null) apps.shortcuts(app) else emptyList() }
     val swipe = DockSwipe.of(app != null, d, shortcuts)
-    val onSwipe: (() -> Unit)? = when (swipe) {
-        null -> null
+    // A tile with nothing to swipe to still owns the swipe: left to the frame, it would open All apps (G10).
+    val onSwipe: () -> Unit = when (swipe) {
+        null -> ({})
         is DockSwipe.Shortcut -> ({ if (app != null) apps.startShortcut(app, swipe.shortcut) })
         is DockSwipe.Open -> ({ actions.start(swipe.intent, label) })
     }
