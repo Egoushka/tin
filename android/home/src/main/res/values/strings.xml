@@ -17,6 +17,7 @@
     <string name="contacts_off_hint">Turn them on in settings</string>
     <string name="call_person">Call %1$s</string>
     <string name="all_apps">All apps</string>
+    <string name="az_jump">Jump to %1$s</string>
     <string name="mic">Speak</string>
     <string name="open_failed">Can\'t open %1$s</string>
     <string name="close">Close</string>

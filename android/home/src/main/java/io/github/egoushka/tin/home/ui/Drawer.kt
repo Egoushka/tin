@@ -66,6 +66,7 @@ import io.github.egoushka.tin.home.Actions
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
+import io.github.egoushka.tin.home.apps.AzIndex
 import io.github.egoushka.tin.home.search.Contact
 import io.github.egoushka.tin.home.search.Hit
 import io.github.egoushka.tin.home.search.Results
@@ -171,15 +172,19 @@ fun Drawer(
         }
 
         if (query.isBlank()) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                state = grid,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = Dimen.space2),
-                verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp + Dimen.space2),
-                horizontalArrangement = Arrangement.spacedBy(tune.gapDp.dp),
-            ) {
-                items(all, key = { it.key }) { app -> AppTile(app, apps) { run(Hit.App(app)) } }
+            val index = remember(all) { AzIndex.of(all.map { it.label }) }
+            Row(Modifier.weight(1f)) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    state = grid,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = Dimen.space2),
+                    verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp + Dimen.space2),
+                    horizontalArrangement = Arrangement.spacedBy(tune.gapDp.dp),
+                ) {
+                    items(all, key = { it.key }) { app -> AppTile(app, apps) { run(Hit.App(app)) } }
+                }
+                AzScroller(index, onJump = { position -> scope.launch { grid.scrollToItem(position) } }, Modifier.padding(vertical = Dimen.space2))
             }
         } else {
             Box(Modifier.weight(1f).padding(vertical = Dimen.space2), contentAlignment = Alignment.TopCenter) {
@@ -216,7 +221,7 @@ fun Drawer(
 }
 
 @Composable
-private fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
+internal fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
     val menu = LocalAppMenu.current
     val unread by rememberUnread(app.pkg)
     // An unread tile reads as one phrase; a plain one keeps its label as text.
@@ -235,7 +240,7 @@ private fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
             UnreadDot(unread)
         }
         Spacer(Modifier.height(Dimen.space1))
-        Text(app.label, style = NgType.body.copy(color = Ng.ink), maxLines = 1, overflow = TextOverflow.Ellipsis,
+        Text(app.label, style = NgType.body.copy(color = Ng.ink), maxLines = 2, overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().then(if (unread) Modifier.clearAndSetSemantics {} else Modifier))
     }

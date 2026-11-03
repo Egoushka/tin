@@ -16,6 +16,7 @@
     <string name="contacts_off_hint">Увімкнути в налаштуваннях</string>
     <string name="call_person">Подзвонити: %1$s</string>
     <string name="all_apps">Усі застосунки</string>
+    <string name="az_jump">Перейти до %1$s</string>
     <string name="mic">Говорити</string>
     <string name="open_failed">Не вдалося відкрити %1$s</string>
     <string name="close">Закрити</string>

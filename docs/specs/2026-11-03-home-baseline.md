@@ -81,3 +81,14 @@ An app whose adaptive icon has no monochrome layer showed a white blank on the g
 | B16 | An adaptive icon with no monochrome layer is drawn in its own colours, inside the disc: the centre is its colour, the corner of the square is empty | `IconRenderTest` | pass |
 | B17 | Tin Home's launcher icon is an adaptive icon with a monochrome layer | `IconRenderTest` | pass |
 
+## Layer 7: the drawer's A to Z scroller
+
+The drawer is a long list with no index, and two-word labels end in "..." (F9). A strip of letters now sits on the right edge: a tap or a drag along it scrolls the grid to the first app under that letter. Only letters that have an app are listed, in list order; digits and symbols share "#". A tile's label may take two lines before it is cut.
+
+| ID | Claim | Test | Result |
+|---|---|---|---|
+| B18 | `AzIndex` lists each first letter once, in list order, with the position of its first app; a label that does not start with a letter files under "#"; a letter with an accent files under its base letter | `AzIndexTest` | pass |
+| B19 | A tap on a letter of the strip reports that letter's position, and every letter has a "Jump to X" description | `AzScrollerTest` | pass |
+| B20 | A dragged y position maps to the letter under the finger, clamped to the first and last letter | `AzIndexTest` | pass |
+| B21 | A two-word label that needs two lines in a drawer tile is shown whole | `AzScrollerTest` | pass |
+
