@@ -1,6 +1,5 @@
 package io.github.egoushka.tin.home
 
-import android.content.ComponentName
 import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.search.Access
 import io.github.egoushka.tin.home.search.Contact
@@ -17,7 +16,7 @@ import org.junit.Test
 
 /** HS3, HS4, HS5, HS6: how the groups rank against each other, which row Enter opens, and the permission rows. */
 class ResultsTest {
-    private fun apps(vararg labels: String) = Index(labels.map { AppEntry(it, ComponentName("p", "c"), null) }) { it.label }
+    private fun apps(vararg labels: String) = Index(labels.map { AppEntry(it, "p", "c", 0) }) { it.label }
     private fun shortcuts(vararg labels: String) = Index(labels.map { ShortcutEntry(it, "p", it, null) }) { it.label }
     private fun people(vararg names: String) = Index(names.mapIndexed { i, n -> Contact(i + 1L, "k$i", n, true) }) { it.name }
 

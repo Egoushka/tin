@@ -20,6 +20,9 @@
     <!-- Earbud battery of the current audio output; asked once, the card works without it. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- Uninstall in the long-press sheet; without it the system drops the ACTION_DELETE request. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
     <!-- Voice: bind tin's VoiceService. Signature-protected there, so it is granted only when both apps share a signer. -->
     <uses-permission android:name="io.github.egoushka.tin.permission.VOICE" />
 

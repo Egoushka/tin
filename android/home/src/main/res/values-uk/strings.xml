@@ -88,4 +88,20 @@
     <string name="voice_listening">Слухаю…</string>
     <string name="voice_thinking">Думаю…</string>
     <string name="voice_error">Не вдалося розчути</string>
+    <string name="app_options">Параметри застосунку</string>
+    <string name="app_unread">%1$s, є сповіщення</string>
+    <string name="app_info">Про застосунок</string>
+    <string name="app_pin">Закріпити в доку</string>
+    <string name="app_replace">Замінити в доку</string>
+    <string name="app_pin_home">Закріпити на Home</string>
+    <string name="app_unpin_home">Відкріпити з Home</string>
+    <string name="app_hide">Сховати зі списку</string>
+    <string name="app_uninstall">Видалити</string>
+    <string name="dock_choose_slot">У яке місце закріпити?</string>
+    <string name="dock_slot_app">Місце %1$d: %2$s</string>
+    <string name="choose_app">Оберіть застосунок</string>
+    <string name="tune_hidden">Сховані застосунки</string>
+    <string name="hidden_none">Нічого не сховано</string>
+    <string name="hidden_show">Показати</string>
+    <string name="hidden_show_app">Показати %1$s</string>
 </resources>

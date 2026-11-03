@@ -41,9 +41,15 @@ fun Modifier.pressable(role: Role = Role.Button, onClick: () -> Unit): Modifier 
 }
 
 /** A dock tile: [pressable], and the glass takes `.ic:active i`'s surface-2 fill and edge-hi border. */
-fun Modifier.pressGlass(shape: Shape, role: Role = Role.Button, onClick: () -> Unit): Modifier = composed {
+fun Modifier.pressGlass(
+    shape: Shape,
+    role: Role = Role.Button,
+    onLongClickLabel: String? = null,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+): Modifier = composed {
     val press = rememberPress()
-    this.clickable(press.source, null, role = role, onClick = onClick)
+    this.combinedClickable(press.source, null, role = role, onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick)
         .pressScale(press)
         .glassBody(shape, pressed = { press.amount.value })
 }

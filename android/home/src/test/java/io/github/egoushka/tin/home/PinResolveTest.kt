@@ -1,19 +1,12 @@
 package io.github.egoushka.tin.home
 
-import android.content.ComponentName
 import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.layout.PinStore
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-/** A real [ComponentName] makes [AppEntry.key] meaningful, so this one runs under Robolectric. */
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
 class PinResolveTest {
-    private fun app(name: String) = AppEntry(name, ComponentName("p.$name", "p.$name.Main"), null)
+    private fun app(name: String) = AppEntry(name, "p.$name", "p.$name.Main", 0)
 
     @Test fun `pins resolve to installed apps in pin order`() {
         val installed = listOf(app("a"), app("b"), app("c"))

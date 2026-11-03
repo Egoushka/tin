@@ -1,102 +1,89 @@
 package io.github.egoushka.tin.home.apps
 
-import android.content.ComponentName
-import android.content.Context
-import android.content.pm.LauncherApps
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.graphics.drawable.AdaptiveIconDrawable
-import android.os.Handler
-import android.os.Looper
-import android.os.Process
-import android.os.UserHandle
-import android.os.UserManager
-import android.util.LruCache
 import io.github.egoushka.tin.home.search.Fold
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-data class AppEntry(val label: String, val component: ComponentName, val user: UserHandle?) {
-    val key: String get() = "${component.flattenToShortString()}#${user?.hashCode() ?: 0}"
+/**
+ * One launchable activity in one profile. Plain data (no ComponentName or UserHandle) so the model runs in unit
+ * tests; [user] is the profile's serial number, stable for as long as the profile exists. [rev] counts the package's
+ * change events, so a redrawn icon is a new value and not a stale cache hit.
+ */
+data class AppEntry(val label: String, val pkg: String, val cls: String, val user: Long, val rev: Int = 0) {
+    val key: String get() = "$pkg/$cls#$user"
 }
 
-class AppRepository(private val context: Context) {
-    private val launcherApps = context.getSystemService(LauncherApps::class.java)
-    private val users = context.getSystemService(UserManager::class.java)
-
-    /** Every launchable activity in every profile (work profile included), A–Z, Home itself excluded. */
-    fun load(): List<AppEntry> = users.userProfiles.flatMap { user ->
-        launcherApps.getActivityList(null, user)
-            .filter { it.componentName.packageName != context.packageName }
-            .map { AppEntry(it.label.toString(), it.componentName, user.takeIf { u -> u != Process.myUserHandle() }) }
-    }.sortedBy { Fold.of(it.label) }
-
-    private val loaded = MutableStateFlow<List<AppEntry>>(emptyList())
-
-    /** The app list, kept current by [keepLoaded] so the drawer opens with it instead of loading on first open. */
-    val list: StateFlow<List<AppEntry>> = loaded
-
-    suspend fun keepLoaded() = changes().collect { loaded.value = withContext(Dispatchers.IO) { load() } }
-
-    /** Draws every icon into the cache ahead of the drawer. */
-    suspend fun warm(px: Int, tint: Int) = withContext(Dispatchers.IO) { loaded.value.forEach { icon(it, px, tint) } }
-
-    /** Emits once now and again on every install, removal or change. */
-    fun changes(): Flow<Unit> = callbackFlow {
-        val cb = object : LauncherApps.Callback() {
-            override fun onPackageRemoved(p: String?, u: UserHandle?) { trySend(Unit) }
-            override fun onPackageAdded(p: String?, u: UserHandle?) { trySend(Unit) }
-            override fun onPackageChanged(p: String?, u: UserHandle?) { trySend(Unit) }
-            override fun onPackagesAvailable(p: Array<out String>?, u: UserHandle?, r: Boolean) { trySend(Unit) }
-            override fun onPackagesUnavailable(p: Array<out String>?, u: UserHandle?, r: Boolean) { trySend(Unit) }
-        }
-        trySend(Unit)
-        launcherApps.registerCallback(cb, Handler(Looper.getMainLooper()))
-        awaitClose { launcherApps.unregisterCallback(cb) }
-    }
-
-    fun launch(app: AppEntry) {
-        launcherApps.startMainActivity(app.component, app.user ?: Process.myUserHandle(), null, null)
-    }
-
-    private val icons = LruCache<String, Bitmap>(256)
-
-    /** The icon if it is already drawn; never blocks. */
-    fun cachedIcon(app: AppEntry, px: Int): Bitmap? = icons.get("${app.key}@$px")
+/** Where apps come from; the system one is [SystemApps]. */
+interface AppSource {
+    /** Every launchable activity in every profile, Home itself excluded. */
+    fun load(): List<AppEntry>
 
     /**
-     * The themed monochrome icon drawn in [tint] (Icons card: third-party apps in `ink` on the glass tile); apps
-     * without one keep their own icon, inset to the same optical size.
+     * Registers on collect and unregisters on cancel. Emits once after registering, so the first load needs no
+     * path of its own, then the package names of every install, removal or change (empty when only "reload" is known).
      */
-    fun icon(app: AppEntry, px: Int, tint: Int): Bitmap? {
-        val key = "${app.key}@$px"
-        icons.get(key)?.let { return it }
-        val info = launcherApps.resolveActivity(
-            android.content.Intent(android.content.Intent.ACTION_MAIN).setComponent(app.component),
-            app.user ?: Process.myUserHandle(),
-        ) ?: return null
-        val drawable = info.getIcon(0)
-        val mono = (drawable as? AdaptiveIconDrawable)?.monochrome
-        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        if (mono != null) {
-            // The adaptive foreground spans 108 dp around a 72 dp safe zone; draw it so the zone fills the tile.
-            val extra = (px * 0.25f).toInt()
-            mono.setBounds(-extra, -extra, px + extra, px + extra)
-            mono.colorFilter = PorterDuffColorFilter(tint, PorterDuff.Mode.SRC_IN)
-            mono.draw(canvas)
-        } else {
-            drawable.setBounds(0, 0, px, px)
-            drawable.draw(canvas)
+    fun changes(): Flow<Set<String>>
+}
+
+/** Every launchable app A–Z and the hidden keys; [visible] is what the drawer and search show. [loaded] once the first load is in. */
+data class Apps(val all: List<AppEntry> = emptyList(), val hidden: Set<String> = emptySet(), val loaded: Boolean = false) {
+    val visible: List<AppEntry> = all.filter { it.key !in hidden }
+    val hiddenApps: List<AppEntry> = all.filter { it.key in hidden }
+    private val byKey: Map<String, AppEntry> = all.associateBy { it.key }
+
+    operator fun get(key: String?): AppEntry? = key?.let(byKey::get)
+}
+
+/** Turns [AppSource] events and the hidden set into the model, one reload per burst of events. */
+class AppList(
+    private val source: AppSource,
+    private val hidden: Flow<Set<String>>,
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+) {
+    private val _state = MutableStateFlow(Apps())
+    val state: StateFlow<Apps> = _state
+
+    private val _visible = MutableStateFlow<List<AppEntry>>(emptyList())
+    val visible: StateFlow<List<AppEntry>> = _visible
+
+    private val revs = HashMap<String, Int>()
+
+    private fun publish(next: Apps) {
+        _state.value = next
+        _visible.value = next.visible
+    }
+
+    /** Runs until cancelled. All state is written from the caller's context; only [AppSource.load] moves to [io]. */
+    suspend fun keep() = coroutineScope {
+        // The hidden set is read first, so the first list never shows an app that was hidden.
+        val ready = CompletableDeferred<Unit>()
+        launch {
+            hidden.collect { h ->
+                publish(_state.value.copy(hidden = h))
+                ready.complete(Unit)
+            }
         }
-        icons.put(key, bmp)
-        return bmp
+        ready.await()
+
+        val events = Channel<Set<String>>(Channel.UNLIMITED)
+        launch { source.changes().collect { events.trySend(it) } }
+        for (first in events) {
+            var changed = first
+            while (true) changed = changed + (events.tryReceive().getOrNull() ?: break)
+            val loaded = withContext(io) { source.load() }
+            changed.forEach { revs[it] = (revs[it] ?: 0) + 1 }
+            val all = loaded
+                .map { app -> revs[app.pkg]?.let { app.copy(rev = it) } ?: app }
+                .sortedBy { Fold.of(it.label) }
+            publish(_state.value.copy(all = all, loaded = true))
+        }
     }
 }

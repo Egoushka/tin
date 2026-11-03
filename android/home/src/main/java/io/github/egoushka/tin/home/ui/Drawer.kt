@@ -1,11 +1,11 @@
 package io.github.egoushka.tin.home.ui
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +36,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,7 +47,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -57,6 +55,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -121,7 +120,13 @@ fun Drawer(
     }
     if (open && focusSearch) AfterAttach(Unit) { runCatching { focus.requestFocus() } }
 
+    val pick = LocalDockPick.current
     fun run(hit: Hit) {
+        // Choosing an app for the dock: only an app can be picked, anything else waits.
+        if (pick != null) {
+            if (hit is Hit.App) { keyboard?.hide(); pick.put(hit.app) }
+            return
+        }
         when (hit) {
             // These two keep the drawer: the dialog and the settings page both come back to it.
             Hit.Allow -> return sources.allow()
@@ -157,7 +162,10 @@ fun Drawer(
             .padding(horizontal = Dimen.gutter),
     ) {
         Row(Modifier.fillMaxWidth().padding(vertical = Dimen.space2), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.all_apps).uppercase(), style = NgType.label, modifier = Modifier.weight(1f))
+            Text(
+                stringResource(if (pick != null) R.string.choose_app else R.string.all_apps).uppercase(),
+                style = NgType.label, modifier = Modifier.weight(1f),
+            )
             IconButton("sliders", stringResource(R.string.tune), onTune)
             IconButton("x", stringResource(R.string.close), onClose)
         }
@@ -209,21 +217,27 @@ fun Drawer(
 
 @Composable
 private fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
-    val px = with(LocalDensity.current) { Dimen.glyphTile.roundToPx() * 2 }
-    val cached = remember(app.key, px) { apps.cachedIcon(app, px)?.asImageBitmap() }
-    val icon by produceState(cached, app.key, px) {
-        if (value == null) value = withContext(Dispatchers.IO) { apps.icon(app, px, Ng.ink.toArgb())?.let(Bitmap::asImageBitmap) }
-    }
+    val menu = LocalAppMenu.current
+    val unread by rememberUnread(app.pkg)
+    // An unread tile reads as one phrase; a plain one keeps its label as text.
+    val description = if (unread) stringResource(R.string.app_unread, app.label) else ""
+    val longClickLabel = stringResource(R.string.app_options)
     Column(
-        Modifier.clip(RoundedCornerShape(Dimen.radiusRow)).clickable(role = Role.Button, onClick = onClick).padding(vertical = Dimen.space1),
+        Modifier
+            .clip(RoundedCornerShape(Dimen.radiusRow))
+            .combinedClickable(role = Role.Button, onLongClickLabel = longClickLabel, onLongClick = { menu.open(app, null) }, onClick = onClick)
+            .then(if (unread) Modifier.semantics { contentDescription = description } else Modifier)
+            .padding(vertical = Dimen.space1),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.size(Dimen.tile).glass(CircleShape), contentAlignment = Alignment.Center) {
-            icon?.let { Image(it, contentDescription = null, Modifier.size(Dimen.glyphTile * 1.5f)) }
+            AppIcon(app, apps, Modifier.size(Dimen.glyphTile * 1.5f))
+            UnreadDot(unread)
         }
         Spacer(Modifier.height(Dimen.space1))
         Text(app.label, style = NgType.body.copy(color = Ng.ink), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().then(if (unread) Modifier.clearAndSetSemantics {} else Modifier))
     }
 }
 

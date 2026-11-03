@@ -87,4 +87,20 @@
     <string name="voice_listening">Listening…</string>
     <string name="voice_thinking">Thinking…</string>
     <string name="voice_error">Didn\'t catch that</string>
+    <string name="app_options">App options</string>
+    <string name="app_unread">%1$s, has notifications</string>
+    <string name="app_info">App info</string>
+    <string name="app_pin">Pin to dock</string>
+    <string name="app_replace">Replace in dock</string>
+    <string name="app_pin_home">Pin to Home</string>
+    <string name="app_unpin_home">Unpin from Home</string>
+    <string name="app_hide">Hide from drawer</string>
+    <string name="app_uninstall">Uninstall</string>
+    <string name="dock_choose_slot">Pin to which slot?</string>
+    <string name="dock_slot_app">Slot %1$d: %2$s</string>
+    <string name="choose_app">Choose an app</string>
+    <string name="tune_hidden">Hidden apps</string>
+    <string name="hidden_none">Nothing is hidden</string>
+    <string name="hidden_show">Show</string>
+    <string name="hidden_show_app">Show %1$s</string>
 </resources>

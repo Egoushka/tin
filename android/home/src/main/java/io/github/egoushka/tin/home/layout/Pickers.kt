@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
@@ -55,18 +56,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.Dp
 
-/** Every launchable app, kept current as packages come and go. */
-@Composable
-fun rememberInstalledApps(apps: AppRepository): List<AppEntry> =
-    produceState(emptyList<AppEntry>(), apps) {
-        apps.changes().collect { value = withContext(Dispatchers.IO) { apps.load() } }
-    }.value
-
 /** The apps pinned above the dock: themed icons like the drawer's, tap to open, long-press to unpin. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PinsRow(keys: List<String>?, apps: AppRepository, gap: Dp, onUnpin: (String) -> Unit) {
-    val installed = rememberInstalledApps(apps)
+    // Everything, hidden included: hiding an app from the drawer does not unpin it.
+    val installed = apps.state.collectAsState().value.all
     val pinned = remember(keys, installed) { PinStore.resolve(keys.orEmpty(), installed) }
     if (pinned.isEmpty()) return
     Row(
@@ -126,7 +121,7 @@ fun WidgetPicker(host: WidgetHost, onPick: (ComponentName) -> Unit, onClose: () 
 /** Apps not yet pinned, A–Z. */
 @Composable
 fun AppPicker(apps: AppRepository, pinned: List<String>, onPick: (AppEntry) -> Unit, onClose: () -> Unit) {
-    val installed = rememberInstalledApps(apps)
+    val installed by apps.list.collectAsState()
     val free = remember(installed, pinned) { installed.filter { it.key !in pinned } }
     PickerSheet(stringResource(R.string.edit_add_app), onClose) {
         when {

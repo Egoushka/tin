@@ -60,7 +60,7 @@ import kotlin.math.roundToInt
 /** Tune (long press on Home, or the sliders button in All apps): every knob writes `tin.tune` at once. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, onClose: () -> Unit) {
+fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, hidden: Int, onHidden: () -> Unit, onClose: () -> Unit) {
     val res = LocalContext.current.resources
     val close = stringResource(R.string.close)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
@@ -139,6 +139,18 @@ fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, onCl
                         uncheckedThumbColor = Ng.ink2, uncheckedTrackColor = Ng.track, uncheckedBorderColor = Ng.edge,
                     ),
                 )
+            }
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Dimen.target)
+                    .clip(RoundedCornerShape(Dimen.radiusRow))
+                    .clickable(role = Role.Button, onClick = onHidden),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.tune_hidden), style = NgType.title, modifier = Modifier.weight(1f))
+                Text(hidden.toString(), style = NgType.label.copy(color = Ng.ink))
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
