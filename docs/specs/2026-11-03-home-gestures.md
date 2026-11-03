@@ -63,4 +63,5 @@ TalkBack is not run here; claims about it are semantics-tree tests (G13, G15) or
 ## Open questions for Yehor
 
 1. **The torch is back on double tap.** #36 removed it as an accident risk. It is a setting now ("Nothing" turns it off). Keep it on by default, as the card says, or ship it off?
+   **Decided by Yehor: keep it on.**
 2. **Swipe up now opens search with the keyboard up**, as the card says ("keyboard ready"); today it opens the drawer without. Wanted?
