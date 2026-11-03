@@ -145,11 +145,11 @@ fun MusicCard(music: MusicSource, actions: Actions) {
                 val art = state.art
                 Box(
                     Modifier
-                        .size(Dimen.tile - Dimen.space3)
+                        .size(Dimen.target)
                         .clip(RoundedCornerShape(Dimen.radiusRow))
                         .background(Brush.linearGradient(listOf(Ng.glow2, Ng.glow1))),
                 ) {
-                    if (art != null) Image(art.asImageBitmap(), null, Modifier.size(Dimen.tile - Dimen.space3), contentScale = ContentScale.Crop)
+                    if (art != null) Image(art.asImageBitmap(), null, Modifier.size(Dimen.target), contentScale = ContentScale.Crop)
                 }
                 Spacer(Modifier.width(Dimen.space3))
                 Column(Modifier.weight(1f)) {
@@ -228,7 +228,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions) {
                         .padding(horizontal = Dimen.space2),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.ink else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space2))
+                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.ink else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space1))
                     Text(
                         row.event.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
