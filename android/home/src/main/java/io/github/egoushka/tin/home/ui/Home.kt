@@ -85,6 +85,7 @@ import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.apps.DockSlots
 import io.github.egoushka.tin.home.layout.AppPicker
+import io.github.egoushka.tin.home.layout.DefaultPins
 import io.github.egoushka.tin.home.layout.EditBar
 import io.github.egoushka.tin.home.layout.HomeFrame
 import io.github.egoushka.tin.home.layout.HomeStack
@@ -347,6 +348,11 @@ private fun Home(
     val listen = {
         val started = voice.start(scope) { said -> actions.ask(said, signals.needsYou.state.value.needs) }
         if (!started && !actions.voice()) onLayer(Layer.Search)
+    }
+    val installed by apps.state.collectAsState()
+    // Once per start: seed() writes only while no pin list has ever been stored.
+    LaunchedEffect(installed.all.isNotEmpty()) {
+        if (installed.all.isNotEmpty()) home.seedPins(DefaultPins.keys(context, installed.all))
     }
     val gap = tune.gapDp.dp
     val extra = home.pages.count

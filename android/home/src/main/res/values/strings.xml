@@ -73,7 +73,6 @@
     <string name="needs_held">%d held</string>
     <string name="homelab">Homelab</string>
     <string name="homelab_ok">All %d up</string>
-    <string name="homelab_unavailable">Homelab not reachable</string>
     <string name="weather_clear">Clear</string>
     <string name="weather_partly">Partly cloudy</string>
     <string name="weather_cloudy">Cloudy</string>

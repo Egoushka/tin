@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
+import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.widget.Toast
@@ -72,6 +73,8 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
         ),
         context.getString(R.string.notif_access),
     )
+
+    fun openAlarms() = start(Intent(AlarmClock.ACTION_SHOW_ALARMS), context.getString(R.string.alarm))
 
     /** Opens the approvals app on its queue; the card never decides anything itself. */
     fun openApprovals() {

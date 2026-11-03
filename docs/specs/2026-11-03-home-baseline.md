@@ -49,3 +49,15 @@ Approvals guards its provider with `signature|knownSigner`; Home's release certi
 | ID | Claim | Test | Result |
 |---|---|---|---|
 | B7 | While reading the Needs-you provider is refused, Home shows no Needs-you card; once it is readable the card is back | `NeedsYouCardTest` | pass |
+
+## Layer 4: apps on the main page, no dead cards
+
+The pins row already sits above the dock, but nothing is pinned on a new install, so the band stays empty (F5). Until pins have been written once, Home pins the phone's default app for a few common jobs (settings, contacts, email, calendar, gallery, music, calculator, clock). Unpinning them all leaves the row empty for good. A card is hidden when it has nothing to show or to act on (F6): Homelab while unreachable, Today when nothing is left today (the Today sheet still says so), and the Alarm card now opens the alarm list on tap.
+
+| ID | Claim | Test | Result |
+|---|---|---|---|
+| B8 | With no pins ever written, `PinStore.seed` stores the defaults (at most `PinStore.MAX`); once any pin list has been written, even an empty one, it stores nothing | `LayoutStoreTest` | pass |
+| B9 | `DefaultPins.keys` returns the installed app that handles each job, skips a job nothing handles or only the system chooser handles, and lists an app once | `DefaultPinsTest` | pass |
+| B10 | While the Homelab endpoint is unreachable, Home shows no Homelab card | `DeadCardsTest` | pass |
+| B11 | With the calendar readable and no event left today, Home shows no Today card | `DeadCardsTest` | pass |
+| B12 | A tap on the Alarm card starts the alarm list | `DeadCardsTest` | pass |
