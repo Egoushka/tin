@@ -58,12 +58,13 @@ fun Modifier.pressGlass(shape: Shape, role: Role = Role.Button, onClick: () -> U
 /** A tap with nothing drawn for it: Night glass gives the search bar and the cards no pressed state. */
 fun Modifier.plainClickable(
     role: Role = Role.Button,
+    onClickLabel: String? = null,
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
     this.combinedClickable(
-        remember { MutableInteractionSource() }, null, role = role,
+        remember { MutableInteractionSource() }, null, role = role, onClickLabel = onClickLabel,
         onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick,
     )
 }

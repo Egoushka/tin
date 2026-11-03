@@ -13,7 +13,11 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.widget.Toast
 import androidx.annotation.StringRes
+import io.github.egoushka.tin.home.signals.MusicState
+import io.github.egoushka.tin.home.signals.OpenVia
 import io.github.egoushka.tin.home.signals.TinListener
+import io.github.egoushka.tin.home.signals.openFirst
+import io.github.egoushka.tin.home.signals.openOrder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -59,6 +63,18 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
         val intent = context.packageManager.getLaunchIntentForPackage(APPROVALS_PACKAGE)
         if (intent == null) Toast.makeText(context, context.getString(R.string.open_failed, context.getString(R.string.needs_you)), Toast.LENGTH_SHORT).show()
         else start(intent, context.getString(R.string.needs_you))
+    }
+
+    /** Opens the app that is playing: its session's own screen, else its launcher. */
+    fun openMusic(music: MusicState) {
+        val name = music.app.ifBlank { context.getString(R.string.card_music) }
+        val opened = openFirst(openOrder(music.sessionActivity != null, music.launchable)) { via ->
+            when (via) {
+                OpenVia.Session -> runCatching { music.sessionActivity?.send() }.isSuccess
+                OpenVia.Launch -> context.packageManager.getLaunchIntentForPackage(music.packageName)?.also { start(it, name) } != null
+            }
+        }
+        if (!opened) Toast.makeText(context, context.getString(R.string.open_failed, name), Toast.LENGTH_SHORT).show()
     }
 
     /** An item's own link (`approvals://item/<id>`), so a spoken "approve" lands on the item and waits for a tap. */

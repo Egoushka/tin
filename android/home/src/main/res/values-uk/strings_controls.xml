@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="torch">Ліхтарик</string>
+    <string name="music_open">Відкрити %1$s</string>
+    <string name="music_empty">Нічого не грає</string>
 </resources>
