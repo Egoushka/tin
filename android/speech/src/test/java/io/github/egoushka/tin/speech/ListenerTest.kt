@@ -41,6 +41,34 @@ class ListenerTest {
     }
 
     @Test
+    fun `onSegment runs once, before the segment is decoded`() {
+        val decodedBefore = mutableListOf<Int>()
+        val src = ArraySource(audio(0.5f to 300, 0f to 100, 0.5f to 300, 0f to 100))
+        val heard = listener.command(src, maxSeconds = 10.0, onSegment = { decodedBefore += rec.calls.size })
+        assertEquals(listOf(0), decodedBefore)
+        assertEquals(listOf(300), rec.calls)
+        assertEquals("n=300", heard.text)
+    }
+
+    @Test
+    fun `cancelled ends the command within one chunk with empty text and no decode`() {
+        var checks = 0
+        var segments = 0
+        val src = ArraySource(audio(0.5f to SAMPLE_RATE * 2))
+        val heard = listener.command(
+            src,
+            maxSeconds = 10.0,
+            onSegment = { segments++ },
+            cancelled = { checks++ >= 3 },
+        )
+        assertEquals(Heard("", 0.0, 0), heard)
+        assertEquals(300, src.pos)
+        assertEquals(emptyList<Int>(), rec.calls)
+        assertEquals(0, segments)
+        assertEquals(2, vad.resets)
+    }
+
+    @Test
     fun `short transcript is decoded whole, silence included`() {
         val heard = listener.transcript(audio(0f to 100, 0.5f to 300, 0f to 100), wholeSeconds = 1.0)
         assertEquals(listOf(500), rec.calls)

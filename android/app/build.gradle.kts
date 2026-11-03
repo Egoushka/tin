@@ -42,6 +42,7 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation(project(":speech"))
+    implementation(project(":voice-ipc"))
     // A library module cannot carry a local AAR, so the app adds the sherpa-onnx runtime that :speech compiles against.
     implementation(files("../speech/libs/sherpa-onnx-2.0.1.aar"))
 }

@@ -44,6 +44,9 @@
   alone. Each launch is `am start -S -W` with Settings on top: Home is the default launcher, so after a plain
   `force-stop` the system restarts it and `am start -W` reports `TotalTime: 0`; the baseline aborts on a 0. Both
   scripts exit non-zero without a phone; the baseline exits 2 with "no device".
+- Home's mic: the debug build keeps a scripted engine; `./gradlew :home:installDebug -Ptin.voice=real` makes it bind tin's
+  `VoiceService`. Both APKs need one signer or the `VOICE` permission is not granted and the mic falls back to the
+  assistant. `tin.voice.uses` (a count, never text) lives in Home's DataStore `tin.voice`.
 - CI (`.github/workflows/ci.yml`): `cargo test`, `scripts/build.sh` (APK), `:speech:testDebugUnitTest`,
   `:home:testDebugUnitTest`, `:home:assembleRelease` (uploaded as `home-release-<sha>`, kept 30 days).
 
