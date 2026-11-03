@@ -12,7 +12,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -31,6 +33,9 @@ class LayoutStoreTest {
         return LayoutStore(ds) to PinStore(ds)
     }
 
+    /** Waits for the first store to release the file: a new DataStore on a file still held by a cancelled one throws. */
+    private suspend fun closeFirst() = scopes.removeAt(0).coroutineContext[Job]!!.cancelAndJoin()
+
     @After fun close() {
         scopes.forEach { it.cancel() }
         dir.deleteRecursively()
@@ -44,7 +49,7 @@ class LayoutStoreTest {
         val first = open().first
         first.update { it.hide(Slot.Card(CardId.Today)).move(Slot.Card(CardId.Homelab), -1).addWidget(11, 3) }
         val expected = first.layout.first()
-        scopes.removeAt(0).cancel()
+        closeFirst()
         assertEquals(expected, open().first.layout.first())
         assertEquals(setOf(11), expected.widgetIds)
     }
@@ -74,7 +79,7 @@ class LayoutStoreTest {
     @Test fun `pins keep their order across a new store`() = runBlocking {
         val pins = open().second
         pins.pin("c"); pins.pin("a"); pins.pin("b")
-        scopes.removeAt(0).cancel()
+        closeFirst()
         assertEquals(listOf("c", "a", "b"), open().second.keys.first())
     }
 
@@ -97,7 +102,7 @@ class LayoutStoreTest {
         pins.pin("a"); pins.unpin("a")
         pins.seed(listOf("x", "y"))
         assertEquals(emptyList<String>(), pins.keys.first())
-        scopes.removeAt(0).cancel()
+        closeFirst()
         val again = open().second
         again.seed(listOf("x"))
         assertEquals(emptyList<String>(), again.keys.first())
