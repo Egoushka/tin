@@ -12,8 +12,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,10 +20,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,7 +62,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -79,6 +74,14 @@ import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.apps.DockSlots
+import io.github.egoushka.tin.home.layout.AppPicker
+import io.github.egoushka.tin.home.layout.EditBar
+import io.github.egoushka.tin.home.layout.HomeFrame
+import io.github.egoushka.tin.home.layout.HomeStack
+import io.github.egoushka.tin.home.layout.HomeState
+import io.github.egoushka.tin.home.layout.PinsRow
+import io.github.egoushka.tin.home.layout.Picker
+import io.github.egoushka.tin.home.layout.WidgetPicker
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.signals.WeatherSource
 import io.github.egoushka.tin.home.theme.Dimen
@@ -96,7 +99,6 @@ import io.github.egoushka.tin.home.theme.pressable
 import io.github.egoushka.tin.home.theme.rememberAnimatorScale
 import io.github.egoushka.tin.home.tune.Tune
 import java.util.Date
-import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -117,6 +119,7 @@ fun HomeScreen(
     apps: AppRepository,
     actions: Actions,
     signals: Signals,
+    home: HomeState,
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val scale = animatorScale()
@@ -143,6 +146,8 @@ fun HomeScreen(
     // Picking ends with the drawer: Back or Home leaves the dock as it was.
     LaunchedEffect(layer) { if (layer != Layer.Apps && layer != Layer.Search) pickSlot = null }
     BackHandler(enabled = layer == Layer.Hidden) { onLayer(Layer.Tune) }
+    BackHandler(enabled = home.editing && layer == Layer.Home) { home.edit(false) }
+    BackHandler(enabled = home.picker != Picker.None) { home.picker = Picker.None }
     BackHandler(enabled = sheet != null) { sheet = null }
     val glance = signals.glance.collectAsState()
     val unread = remember(glance) { { pkg: String -> (glance.value.glance.byPackage[pkg] ?: 0) > 0 } }
@@ -155,7 +160,7 @@ fun HomeScreen(
                 .drawBehind { drawRoom(tune.roomLight, this.size) },
         ) {
             FrostRenderer(tune, size, frost)
-            Home(tune, onLayer, dock, apps, actions, signals)
+            Home(tune, layer, onLayer, dock, apps, actions, signals, home)
 
             // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
             val open = layer == Layer.Apps || layer == Layer.Search
@@ -189,6 +194,7 @@ fun HomeScreen(
                 TuneSheet(
                     tune = tune,
                     onChange = onTune,
+                    onEditHome = { home.edit(true); onLayer(Layer.Home) },
                     hidden = state.hiddenApps.size,
                     onHidden = { onLayer(Layer.Hidden) },
                     onClose = { onLayer(Layer.Home) },
@@ -203,7 +209,13 @@ fun HomeScreen(
                 HiddenSheet(apps, onShow = { key -> scope.launch { apps.show(key) } }, onClose = { onLayer(Layer.Tune) })
             }
 
-            // Last, so the menu opens above the drawer and above Tune.
+            when (home.picker) {
+                Picker.Widgets -> WidgetPicker(home.widgets, onPick = home.widgets::add, onClose = { home.picker = Picker.None })
+                Picker.Apps -> AppPicker(apps, home.pinKeys.orEmpty(), onPick = home::pin, onClose = { home.picker = Picker.None })
+                Picker.None -> Unit
+            }
+
+            // Last, so the menu opens above the drawer, Tune and the pickers.
             AnimatedContent(
                 targetState = sheet,
                 modifier = Modifier.fillMaxSize(),
@@ -219,6 +231,7 @@ fun HomeScreen(
                         apps = apps,
                         dock = dock,
                         dockSlot = s.dockSlot,
+                        pins = home.pinKeys.orEmpty(),
                         onPin = { slot -> dockApp(slot, s.app); sheet = null },
                         onReplace = { sheet = null; s.dockSlot?.let(menu.pick) },
                         onHide = { scope.launch { apps.hide(s.app) }; sheet = null },
@@ -254,19 +267,18 @@ private fun DrawerHost(open: Boolean, scale: Float, content: @Composable () -> U
     ) { content() }
 }
 
-/** The stock launcher's job: glance, dock, search bar; gestures on empty space only. */
+/** The stock launcher's job: glance, dock, search bar, with the cards between them scrolling. */
 @Composable
 private fun Home(
     tune: Tune,
+    layer: Layer,
     onLayer: (Layer) -> Unit,
     dock: StateFlow<DockSlots?>,
     apps: AppRepository,
     actions: Actions,
     signals: Signals,
+    home: HomeState,
 ) {
-    val density = LocalDensity.current
-    val edge = with(density) { Dimen.backEdge.toPx() }
-    val travel = with(density) { Dimen.target.toPx() } // one target's travel opens a layer
     val context = LocalContext.current
     val voice = remember { Voice(Engines.default(context)) }
     val scope = rememberCoroutineScope()
@@ -274,48 +286,29 @@ private fun Home(
         val started = voice.start(scope) { said -> actions.ask(said, signals.needsYou.state.value.needs) }
         if (!started && !actions.voice()) onLayer(Layer.Search)
     }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                var dy = 0f
-                var live = false
-                detectVerticalDragGestures(
-                    onDragStart = { dy = 0f; live = it.x > edge && it.x < size.width - edge },
-                    onDragEnd = {
-                        if (live && abs(dy) >= travel) {
-                            if (dy < 0) onLayer(Layer.Apps) else actions.openNotifications()
-                        }
-                    },
-                    onVerticalDrag = { _, d -> dy += d },
-                )
+    val gap = tune.gapDp.dp
+    HomeFrame(
+        gap = gap,
+        gestures = layer == Layer.Home && !home.editing,
+        onSwipeUp = { onLayer(Layer.Apps) },
+        onSwipeDown = { actions.openNotifications() },
+        onDoubleTap = { actions.toggleTorch() },
+        onLongPress = { home.edit(true) },
+        top = { Glance(signals.weather, Modifier.padding(top = Dimen.space6)) },
+        bottom = {
+            if (home.editing) {
+                EditBar(home) { onLayer(Layer.Tune) }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(gap + Dimen.space2)) {
+                    PinsRow(home.pinKeys, apps, Dimen.space3, home::unpin)
+                    DockRow(tune, dock, apps, actions)
+                    SearchBar(tune, voice.state, onOpen = { onLayer(Layer.Search) }, onMic = listen)
+                }
             }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { if (it.x > edge && it.x < size.width - edge) actions.toggleTorch() },
-                    onLongPress = { if (it.x > edge && it.x < size.width - edge) onLayer(Layer.Tune) },
-                )
-            }
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = Dimen.gutter),
-    ) {
-        Glance(signals.weather, Modifier.padding(top = Dimen.space6))
-        Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
-        Column(verticalArrangement = Arrangement.spacedBy(tune.gapDp.dp)) {
-            NeedsYouCard(signals.needsYou, actions)
-            TodayCard(signals.calendar, actions)
-            GlanceCard(signals, actions)
-            MusicCard(signals.music)
-            AlarmCard(signals.alarm)
-            HomelabCard(signals.homelab)
-        }
-        Spacer(Modifier.weight(1f))
-        DockRow(tune, dock, apps, actions)
-        Spacer(Modifier.height(tune.gapDp.dp + Dimen.space2))
-        SearchBar(tune, voice.state, onOpen = { onLayer(Layer.Search) }, onMic = listen)
-        Spacer(Modifier.height(Dimen.space2))
-    }
+            Spacer(Modifier.height(Dimen.space2))
+        },
+        stack = { HomeStack(home, signals, actions) },
+    )
 }
 
 @Composable
@@ -356,7 +349,7 @@ private fun DockRow(tune: Tune, dock: StateFlow<DockSlots?>, apps: AppRepository
 }
 
 /**
- * Consumes the touch-down after the child's own handlers saw it, so Home's long-press (Tune) does not fire on top of
+ * Consumes the touch-down after the child's own handlers saw it, so Home's long-press (edit mode) does not fire on top of
  * this tile's long-press: the parent's detector only skips a gesture whose down is already consumed.
  */
 private fun Modifier.ownsPress() = pointerInput(Unit) {

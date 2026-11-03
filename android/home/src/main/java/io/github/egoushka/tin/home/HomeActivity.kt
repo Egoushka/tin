@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
 import io.github.egoushka.tin.home.apps.AppPrefs
 import io.github.egoushka.tin.home.apps.AppRepository
+import io.github.egoushka.tin.home.layout.HomeState
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.theme.Frost
 import io.github.egoushka.tin.home.theme.LocalFrost
@@ -41,6 +42,7 @@ class HomeActivity : ComponentActivity() {
         // A second refusal is final on Android; only the app's settings can still grant it.
         if (!granted && !shouldShowRequestPermissionRationale(Manifest.permission.READ_CALENDAR)) actions.openAppSettings()
     }
+    private lateinit var home: HomeState
     private val actions: Actions by lazy { Actions(this) { calendarPermission.launch(Manifest.permission.READ_CALENDAR) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +53,7 @@ class HomeActivity : ComponentActivity() {
         val store = TuneStore(applicationContext)
         val apps = AppRepository(applicationContext, AppPrefs(applicationContext))
         val signals = Signals.of(applicationContext)
+        home = HomeState.of(this)
         askBluetoothOnce()
 
         setContent {
@@ -68,6 +71,7 @@ class HomeActivity : ComponentActivity() {
                     apps = apps,
                     actions = actions,
                     signals = signals,
+                    home = home,
                 )
             }
         }
@@ -86,15 +90,26 @@ class HomeActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Engines.default(applicationContext)?.attach()
+        home.widgets.start()
     }
 
     override fun onStop() {
+        home.widgets.stop()
         Engines.default(applicationContext)?.detach()
         super.onStop()
     }
 
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION") // the bind and configure screens answer only through the legacy result
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        home.widgets.onResult(requestCode, resultCode)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.hasCategory(Intent.CATEGORY_HOME)) layer = Layer.Home
+        if (intent.hasCategory(Intent.CATEGORY_HOME)) {
+            layer = Layer.Home
+            home.edit(false)
+        }
     }
 }

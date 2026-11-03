@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_home">Змінити Home</string>
+    <string name="edit_hint">Рухай і ховай картки. Віджети та закріплені застосунки додаєш унизу.</string>
+    <string name="edit_done">Готово</string>
+    <string name="edit_add_widget">Додати віджет</string>
+    <string name="edit_add_app">Закріпити застосунок</string>
+    <string name="edit_hidden">Сховане</string>
+    <string name="edit_up">Підняти «%1$s» вище</string>
+    <string name="edit_down">Опустити «%1$s» нижче</string>
+    <string name="edit_hide">Сховати «%1$s»</string>
+    <string name="edit_show">Показати «%1$s»</string>
+    <string name="edit_remove">Прибрати «%1$s»</string>
+    <string name="edit_taller">Збільшити висоту «%1$s»</string>
+    <string name="edit_shorter">Зменшити висоту «%1$s»</string>
+    <string name="card_notifications">Сповіщення</string>
+    <string name="card_music">Музика</string>
+    <string name="widget_unavailable">Віджет недоступний</string>
+    <string name="widget_none">Віджетів не встановлено</string>
+    <string name="pins_full">Закріплено 12 застосунків. Спершу відкріпи один.</string>
+    <string name="pins_none">Усі застосунки вже закріплені</string>
+    <string name="unpin_app">Відкріпити «%1$s»</string>
+</resources>

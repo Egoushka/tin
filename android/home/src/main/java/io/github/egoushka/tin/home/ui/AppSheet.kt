@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -33,6 +34,9 @@ import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.apps.AppShortcut
 import io.github.egoushka.tin.home.apps.DockSlots
+import io.github.egoushka.tin.home.layout.PinStore
+import io.github.egoushka.tin.home.layout.pinToHome
+import io.github.egoushka.tin.home.layout.unpinFromHome
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.LocalTune
 import io.github.egoushka.tin.home.theme.Lucide
@@ -41,8 +45,8 @@ import io.github.egoushka.tin.home.theme.glass
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The long-press menu of an app: its shortcuts, then dock, info, hide and uninstall. [dockSlot] is the app's place in
- * the dock, null when the press was on a drawer tile.
+ * The long-press menu of an app: its shortcuts, then info, dock, Home, hide and uninstall. [dockSlot] is the app's place
+ * in the dock, null when the press was on a drawer tile. [pins] are the keys pinned above the dock.
  */
 @Composable
 fun AppSheet(
@@ -50,12 +54,14 @@ fun AppSheet(
     apps: AppRepository,
     dock: StateFlow<DockSlots?>,
     dockSlot: Int?,
+    pins: List<String>,
     onPin: (slot: Int) -> Unit,
     onReplace: () -> Unit,
     onHide: () -> Unit,
     onClose: () -> Unit,
 ) {
     val tune = LocalTune.current
+    val context = LocalContext.current
     val shortcuts by produceState(emptyList<AppShortcut>(), app.key) { value = apps.shortcuts(app) }
     var choosing by remember { mutableStateOf(false) }
     SheetFrame(tune, onClose) {
@@ -77,6 +83,10 @@ fun AppSheet(
             dockSlot != null -> SheetRow("pin", stringResource(R.string.app_replace), onReplace)
             choosing -> SlotChooser(apps, dock, onPin)
             else -> SheetRow("pin", stringResource(R.string.app_pin)) { choosing = true }
+        }
+        when {
+            app.key in pins -> SheetRow("home", stringResource(R.string.app_unpin_home)) { unpinFromHome(context, app); onClose() }
+            pins.size < PinStore.MAX -> SheetRow("home", stringResource(R.string.app_pin_home)) { pinToHome(context, app); onClose() }
         }
         SheetRow("eye-off", stringResource(R.string.app_hide), onHide)
         SheetRow("trash-2", stringResource(R.string.app_uninstall)) { apps.uninstall(app); onClose() }

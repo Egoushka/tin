@@ -92,6 +92,8 @@
     <string name="app_info">App info</string>
     <string name="app_pin">Pin to dock</string>
     <string name="app_replace">Replace in dock</string>
+    <string name="app_pin_home">Pin to Home</string>
+    <string name="app_unpin_home">Unpin from Home</string>
     <string name="app_hide">Hide from drawer</string>
     <string name="app_uninstall">Uninstall</string>
     <string name="dock_choose_slot">Pin to which slot?</string>

@@ -93,6 +93,8 @@
     <string name="app_info">Про застосунок</string>
     <string name="app_pin">Закріпити в доку</string>
     <string name="app_replace">Замінити в доку</string>
+    <string name="app_pin_home">Закріпити на Home</string>
+    <string name="app_unpin_home">Відкріпити з Home</string>
     <string name="app_hide">Сховати зі списку</string>
     <string name="app_uninstall">Видалити</string>
     <string name="dock_choose_slot">У яке місце закріпити?</string>
