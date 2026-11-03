@@ -29,6 +29,7 @@ import io.github.egoushka.tin.home.tune.Tune
 import io.github.egoushka.tin.home.tune.TuneStore
 import io.github.egoushka.tin.home.ui.HomeScreen
 import io.github.egoushka.tin.home.ui.Layer
+import io.github.egoushka.tin.home.voice.Engines
 import kotlinx.coroutines.launch
 
 class HomeActivity : ComponentActivity() {
@@ -84,13 +85,16 @@ class HomeActivity : ComponentActivity() {
         requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
     }
 
+    // The voice engine holds a Binder to tin only while Home is in front.
     override fun onStart() {
         super.onStart()
+        Engines.default(applicationContext)?.attach()
         home.widgets.start()
     }
 
     override fun onStop() {
         home.widgets.stop()
+        Engines.default(applicationContext)?.detach()
         super.onStop()
     }
 
