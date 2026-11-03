@@ -33,6 +33,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -41,6 +42,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import io.github.egoushka.tin.home.gestures.TwoFinger
 import io.github.egoushka.tin.home.pages.Pages
 import io.github.egoushka.tin.home.theme.Dimen
 import kotlin.math.abs
@@ -53,6 +55,7 @@ object FrameTags {
 class NoGestureZones {
     private val zones = mutableMapOf<Any, Rect>()
     private val owned = mutableMapOf<Any, Rect>()
+    private val swipes = mutableMapOf<Any, Rect>()
 
     fun set(key: Any, bounds: Rect) { zones[key] = bounds }
     fun clear(key: Any) { zones.remove(key) }
@@ -62,6 +65,11 @@ class NoGestureZones {
     fun own(key: Any, bounds: Rect) { owned[key] = bounds }
     fun disown(key: Any) { owned.remove(key) }
     fun owns(p: Offset) = owned.values.any { it.contains(p) }
+
+    /** Where a tile reads its own swipe up: the frame does not open the drawer for a swipe that starts there. */
+    fun ownSwipe(key: Any, bounds: Rect) { swipes[key] = bounds }
+    fun disownSwipe(key: Any) { swipes.remove(key) }
+    fun ownsSwipe(p: Offset) = swipes.values.any { it.contains(p) }
 }
 
 val LocalNoGestureZones = staticCompositionLocalOf<NoGestureZones?> { null }
@@ -78,6 +86,43 @@ fun Modifier.ownsLongPress(): Modifier = composed {
     val key = remember { Any() }
     DisposableEffect(zones) { onDispose { zones?.disown(key) } }
     onGloballyPositioned { zones?.own(key, it.boundsInRoot()) }
+}
+
+/**
+ * A swipe up that starts on this element runs [onSwipe] and nothing else: the frame does not open the drawer for it and
+ * the element's own click does not fire. With a null [onSwipe] the element has no swipe and the frame's applies.
+ * Put it before the element's own press handlers; it reads the touch from the Initial pass.
+ */
+fun Modifier.ownsSwipeUp(onSwipe: (() -> Unit)?): Modifier = composed {
+    val zones = LocalNoGestureZones.current
+    val key = remember { Any() }
+    val swipe by rememberUpdatedState(onSwipe)
+    val enabled = onSwipe != null
+    var bounds by remember { mutableStateOf<Rect?>(null) }
+    DisposableEffect(zones, enabled, bounds) {
+        bounds?.takeIf { enabled }?.let { zones?.ownSwipe(key, it) }
+        onDispose { zones?.disownSwipe(key) }
+    }
+    onGloballyPositioned { bounds = it.boundsInRoot() }
+        .pointerInput(Unit) {
+            val travel = Dimen.target.toPx()
+            awaitEachGesture {
+                val first = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    if (event.changes.size > 1) return@awaitEachGesture
+                    val change = event.changes.firstOrNull { it.id == first.id } ?: return@awaitEachGesture
+                    if (!change.changedToUpIgnoreConsumed()) continue
+                    val d = change.position - first.position
+                    val run = swipe
+                    if (run != null && -d.y >= travel && -d.y > abs(d.x)) {
+                        change.consume() // the tile's click sees a cancel
+                        run()
+                    }
+                    return@awaitEachGesture
+                }
+            }
+        }
 }
 
 /**
@@ -102,6 +147,10 @@ fun HomeFrame(
     dots: @Composable () -> Unit = {},
     page: @Composable ColumnScope.(index: Int) -> Unit = {},
     stack: @Composable ColumnScope.() -> Unit,
+    onTwoFingerUp: () -> Unit = {},
+    onTwoFingerDown: () -> Unit = {},
+    onPinchIn: () -> Unit = {},
+    onDoubleTap: () -> Unit = {},
 ) {
     val density = LocalDensity.current
     val edge = with(density) { Dimen.backEdge.toPx() }
@@ -115,6 +164,10 @@ fun HomeFrame(
     val up by rememberUpdatedState(onSwipeUp)
     val down by rememberUpdatedState(onSwipeDown)
     val long by rememberUpdatedState(onLongPress)
+    val twoUp by rememberUpdatedState(onTwoFingerUp)
+    val twoDown by rememberUpdatedState(onTwoFingerDown)
+    val pinch by rememberUpdatedState(onPinchIn)
+    val double by rememberUpdatedState(onDoubleTap)
 
     Box(
         Modifier
@@ -127,6 +180,7 @@ fun HomeFrame(
                     val first = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     val at = origin + first.position
                     val live = first.position.x > edge && first.position.x < size.width - edge && at !in zones
+                    val tileSwipe = zones.ownsSwipe(at)
                     val onStack = stackBounds.contains(at)
                     val shown = scrollOf(pager?.currentPage ?: 0)
                     val atTop = !shown.canScrollBackward
@@ -172,12 +226,61 @@ fun HomeFrame(
                     if (paged && abs(dx) > abs(dy)) return@awaitEachGesture
                     val upward = dy < 0
                     if (onStack && !(if (upward) atBottom else atTop)) return@awaitEachGesture
+                    if (upward && tileSwipe) return@awaitEachGesture // the dock tile runs its own swipe
                     if (upward) up() else down()
                 }
             }
             .pointerInput(gestures) {
                 if (!gestures) return@pointerInput
+                // Two fingers, from the Initial pass like the swipe above. A gesture it recognises is consumed on lift,
+                // so a card under the fingers is not tapped and the tap detector below does not count a tap.
+                awaitEachGesture {
+                    val a = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    var a0 = a.position
+                    var b0 = Offset.Zero
+                    var second: PointerInputChange? = null
+                    while (second == null) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val ca = event.changes.firstOrNull { it.id == a.id }
+                        if (ca?.pressed != true || event.changes.size > 2) return@awaitEachGesture
+                        second = event.changes.firstOrNull { it.id != a.id && it.pressed }
+                        a0 = ca.position
+                        b0 = second?.position ?: b0
+                    }
+                    fun inside(p: Offset) = p.x > edge && p.x < size.width - edge && origin + p !in zones
+                    val live = inside(a0) && inside(b0)
+                    var a1 = a0
+                    var b1 = b0
+                    var recognised = false
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.changes.size > 2) return@awaitEachGesture
+                        val ca = event.changes.firstOrNull { it.id == a.id } ?: return@awaitEachGesture
+                        val cb = event.changes.firstOrNull { it.id == second.id } ?: return@awaitEachGesture
+                        a1 = ca.position
+                        b1 = cb.position
+                        if (!recognised && (ca.changedToUpIgnoreConsumed() || cb.changedToUpIgnoreConsumed())) {
+                            val kind = if (live) TwoFinger.of(a0, b0, a1, b1, travel) else null
+                            when (kind) {
+                                TwoFinger.SwipeUp -> twoUp()
+                                TwoFinger.SwipeDown -> twoDown()
+                                TwoFinger.PinchIn -> pinch()
+                                null -> return@awaitEachGesture
+                            }
+                            recognised = true
+                        }
+                        if (recognised) event.changes.forEach { it.consume() }
+                        if (event.changes.none { it.pressed }) return@awaitEachGesture
+                    }
+                }
+            }
+            .pointerInput(gestures) {
+                if (!gestures) return@pointerInput
                 detectTapGestures(
+                    onDoubleTap = {
+                        val at = origin + it
+                        if (it.x > edge && it.x < size.width - edge && at !in zones) double()
+                    },
                     onLongPress = {
                         val at = origin + it
                         // A press on the stack was already read from the Initial pass above.

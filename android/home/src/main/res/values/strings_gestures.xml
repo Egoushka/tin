@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gestures">Gestures</string>
+    <string name="gesture_swipe_up">Swipe up</string>
+    <string name="gesture_swipe_down">Swipe down</string>
+    <string name="gesture_two_down">Two fingers down</string>
+    <string name="gesture_two_up">Two fingers up</string>
+    <string name="gesture_double_tap">Double tap</string>
+    <string name="gesture_pinch">Pinch in</string>
+    <string name="gesture_long_press">Long press</string>
+    <string name="gesture_do_apps">All apps and search</string>
+    <string name="gesture_do_notifications">Notifications</string>
+    <string name="gesture_do_quick_settings">Quick settings</string>
+    <string name="gesture_do_camera">Camera</string>
+    <string name="gesture_do_today">Today in full</string>
+    <string name="gesture_do_edit">Edit Home</string>
+    <string name="gesture_do_nothing">Nothing</string>
+    <string name="gesture_row">%1$s, %2$s</string>
+    <string name="gestures_hint">Tap a row to change what it does. These stay as they are: a long press on the search bar listens, and a swipe up on a dock icon opens the app\'s first shortcut.</string>
+    <string name="action_quick_settings">Open quick settings</string>
+    <string name="action_today">Show today in full</string>
+    <string name="today_queue">Waiting for you</string>
+    <string name="today_open_approvals">Open approvals</string>
+</resources>

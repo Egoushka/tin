@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gestures">Жести</string>
+    <string name="gesture_swipe_up">Свайп угору</string>
+    <string name="gesture_swipe_down">Свайп униз</string>
+    <string name="gesture_two_down">Два пальці вниз</string>
+    <string name="gesture_two_up">Два пальці вгору</string>
+    <string name="gesture_double_tap">Подвійний дотик</string>
+    <string name="gesture_pinch">Зведення пальців</string>
+    <string name="gesture_long_press">Довге натискання</string>
+    <string name="gesture_do_apps">Усі застосунки й пошук</string>
+    <string name="gesture_do_notifications">Сповіщення</string>
+    <string name="gesture_do_quick_settings">Швидкі налаштування</string>
+    <string name="gesture_do_camera">Камера</string>
+    <string name="gesture_do_today">Сьогодні повністю</string>
+    <string name="gesture_do_edit">Редагувати Home</string>
+    <string name="gesture_do_nothing">Нічого</string>
+    <string name="gesture_row">%1$s, %2$s</string>
+    <string name="gestures_hint">Торкнися рядка, щоб змінити дію. Ці дві не змінюються: довге натискання на пошуку вмикає мікрофон, а свайп угору на іконці в доку відкриває першу команду застосунку.</string>
+    <string name="action_quick_settings">Відкрити швидкі налаштування</string>
+    <string name="action_today">Показати сьогодні повністю</string>
+    <string name="today_queue">Чекає на тебе</string>
+    <string name="today_open_approvals">Відкрити схвалення</string>
+</resources>
