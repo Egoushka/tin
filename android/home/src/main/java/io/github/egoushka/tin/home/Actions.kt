@@ -14,6 +14,8 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.annotation.StringRes
 import io.github.egoushka.tin.home.signals.TinListener
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /** A dock slot: a Lucide icon and the default handler for one job, so the dock follows the user's app choices. */
 private const val APPROVALS_PACKAGE = "com.yehor.approvals"
@@ -87,23 +89,31 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
     }
 
     private val cameras = context.getSystemService(CameraManager::class.java)
-    private var torchOn = false
     private val torchId: String? by lazy {
-        cameras.cameraIdList.firstOrNull {
-            cameras.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-        }
+        runCatching {
+            cameras.cameraIdList.firstOrNull {
+                cameras.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            }
+        }.getOrNull()
     }
+    private val torchOn = MutableStateFlow(false)
+
+    /** The system's torch, so a change from Quick Settings shows here too. */
+    val torch: StateFlow<Boolean> = torchOn
+
+    /** False on a phone with no flash unit; the switch is not drawn then. */
+    val hasTorch: Boolean get() = torchId != null
 
     init {
         cameras.registerTorchCallback(object : CameraManager.TorchCallback() {
             override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
-                if (cameraId == torchId) torchOn = enabled
+                if (cameraId == torchId) torchOn.value = enabled
             }
         }, null)
     }
 
     fun toggleTorch() {
         val id = torchId ?: return
-        runCatching { cameras.setTorchMode(id, !torchOn) }
+        runCatching { cameras.setTorchMode(id, !torchOn.value) }
     }
 }

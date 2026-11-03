@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
@@ -38,6 +39,12 @@ private fun Modifier.pressScale(press: Press): Modifier = graphicsLayer {
 fun Modifier.pressable(role: Role = Role.Button, onClick: () -> Unit): Modifier = composed {
     val press = rememberPress()
     this.clickable(press.source, null, role = role, onClick = onClick).pressScale(press)
+}
+
+/** [pressable] for a switch: the same scale, and TalkBack reads the role and the state. */
+fun Modifier.pressToggleable(on: Boolean, onValueChange: (Boolean) -> Unit): Modifier = composed {
+    val press = rememberPress()
+    this.toggleable(on, press.source, null, role = Role.Switch, onValueChange = onValueChange).pressScale(press)
 }
 
 /** A dock tile: [pressable], and the glass takes `.ic:active i`'s surface-2 fill and edge-hi border. */

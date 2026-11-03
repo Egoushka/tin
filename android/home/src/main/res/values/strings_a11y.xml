@@ -2,7 +2,6 @@
 <resources>
     <string name="action_apps">Open all apps</string>
     <string name="action_notifications">Open notifications</string>
-    <string name="action_torch">Toggle flashlight</string>
     <string name="age_now_spoken">just now</string>
     <plurals name="age_min_spoken">
         <item quantity="one">%d minute ago</item>

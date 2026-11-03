@@ -214,9 +214,8 @@ private fun Home(
         gestures = layer == Layer.Home && !home.editing,
         onSwipeUp = { onLayer(Layer.Apps) },
         onSwipeDown = { actions.openNotifications() },
-        onDoubleTap = { actions.toggleTorch() },
         onLongPress = { home.edit(true) },
-        top = { Glance(signals.weather, Modifier.padding(top = Dimen.space6), actions, onLayer) },
+        top = { Glance(signals.weather, tune, Modifier.padding(top = Dimen.space6), actions, onLayer) },
         bottom = {
             if (home.editing) {
                 EditBar(home) { onLayer(Layer.Tune) }
@@ -234,7 +233,7 @@ private fun Home(
 }
 
 @Composable
-private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier, actions: Actions, onLayer: (Layer) -> Unit) {
+private fun Glance(weather: WeatherSource, tune: Tune, modifier: Modifier = Modifier, actions: Actions, onLayer: (Layer) -> Unit) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val now by produceState(System.currentTimeMillis()) {
@@ -246,30 +245,35 @@ private fun Glance(weather: WeatherSource, modifier: Modifier = Modifier, action
     val timePattern = if (DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm"
     val datePattern = DateFormat.getBestDateTimePattern(locale, stringResource(R.string.date_skeleton))
     val date = Date(now)
-    // The drags, the double tap and the long press have no screen-reader equivalent; the clock is the first stop.
+    // The drags and the long press have no screen-reader equivalent; the clock is the first stop.
     val apps = stringResource(R.string.action_apps)
     val notifications = stringResource(R.string.action_notifications)
-    val torch = stringResource(R.string.action_torch)
-    val tune = stringResource(R.string.tune)
-    Row(
-        modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            customActions = listOf(
-                CustomAccessibilityAction(apps) { onLayer(Layer.Apps); true },
-                CustomAccessibilityAction(notifications) { actions.openNotifications(); true },
-                CustomAccessibilityAction(torch) { actions.toggleTorch(); true },
-                CustomAccessibilityAction(tune) { onLayer(Layer.Tune); true },
-            )
-        },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // The clock is measured first: weighted, the wide uk date left it too little room at font scale 2.0 ("01:3|0").
-        Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock)
-        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            Text(
-                android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
-                style = NgType.title, textAlign = TextAlign.End,
-            )
-            WeatherLine(weather, now)
+    val tuneLabel = stringResource(R.string.tune)
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).semantics(mergeDescendants = true) {
+                customActions = listOf(
+                    CustomAccessibilityAction(apps) { onLayer(Layer.Apps); true },
+                    CustomAccessibilityAction(notifications) { actions.openNotifications(); true },
+                    CustomAccessibilityAction(tuneLabel) { onLayer(Layer.Tune); true },
+                )
+            },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The clock is measured first: weighted, the wide uk date left it too little room at font scale 2.0 ("01:3|0").
+            Text(DateFormat.format(timePattern, date).toString(), style = NgType.clock)
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Text(
+                    android.icu.text.SimpleDateFormat(datePattern, locale).format(date),
+                    style = NgType.title, textAlign = TextAlign.End,
+                )
+                WeatherLine(weather, now)
+            }
+        }
+        // Outside the merged node: the switch is its own TalkBack stop.
+        if (actions.hasTorch) {
+            val on by actions.torch.collectAsState()
+            TorchSwitch(on, { actions.toggleTorch() }, tune)
         }
     }
 }
