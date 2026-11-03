@@ -158,6 +158,8 @@ fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, hidd
                 Text(res.getQuantityString(R.plurals.tune_changed, n, n), style = NgType.body, modifier = Modifier.weight(1f))
                 Chip(stringResource(R.string.tune_reset), selected = false, role = Role.Button) { onChange(Tune()) }
             }
+
+            BuildStamp()
         }
     }
 }
