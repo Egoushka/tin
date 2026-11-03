@@ -40,8 +40,10 @@ class SystemApps(private val context: Context) : AppSource {
 
     val ownUser: Long = users.getSerialNumberForUser(own)
 
-    fun userOf(app: AppEntry): UserHandle =
-        users.userProfiles.firstOrNull { users.getSerialNumberForUser(it) == app.user } ?: own
+    private fun handle(serial: Long): UserHandle =
+        users.userProfiles.firstOrNull { users.getSerialNumberForUser(it) == serial } ?: own
+
+    fun userOf(app: AppEntry): UserHandle = handle(app.user)
 
     override fun load(): List<AppEntry> = users.userProfiles.flatMap { user ->
         val serial = users.getSerialNumberForUser(user)
@@ -118,6 +120,11 @@ class SystemApps(private val context: Context) : AppSource {
         launcherApps.startShortcut(app.pkg, id, null, null, userOf(app))
     }
 
+    /** Sets the whole pinned set of [pkg] for [user]: a pinned shortcut outlives the app removing it from its own list. */
+    fun pinShortcuts(pkg: String, user: Long, ids: Set<String>) {
+        launcherApps.pinShortcuts(pkg, ids.toList(), handle(user))
+    }
+
     fun icon(app: AppEntry): android.graphics.drawable.Drawable? =
         launcherApps.resolveActivity(Intent(Intent.ACTION_MAIN).setComponent(ComponentName(app.pkg, app.cls)), userOf(app))?.getIcon(0)
 
@@ -168,6 +175,8 @@ class AppRepository(context: Context, private val prefs: AppPrefs) {
     fun uninstall(app: AppEntry) = runCatching { system.uninstall(app) }
     suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) { system.shortcuts(app) }
     fun startShortcut(app: AppEntry, shortcut: AppShortcut) = runCatching { system.startShortcut(app, shortcut.id) }
+    suspend fun pinShortcuts(pkg: String, user: Long, ids: Set<String>) =
+        withContext(Dispatchers.IO) { runCatching { system.pinShortcuts(pkg, user, ids) } }
 
     private val icons = LruCache<String, Bitmap>(256)
 

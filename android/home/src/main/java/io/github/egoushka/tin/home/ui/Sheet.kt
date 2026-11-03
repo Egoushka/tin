@@ -64,9 +64,9 @@ fun SheetFrame(tune: Tune, onClose: () -> Unit, content: @Composable ColumnScope
     }
 }
 
-/** One action: a 16 dp Lucide glyph and a label on a 48 dp target. */
+/** One action: a 16 dp Lucide glyph and a label on a 48 dp target, with an optional control of its own at the end. */
 @Composable
-fun SheetRow(icon: String, label: String, onClick: () -> Unit) {
+fun SheetRow(icon: String, label: String, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val tune = LocalTune.current
     Row(
         Modifier
@@ -79,6 +79,10 @@ fun SheetRow(icon: String, label: String, onClick: () -> Unit) {
     ) {
         Image(Lucide.icon(icon, 16f, tune.strokeDp), contentDescription = null, Modifier.size(Dimen.glyphSmall))
         Spacer(Modifier.width(Dimen.space3))
-        Text(label, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            label, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = if (trailing != null) Modifier.weight(1f) else Modifier,
+        )
+        trailing?.invoke()
     }
 }

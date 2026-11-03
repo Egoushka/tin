@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.github.egoushka.tin.home.apps.AppEntry
+import io.github.egoushka.tin.home.pages.PagePlace
 
 /** What a long press asks of the screen, which owns the sheet and the pick mode; tiles only call these. */
 @Stable
@@ -12,6 +13,8 @@ class AppMenu(
     val open: (app: AppEntry, dockSlot: Int?) -> Unit,
     /** Opens All apps to choose the app for dock slot [slot]. */
     val pick: (slot: Int) -> Unit,
+    /** The press was on a tile of an extra page, which adds moving and removing it to the menu. */
+    val openOnPage: (app: AppEntry, place: PagePlace) -> Unit = { _, _ -> },
 )
 
 val LocalAppMenu = staticCompositionLocalOf { AppMenu(open = { _, _ -> }, pick = {}) }

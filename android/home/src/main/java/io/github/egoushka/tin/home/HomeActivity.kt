@@ -53,7 +53,7 @@ class HomeActivity : ComponentActivity() {
         val store = TuneStore(applicationContext)
         val apps = AppRepository(applicationContext, AppPrefs(applicationContext))
         val signals = Signals.of(applicationContext)
-        home = HomeState.of(this)
+        home = HomeState.of(this, apps)
         askBluetoothOnce()
 
         setContent {

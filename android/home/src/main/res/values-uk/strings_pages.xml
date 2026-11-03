@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="page_of">Сторінка %1$d з %2$d</string>
+    <string name="page_next">Наступна сторінка</string>
+    <string name="page_previous">Попередня сторінка</string>
+    <string name="page_add">Додати сторінку</string>
+    <string name="page_remove">Прибрати сторінку</string>
+    <string name="page_remove_ask">Прибрати сторінку %1$d і все на ній?</string>
+    <string name="page_remove_yes">Прибрати</string>
+    <string name="page_remove_no">Залишити</string>
+    <string name="page_empty">Тут поки порожньо. Додай застосунок чи віджет унизу або обери «Додати на сторінку» в меню застосунку.</string>
+    <string name="page_add_app">Додати застосунок</string>
+    <string name="page_app_none">Усі застосунки вже на цій сторінці</string>
+    <string name="page_full">Ця сторінка заповнена</string>
+    <string name="page_add_to">Додати на сторінку</string>
+    <string name="page_choose">На яку сторінку?</string>
+    <string name="page_number">Сторінка %1$d</string>
+    <string name="page_new">Нова сторінка</string>
+    <string name="page_move_menu">Перемістити на сторінку</string>
+    <string name="page_move_to">Перемістити на сторінку %1$d</string>
+    <string name="page_earlier">Перемістити раніше</string>
+    <string name="page_later">Перемістити пізніше</string>
+    <string name="page_item_remove">Прибрати зі сторінки</string>
+    <string name="page_shortcut_add">Додати «%1$s» на сторінку</string>
+    <string name="page_shortcut_of">%1$s, ярлик застосунку %2$s</string>
+</resources>

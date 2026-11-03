@@ -22,20 +22,33 @@ data class WidgetProvider(val component: ComponentName, val label: String, val a
 /**
  * A widget inside the scrolling stack. A view that handles a touch hides it from the scroll, so a vertical drag over a
  * widget that does not scroll itself is taken from the widget and goes to the stack; one that scrolls keeps its drags.
+ * With [sideways] set (Home has more than one page) a sideways drag is handled the same way and goes to the pager.
  */
 internal class StackWidgetView(context: Context) : AppWidgetHostView(context) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private var downX = 0f
     private var downY = 0f
-    private var scrolls = false
+    private var scrollsUp = false
+    private var scrollsAcross = false
     private var taken = false
+
+    var sideways = false
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { downX = ev.x; downY = ev.y; scrolls = scrollsVertically(this); taken = false }
+            MotionEvent.ACTION_DOWN -> {
+                downX = ev.x
+                downY = ev.y
+                scrollsUp = scrolls(this, vertical = true)
+                scrollsAcross = scrolls(this, vertical = false)
+                taken = false
+            }
             MotionEvent.ACTION_MOVE -> {
+                val dx = abs(ev.x - downX)
                 val dy = abs(ev.y - downY)
-                if (!taken && !scrolls && dy > slop && dy > abs(ev.x - downX)) taken = true
+                if (!taken) {
+                    taken = if (dy > dx) !scrollsUp && dy > slop else sideways && !scrollsAcross && dx > slop
+                }
             }
         }
         return taken
@@ -45,9 +58,9 @@ internal class StackWidgetView(context: Context) : AppWidgetHostView(context) {
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent) = false
 
-    private fun scrollsVertically(v: View): Boolean =
-        v.canScrollVertically(1) || v.canScrollVertically(-1) ||
-            (v is ViewGroup && (0 until v.childCount).any { scrollsVertically(v.getChildAt(it)) })
+    private fun scrolls(v: View, vertical: Boolean): Boolean =
+        (if (vertical) v.canScrollVertically(1) || v.canScrollVertically(-1) else v.canScrollHorizontally(1) || v.canScrollHorizontally(-1)) ||
+            (v is ViewGroup && (0 until v.childCount).any { scrolls(v.getChildAt(it), vertical) })
 }
 
 /**

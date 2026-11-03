@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -64,6 +65,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -84,6 +86,15 @@ import io.github.egoushka.tin.home.layout.HomeState
 import io.github.egoushka.tin.home.layout.PinsRow
 import io.github.egoushka.tin.home.layout.Picker
 import io.github.egoushka.tin.home.layout.WidgetPicker
+import io.github.egoushka.tin.home.pages.DragGhost
+import io.github.egoushka.tin.home.pages.PageContent
+import io.github.egoushka.tin.home.pages.PageDots
+import io.github.egoushka.tin.home.pages.PageDrag
+import io.github.egoushka.tin.home.pages.PageItem
+import io.github.egoushka.tin.home.pages.PagePlace
+import io.github.egoushka.tin.home.pages.Pages
+import io.github.egoushka.tin.home.pages.pageActionsFor
+import io.github.egoushka.tin.home.pages.pageDrag
 import io.github.egoushka.tin.home.signals.Signals
 import io.github.egoushka.tin.home.signals.WeatherSource
 import io.github.egoushka.tin.home.theme.Dimen
@@ -108,8 +119,8 @@ import kotlinx.coroutines.launch
 
 enum class Layer { Home, Apps, Search, Tune, Hidden }
 
-/** The app whose menu is open, and its dock slot when the press was on the dock. */
-private data class SheetFor(val app: AppEntry, val dockSlot: Int?)
+/** The app whose menu is open, its dock slot when the press was on the dock, and its place when it was on an extra page. */
+private data class SheetFor(val app: AppEntry, val dockSlot: Int?, val place: PagePlace? = null)
 
 @Composable
 fun HomeScreen(
@@ -133,6 +144,7 @@ fun HomeScreen(
         AppMenu(
             open = { app, slot -> sheet = SheetFor(app, slot) },
             pick = { slot -> pickSlot = slot; onLayerNow(Layer.Apps) },
+            openOnPage = { app, place -> sheet = SheetFor(app, null, place) },
         )
     }
     val dock = remember(apps, actions) {
@@ -149,7 +161,7 @@ fun HomeScreen(
     LaunchedEffect(layer) { if (layer != Layer.Apps && layer != Layer.Search) pickSlot = null }
     BackHandler(enabled = layer == Layer.Hidden) { onLayer(Layer.Tune) }
     BackHandler(enabled = home.editing && layer == Layer.Home) { home.edit(false) }
-    BackHandler(enabled = home.picker != Picker.None) { home.picker = Picker.None }
+    BackHandler(enabled = home.picker != Picker.None) { home.closePicker() }
     BackHandler(enabled = sheet != null) { sheet = null }
     val glance = signals.glance.collectAsState()
     val unread = remember(glance) { { pkg: String -> (glance.value.glance.byPackage[pkg] ?: 0) > 0 } }
@@ -212,8 +224,25 @@ fun HomeScreen(
             }
 
             when (home.picker) {
-                Picker.Widgets -> WidgetPicker(home.widgets, onPick = home.widgets::add, onClose = { home.picker = Picker.None })
-                Picker.Apps -> AppPicker(apps, home.pinKeys.orEmpty(), onPick = home::pin, onClose = { home.picker = Picker.None })
+                Picker.Widgets -> WidgetPicker(home.widgets, onPick = { home.addWidget(it, home.pickerPage) }, onClose = home::closePicker)
+                Picker.Apps -> {
+                    val page = home.pickerPage
+                    if (page == null) {
+                        AppPicker(apps, home.pinKeys.orEmpty(), onPick = home::pin, onClose = home::closePicker)
+                    } else {
+                        // Whatever else is on the page counts toward its limit, so the ids stand in for the non-apps.
+                        val held = home.pages.pages.getOrNull(page).orEmpty().map { if (it is PageItem.App) it.key else it.id }
+                        AppPicker(
+                            apps, held,
+                            onPick = { home.place(page, PageItem.App(it.key)) },
+                            onClose = home::closePicker,
+                            max = Pages.MAX_ITEMS,
+                            title = R.string.page_add_app,
+                            full = R.string.page_full,
+                            none = R.string.page_app_none,
+                        )
+                    }
+                }
                 Picker.None -> Unit
             }
 
@@ -238,6 +267,7 @@ fun HomeScreen(
                         onReplace = { sheet = null; s.dockSlot?.let(menu.pick) },
                         onHide = { scope.launch { apps.hide(s.app) }; sheet = null },
                         onClose = { sheet = null },
+                        pages = pageActionsFor(home, s.app, s.place),
                     )
                 }
             }
@@ -289,28 +319,51 @@ private fun Home(
         if (!started && !actions.voice()) onLayer(Layer.Search)
     }
     val gap = tune.gapDp.dp
-    HomeFrame(
-        gap = gap,
-        gestures = layer == Layer.Home && !home.editing,
-        onSwipeUp = { onLayer(Layer.Apps) },
-        onSwipeDown = { actions.openNotifications() },
-        onDoubleTap = { actions.toggleTorch() },
-        onLongPress = { home.edit(true) },
-        top = { Glance(signals.weather, Modifier.padding(top = Dimen.space6), actions, onLayer) },
-        bottom = {
-            if (home.editing) {
-                EditBar(home) { onLayer(Layer.Tune) }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(gap + Dimen.space2)) {
-                    PinsRow(home.pinKeys, apps, Dimen.space3, home::unpin)
-                    DockRow(tune, dock, apps, actions)
-                    SearchBar(tune, voice.state, onOpen = { onLayer(Layer.Search) }, onMic = listen)
+    val extra = home.pages.count
+    val pager = rememberPagerState { 1 + extra }
+    val drag = remember { PageDrag() }
+    val haptic = LocalHapticFeedback.current
+
+    // A page removed under the finger leaves the pager past its end.
+    LaunchedEffect(extra) { if (pager.currentPage > extra) pager.scrollToPage(extra) }
+    // A page added now is shown; the pages read at start are not announced.
+    var seen by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(extra, home.layout != null) {
+        if (home.layout == null) return@LaunchedEffect
+        val before = seen
+        seen = extra
+        if (before != null && extra > before) pager.animateScrollToPage(extra)
+    }
+
+    Box(Modifier.fillMaxSize().pageDrag(drag, home, pager, scope, haptic, enabled = home.editing && extra > 0)) {
+        HomeFrame(
+            gap = gap,
+            gestures = layer == Layer.Home && !home.editing,
+            onSwipeUp = { onLayer(Layer.Apps) },
+            onSwipeDown = { actions.openNotifications() },
+            onDoubleTap = { actions.toggleTorch() },
+            onLongPress = { home.edit(true) },
+            top = { Glance(signals.weather, Modifier.padding(top = Dimen.space6), actions, onLayer) },
+            bottom = {
+                if (home.editing) {
+                    EditBar(home, (pager.currentPage - 1).takeIf { it >= 0 }) { onLayer(Layer.Tune) }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(gap + Dimen.space2)) {
+                        PinsRow(home.pinKeys, apps, Dimen.space3, home::unpin)
+                        DockRow(tune, dock, apps, actions)
+                        SearchBar(tune, voice.state, onOpen = { onLayer(Layer.Search) }, onMic = listen)
+                    }
                 }
-            }
-            Spacer(Modifier.height(Dimen.space2))
-        },
-        stack = { HomeStack(home, signals, actions) },
-    )
+                Spacer(Modifier.height(Dimen.space2))
+            },
+            pager = pager.takeIf { extra > 0 },
+            swipePages = drag.lifted == null,
+            dots = { PageDots(pager, extra, home.editing) { home.addPage() } },
+            page = { index -> PageContent(index, home, apps, drag) },
+            stack = { HomeStack(home, signals, actions) },
+        )
+        DragGhost(drag, home, apps)
+    }
 }
 
 @Composable

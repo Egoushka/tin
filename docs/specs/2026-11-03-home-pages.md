@@ -53,7 +53,8 @@ touching the pager, the dots, the storage of page count or the menu.
    there is no pager and no dots, the frame is as it is on main. With pages, a row of dots sits between the content and
    the pinned apps (current dot full ink, others dimmed); it is one accessibility node, "Page 2 of 3", with
    next/previous page actions. A swipe counts as a page swipe when it is more sideways than vertical; an up or down
-   swipe is judged against the page on screen, with that page's own scroll.
+   swipe is judged against the page on screen, with that page's own scroll. In edit mode the dots row is there even with
+   no extra page, for its plus (scope 4).
 2. **Pages model and storage.** `Pages`: an ordered list of extra pages, each an ordered list of items (`App(key)`,
    `Shortcut(pkg, id, user, label)`, `Widget(id, rows)`). Pure Kotlin: add and remove a page, add, move (within a page
    and across), remove an item, widgets in use, drop widgets the host no longer has. Stored under one new key
@@ -75,8 +76,9 @@ touching the pager, the dots, the storage of page count or the menu.
    drop goes before or after the item under the finger (left half before, right half after), at the end of the page if
    the finger is on no item. Held at the left or right edge for 0.6 s the page flips and the drag goes on; the drop on
    another page moves it there. The same moves exist without dragging: Move earlier, Move later, Move to page N,
-   Remove, as accessibility actions and in the sheet. A widget on the main page gets Move to page in its edit controls;
-   a widget moved to a page keeps its id and its size.
+   Remove, as accessibility actions and in the sheet. A widget on an extra page keeps its id and its size when it moves
+   to another extra page (one atomic write); the flip while dragging goes only to extra pages, and a drop on the main
+   page cancels.
 6. English and Ukrainian strings for every new string (`strings_pages.xml` in both).
 
 Out: page names, free placement, folders, an auto-filling page, moving an app between a pin and a page, drag from the
@@ -93,7 +95,7 @@ touches something Yehor uses.
 |---|---|---|---|
 | P1 | Pages model | `PagesTest`: add up to 5 extra pages, a sixth changes nothing; remove a page; add appends; the same app twice on a page is ignored; move within a page and across pages, with the index clamped; a bad page or index changes nothing; remove an item; widgets in use; drop dead widgets; shortcuts per app; flow rows (tiles four to a row, a widget alone) | passes |
 | P2 | Codec | `PagesCodecTest`: round trip of every item kind including ids with `,;|` and non-ASCII; empty string and a missing key are no extra pages; a corrupt page or item is skipped and the rest kept; a hostile 1 MB string decodes without throwing | passes |
-| P3 | Drop geometry | `PageDropTest`: before or after by half; between rows; below everything is the end; an empty page is 0; the dragged item is skipped; the edge zone is 48 dp and flips only after 0.6 s | passes |
+| P3 | Drop geometry | `PageDropTest`: before or after by half; between rows; below everything is the end; an empty page is 0; the dragged item is skipped; the edge zone is `EDGE_DP == 48` and the hold is `HOLD_MS == 600` | passes |
 | P4 | Store | `PageStoreTest` on a file-backed DataStore as `LayoutStoreTest`: empty file reads empty; a change is read by a new store; 20 concurrent updates keep every change; pins, layout and pages share the file without touching each other; `Board.moveWidgetToPage` leaves the id in exactly one of layout and pages, and the reverse | passes |
 | P5 | Widgets kept alive | `WidgetsInUseTest`: the host's sweep keeps the ids of both the layout and the pages | passes |
 | R1 | Frame without pages is today's | the existing `HomeFrameTest` runs unchanged | passes |
@@ -120,3 +122,6 @@ them. The accessibility actions are read from the semantics code, not listened t
 - A shortcut tile needs Home as the default home app to resolve; without it the tile opens the app, and that fallback is
   not checked on a device.
 - Model 4 (the self-filling page) is the next cheapest thing to try beside this one.
+- Cut from v1 while building, each a follow-up if the trial wants it: scrolling a tall page while a drag is held at its
+  top or bottom edge (Move later and Move to page cover it); Move to page for a widget that sits on the main page; the
+  flip onto the main page from the left edge while dragging.
