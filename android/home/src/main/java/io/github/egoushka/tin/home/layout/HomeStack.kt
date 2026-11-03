@@ -115,7 +115,18 @@ private fun SlotContent(slot: Slot, home: HomeState, layout: HomeLayout, signals
                     GlanceCard(signals, actions)
                 }
             }
-            CardId.Music -> MusicCard(signals.music)
+            CardId.Music -> {
+                val connected by signals.listenerConnected.collectAsState()
+                val playing = signals.music.state.collectAsState().value
+                when {
+                    // The glance row already asks for the same grant; two identical rows would be noise.
+                    !connected -> if (Slot.Card(CardId.Glance) !in layout.visible) {
+                        GrantRow("bell", R.string.notif_access, { actions.openListenerSettings() }, hide = hideOf(slot, home, editing))
+                    }
+                    playing == null -> GrantRow("play", R.string.music_empty, onGrant = null, hide = hideOf(slot, home, editing))
+                    else -> MusicCard(signals.music, actions)
+                }
+            }
             CardId.Alarm -> AlarmCard(signals.alarm)
             CardId.Homelab -> HomelabCard(signals.homelab)
         }
@@ -129,7 +140,7 @@ private fun hideOf(slot: Slot, home: HomeState, editing: Boolean): (() -> Unit)?
 
 /** One compact row in place of a full card that can only ask for a grant. */
 @Composable
-internal fun GrantRow(icon: String, text: Int, onGrant: () -> Unit, hide: (() -> Unit)?) {
+internal fun GrantRow(icon: String, text: Int, onGrant: (() -> Unit)?, hide: (() -> Unit)?) {
     val tune = LocalTune.current
     val name = stringResource(text)
     Row(
@@ -144,7 +155,7 @@ internal fun GrantRow(icon: String, text: Int, onGrant: () -> Unit, hide: (() ->
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .clickable(role = Role.Button, onClick = onGrant)
+                .then(if (onGrant != null) Modifier.clickable(role = Role.Button, onClick = onGrant) else Modifier)
                 .padding(start = Dimen.space4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -163,7 +174,7 @@ internal fun WidgetCell(id: Int, rows: Int?, host: WidgetHost, editing: Boolean,
     if (!known) {
         // The provider's app is gone; the sweep drops the slot once the host forgets the id.
         GrantRow(
-            "warn", R.string.widget_unavailable, onGrant = {},
+            "warn", R.string.widget_unavailable, onGrant = null,
             hide = if (editing) null else onRemove,
         )
         return

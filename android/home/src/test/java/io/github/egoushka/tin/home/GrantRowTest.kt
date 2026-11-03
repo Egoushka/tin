@@ -3,6 +3,7 @@ package io.github.egoushka.tin.home
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -54,6 +55,13 @@ class GrantRowTest {
         val label = res.getString(R.string.edit_hide, res.getString(R.string.calendar_access))
         rule.onNode(hasContentDescription(label)).performClick()
         assertEquals(1 to 1, granted to hidden)
+    }
+
+    @Test fun `a row with no grant to ask for is not a button, and the x still hides`() {
+        rule.setContent { GrantRow("play", R.string.music_empty, onGrant = null, hide = { hidden++ }) }
+        rule.onNodeWithTag(StackTags.Grant).assertIsDisplayed().assertHasNoClickAction()
+        rule.onNode(hasContentDescription(res.getString(R.string.edit_hide, res.getString(R.string.music_empty)))).performClick()
+        assertEquals(1, hidden)
     }
 
     @Test fun `without a hide control there is no x`() {

@@ -67,7 +67,6 @@ class HomeFramePagesTest {
                     gestures = true,
                     onSwipeUp = { up++ },
                     onSwipeDown = { down++ },
-                    onDoubleTap = {},
                     onLongPress = {},
                     top = { Text("12:00", style = NgType.clock, modifier = Modifier.testTag("top")) },
                     bottom = {

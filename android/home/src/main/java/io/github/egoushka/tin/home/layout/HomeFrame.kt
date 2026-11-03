@@ -94,7 +94,6 @@ fun HomeFrame(
     gestures: Boolean,
     onSwipeUp: () -> Unit,
     onSwipeDown: () -> Unit,
-    onDoubleTap: () -> Unit,
     onLongPress: () -> Unit,
     top: @Composable () -> Unit,
     bottom: @Composable () -> Unit,
@@ -115,7 +114,6 @@ fun HomeFrame(
     var stackBounds by remember { mutableStateOf(Rect.Zero) }
     val up by rememberUpdatedState(onSwipeUp)
     val down by rememberUpdatedState(onSwipeDown)
-    val double by rememberUpdatedState(onDoubleTap)
     val long by rememberUpdatedState(onLongPress)
 
     Box(
@@ -180,7 +178,6 @@ fun HomeFrame(
             .pointerInput(gestures) {
                 if (!gestures) return@pointerInput
                 detectTapGestures(
-                    onDoubleTap = { if (it.x > edge && it.x < size.width - edge && origin + it !in zones) double() },
                     onLongPress = {
                         val at = origin + it
                         // A press on the stack was already read from the Initial pass above.
