@@ -31,7 +31,9 @@ android {
             buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"io.github.egoushka.tin.home.needsyou.fake\"")
             buildConfigField("String", "GATUS_URL", "\"http://127.0.0.1:8095\"")
         }
+        // Debug-signed so CI's release APK installs: Home isn't distributed, and no key material lives in the repo.
         release {
+            signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "NEEDS_YOU_AUTHORITY", "\"com.yehor.approvals.needsyou\"")
             buildConfigField("String", "GATUS_URL", "\"http://100.64.0.2:8095\"")
         }
