@@ -50,8 +50,7 @@ Obtainium compares the release tag (`v0.1.N`) with Home's `versionName` (`0.1.N`
 
 ## Am I on the latest?
 
-- Home shows `Build 0.1.N · <short sha>` through `BuildStamp()` (`ui/BuildStamp.kt`). The Tune sheet hook is one line:
-  `BuildStamp()` at the end of its column, left out of the PR that added the stamp because two open PRs rewrite that file.
+- Home shows `Build 0.1.N · <short sha>` through `BuildStamp()` (`ui/BuildStamp.kt`), the last line of the Tune sheet.
 - From the Mac: the phone's version against the newest release.
   ```bash
   adb shell dumpsys package io.github.egoushka.tin.home | grep versionName
