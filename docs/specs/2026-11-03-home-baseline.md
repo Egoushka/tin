@@ -28,9 +28,9 @@ F2 (Android dropping Home as the preferred Home) follows from F1: the system cle
 
 | ID | Claim | Test | Result |
 |---|---|---|---|
-| B1 | Every icon name written as a literal in `android/home/src/main` is a key of `Lucide.bodies` | `LucideTest` | pending |
-| B2 | `Lucide.icon` with a name that has no body returns a glyph instead of throwing | `LucideTest` | pending |
-| B3 | `AppSheet` composes in every branch (on the dock or not, pinned, unpinned, full pins, with and without page actions, choosing a slot) and shows its Info and Hide rows | `AppSheetTest` | pending |
+| B1 | Every icon name written as a literal in `android/home/src/main` is a key of `Lucide.bodies` | `LucideTest` | pass |
+| B2 | `Lucide.icon` with a name that has no body returns a glyph instead of throwing | `LucideTest` | pass |
+| B3 | `AppSheet` composes in every branch (on the dock or not, pinned, unpinned, full pins, with and without page actions, choosing a slot) and shows its Info and Hide rows | `AppSheetTest` | pass |
 
 ## Layer 2: dock swipes
 
