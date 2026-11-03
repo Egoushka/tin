@@ -1,12 +1,12 @@
 # Home accessibility and locale audit
 
-Against main. It audits the Night glass Home as it is on main after #27 (polish), #26 (weather) and #28 (search results). Scope: `android/home`. Four audits: TalkBack, font scale, contrast, Ukrainian. Each gap has an ID, a check, and a status.
+Against main. It audits the Night glass Home as it was on main after #27 (polish), #26 (weather) and #28 (search results); #25 (voice engine) and #29 (the HomeFrame restructure) landed while the audit ran, and this branch merges them (see "Merge with #29"). Scope: `android/home`. Four audits: TalkBack, font scale, contrast, Ukrainian. Each gap has an ID, a check, and a status.
 
 ## What is audited
 
-The glance and its weather line, and the music, today, needs-you, homelab and alarm cards (`ui/Cards.kt`, `layer/LayerCard.kt`), the dock, the search bar and the mic (`ui/Home.kt`), the search results and the drawer rows (`ui/SearchPanel.kt`, `ui/Drawer.kt`), the Tune sheet (`ui/TuneSheet.kt`), the press modifiers (`theme/Press.kt`), and every string. The search results, the drawer and the Tune sheet were audited by reading their semantics and strings, not on the device.
+The glance and its weather line, and the music, today, needs-you, homelab and alarm cards (`ui/Cards.kt`, `layer/LayerCard.kt`), the dock, the search bar and the mic (`ui/Home.kt`), the search results and the drawer rows (`ui/SearchPanel.kt`, `ui/Drawer.kt`), the Tune sheet (`ui/TuneSheet.kt`), the press modifiers (`theme/Press.kt`), and every string. The search results and the drawer were audited by reading their semantics and strings, not on the device; the Tune sheet by a device dump and by reading.
 
-Deferred, because the surface is in an open PR and not on main: the scrolling card stack, edit mode, pinned apps and widgets (#29, `home-layout-widgets-669cd7`), apps manage (`home-apps-manage-7c11e5`), the dock menu, and the voice-engine UI (`home-voice-engine-ebd7e0`). Each gets this audit when its PR lands; `StringsTest` and `ContrastTest` already cover their strings and colours once merged.
+Not audited. The scrolling card stack, edit mode, pinned apps and widgets (#29) and the voice-engine UI (#25) are on main now, but their semantics and Ukrainian layout were not read or run; only their strings and colours are covered, because `StringsTest` and `ContrastTest` run over the merged tree. Apps manage (#30, `home-apps-manage-7c11e5`) and the dock menu are still in open PRs and get this audit when they land.
 
 ## Findings
 
@@ -18,11 +18,11 @@ Deferred, because the surface is in an open PR and not on main: the scrolling ca
 | A4 | Vertical drags (apps, notifications), double-tap torch and long-press Tune have no accessibility action | the semantics code (`customActions`); not listened to | four custom actions on the glance, the first stop | fixed |
 | A5 | The mic's label is already the state word; keep it | reading `SearchBar` in `Home.kt`: the mic's `contentDescription` is the state word (`mic`, `voice_listening`, `voice_thinking`, `voice_error`) and the hint is a polite live region | none | pinned |
 | A6 | A search result row (`HitRow`) and an app tile in the drawer (`AppTile`) are clickable with no role, so TalkBack does not say "button" | reading the semantics; the clickables on Home and in the drawer and search already set a role (`plainClickable`, `pressGlass` and `IconButton` default to button), A7 aside | `role = Role.Button` | fixed |
-| A7 | The Tune sheet's scrim (`clickable`, no label, no role) and its swallow-tap panel (`clickable {}`, merges its descendants) may be an unlabeled stop and one merged node | device dump of the sheet | scrim label and role; panel `pointerInput` instead of `clickable` | open: needs the device |
+| A7 | The Tune sheet, from a device dump: the scrim is a clickable with no label and no role; the panel is a `clickable {}` that merges its descendants; the three sliders have no name (label and value are sibling texts); the Focus switch is not tied to its label; Reset is exposed as a radio button; a selected chip is not marked selected | device dump of the sheet (unmerged tree); the merge and the announcements are by the semantics code, not listened to | scrim is a sibling of the panel with the Close label and button role; the panel swallows taps with `pointerInput`; each slider carries its name as `contentDescription` and its value as `stateDescription`, and the sighted label row is hidden from semantics; the Focus row is `toggleable(Role.Switch)` over a `Switch(onCheckedChange = null)`; chips that choose are `selectable`, Reset is a button | fixed in code; not re-dumped on the device (phone locked) |
 | F1 | Large text: the clock, the alarm label and the fixed rows may clip, wrap or overlap at scale 1.3 and 2.0 | device check at 412×915 dp, scale 1.3 and 2.0, English and Ukrainian: no node leaves the screen, none overlaps, every clickable is at least 48 dp | see F2 to F4 | see below |
 | F2 | English, 2.0: the alarm label broke mid-word ("Alar/m") because it was weighted and got what the time and "in 18 min" left | device dump and screenshot | label measured first, a spacer takes the slack | fixed in code; reproduced on the device before, not re-run after |
 | F3 | Ukrainian, 2.0: the clock wrapped ("01:3/0") because the wider date squeezed it | device dump and screenshot | clock measured first, the date column takes the rest | fixed in code; reproduced on the device before, not re-run after |
-| F4 | Ukrainian, 2.0: the card stack is taller than the screen, so the dock and the search bar with its mic are pushed off | device dump | #29 makes the stack scroll between a pinned top and bottom | deferred to #29 |
+| F4 | Ukrainian, 2.0: the card stack is taller than the screen, so the dock and the search bar with its mic are pushed off | device dump | #29 makes the stack scroll between a pinned top and bottom | #29 is merged here; not re-checked on the phone |
 | C1 | `ink` and `ink-2` text on the glass for tint 35–100% and for the three skins | `ContrastTest` over `tokens.json` | see below | fixed or documented |
 | C2 | The clash icon, the only mark of a clash, is the plain attention hue: worst case over tint, room and row, Violet 2.16:1, Blue 2.94:1, Rose 3.22:1, Amber 4.60:1 (a UI part needs 3:1) | `ContrastTest` | the hue mixed 35% toward `ink`: 3.34:1 or more for every hue | fixed |
 | L1 | `today_more` ("ще %d") and `needs_more` ("+%d ще") say the same thing two ways; English says "+%d more" for both | `StringsTest` (key and placeholder parity) and reading | "+%d ще" for both | fixed |
@@ -74,9 +74,9 @@ Results, on the APK built before the F2 and F3 fixes:
 
 Strings read in Ukrainian on the device were correct.
 
-**Not re-run after the fixes.** The phone locked itself (secure lock) after I built and installed the final APK, and a PIN is not mine to enter. F2, F3 and A6 are fixed in code, built, linted and unit-tested, but their on-device confirmation, Ukrainian at 1.0 and 1.3, and a dump of the Tune sheet (A7) are still open. The device settings were restored (font scale 1.0, app locale cleared) over adb, which works with the screen locked.
+**Not re-run after the fixes.** The phone locked itself (secure lock) after I built and installed the final APK, and a PIN is not mine to enter. F2, F3 and A6 are fixed in code, built, linted and unit-tested, but their on-device confirmation and Ukrainian at 1.0 and 1.3 are still open. The device settings were restored (font scale 1.0, app locale cleared) over adb, which works with the screen locked.
 
-A7 (found by reading, not fixed): the Tune sheet's scrim is a `clickable` with no label and no role, and its panel is a `clickable {}` that only swallows taps; a clickable merges its descendants, so the panel may read as one node. The fix, if the dump confirms it, is a close label and button role on the scrim and a tap-gesture swallow instead of `clickable` on the panel. Not changed: it needs the device, and the Tune sheet's own layout is out of scope.
+A7: the dump showed the Tune sheet's scrim with no label and no role, the panel as one clickable ScrollView, the three sliders without a name, the Focus switch apart from its label, and Reset as a radio button. The fix is in `ui/TuneSheet.kt` (see the A7 row). It was written after the phone locked again, so the new sheet was not dumped: the sibling scrim, the slider names and the switch row are checked by reading the code and by the build, not on the device. `uiautomator` shows no custom actions or merge in any case, so a TalkBack pass is the check for it.
 
 TalkBack itself was not run: `uiautomator` dumps the unmerged semantics tree (the existing dock buttons look the same), so it cannot show that TalkBack reads a card as one unit. It does show every leaf's text and description, bounds, and clickable and long-clickable flags. The one-unit reading, the custom actions and the long-click label are verified by the semantics code and the string checks, not by listening. A TalkBack pass on the phone is the check this PR does not have.
 
@@ -84,23 +84,16 @@ TalkBack itself was not run: `uiautomator` dumps the unmerged semantics tree (th
 
 `android/home` has no Compose UI test or Robolectric dependency (`build.gradle.kts` lists JUnit and kotlinx-serialization only). A JVM Compose test needs Robolectric plus a Robolectric jar for compileSdk 37, the same cost #27 declined for goldens. The device checks above replace it.
 
-## `ui/Home.kt` edits, for whoever merges second
+## Merge with #29
 
-#29 restructures this file. The edits here are the smallest set (line numbers on this branch):
+#29 moved the Home layout into `HomeFrame`. `origin/main` (`e9d6b0b`) is merged into this branch with no rebase. The one conflict was in `ui/Home.kt`: the branch kept `HomeFrame`'s side and re-added `actions, onLayer` to the `Glance(...)` call inside `HomeFrame(top = { ... })`. The clock and date weights (F3) are on the merged `Glance`; `Glance` keeps the four `customActions` (A4) and the search bar keeps its long-click label (A3).
 
-- 36 and 38: the imports `CustomAccessibilityAction` and `customActions`.
-- 214: the `Glance(...)` call site passes `actions, onLayer`.
-- 233: the `Glance` signature takes `actions, onLayer`.
-- 245 to 261: the four action strings, and the merged `Row` with `customActions` in place of the plain `Row`.
-- 262 to 263: the clock `Text` loses `weight(1f)` and the date `Column` gains it (F3). #29's Glance still has the old weights, so this is the one hunk that will conflict.
-- 308: the search bar's `plainClickable(..., onLongClickLabel = ...)`.
-
-The other edits are one-liners in other files: `ui/SearchPanel.kt` (`HitRow`) and `ui/Drawer.kt` (`AppTile`) get `role = Role.Button` (A6), and `ui/Cards.kt` (`AlarmCard`) stops weighting the label (F2) and moves the clash icon colour (C2). The rest is `layer/LayerCard.kt`, `theme/Press.kt` (`onLongClickLabel`), `theme/Tokens.kt` (a comment) and the new `strings_a11y.xml` pair.
+The other edits are one-liners in other files: `ui/SearchPanel.kt` (`HitRow`) and `ui/Drawer.kt` (`AppTile`) get `role = Role.Button` (A6), `ui/Cards.kt` (`AlarmCard`) stops weighting the label (F2) and moves the clash icon colour (C2), and `ui/TuneSheet.kt` carries A7. The rest is `layer/LayerCard.kt`, `theme/Press.kt` (`onLongClickLabel`), `theme/Tokens.kt` (a comment) and the new `strings_a11y.xml` pair.
 
 ## Open questions for Yehor
 
 - `age_day` is "дн" and `alarm_in_hm` ("за 1 год 5 хв") keeps its abbreviations for speech; only the card ages have spoken forms.
 - The Tune tint knob stops at 85%; the sweep to 100% passes ink and ink-2 off the lit card, so the knob has margin.
 - `voice_error` changed wording (L3).
-- Ukrainian `date_skeleton` is the full month ("3 листопада"); English is the short month ("3 Nov"). It is what makes the glance wide at 2.0 (F3); #29 may want the short month.
+- Ukrainian `date_skeleton` is the full month ("3 листопада"); English is the short month ("3 Nov"). It is what makes the glance wide at 2.0 (F3); whether to shorten it is the design's call.
 - The design README's `ink-2` claims for a lit card need a correction, or Blue and Amber need a different lit-card fill.
