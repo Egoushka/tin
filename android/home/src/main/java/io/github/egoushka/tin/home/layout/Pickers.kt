@@ -51,6 +51,7 @@ import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
 import io.github.egoushka.tin.home.theme.glass
+import io.github.egoushka.tin.home.theme.sheetPanel
 import io.github.egoushka.tin.home.ui.IconButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -175,7 +176,7 @@ private fun PickerSheet(title: String, onClose: () -> Unit, content: @Composable
                 .padding(Dimen.gutter)
                 .fillMaxWidth()
                 .fillMaxHeight(0.7f)
-                .glass(RoundedCornerShape(Dimen.radiusCard))
+                .sheetPanel(RoundedCornerShape(Dimen.radiusCard))
                 .clickable(remember { MutableInteractionSource() }, indication = null) {}
                 .padding(Dimen.space3),
         ) {

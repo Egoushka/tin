@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
@@ -85,6 +86,7 @@ import io.github.egoushka.tin.home.apps.AppEntry
 import io.github.egoushka.tin.home.apps.AppRepository
 import io.github.egoushka.tin.home.apps.DockSlots
 import io.github.egoushka.tin.home.layout.AppPicker
+import io.github.egoushka.tin.home.layout.DefaultPins
 import io.github.egoushka.tin.home.layout.EditBar
 import io.github.egoushka.tin.home.layout.HomeFrame
 import io.github.egoushka.tin.home.layout.HomeStack
@@ -124,6 +126,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class Layer { Home, Apps, Search, Tune, Hidden }
+
+/** Home under the drawer or a sheet: still composed, so it is there when the layer closes, but no screen reader can land on it. */
+internal fun Modifier.coveredBy(layer: Layer): Modifier = if (layer != Layer.Home) clearAndSetSemantics {} else this
 
 /** The app whose menu is open, its dock slot when the press was on the dock, and its place when it was on an extra page. */
 private data class SheetFor(val app: AppEntry, val dockSlot: Int?, val place: PagePlace? = null)
@@ -187,7 +192,9 @@ fun HomeScreen(
                 .drawBehind { drawRoom(tune.roomLight, this.size) },
         ) {
             FrostRenderer(tune, size, frost)
-            Home(tune, layer, onLayer, dock, apps, actions, signals, home, gestureMap, onGestures = { gesturesOpen = true }, onToday = { todayOpen = true })
+            Box(Modifier.fillMaxSize().coveredBy(layer)) {
+                Home(tune, layer, onLayer, dock, apps, actions, signals, home, gestureMap, onGestures = { gesturesOpen = true }, onToday = { todayOpen = true })
+            }
 
             // Composed from the first frames on, so opening is a fade and a slide on the render thread and nothing else.
             val open = layer == Layer.Apps || layer == Layer.Search
@@ -348,6 +355,11 @@ private fun Home(
         val started = voice.start(scope) { said -> actions.ask(said, signals.needsYou.state.value.needs) }
         if (!started && !actions.voice()) onLayer(Layer.Search)
     }
+    val installed by apps.state.collectAsState()
+    // Once per start: seed() writes only while no pin list has ever been stored.
+    LaunchedEffect(installed.all.isNotEmpty()) {
+        if (installed.all.isNotEmpty()) home.seedPins(DefaultPins.keys(context, installed.all))
+    }
     val gap = tune.gapDp.dp
     val extra = home.pages.count
     val pager = rememberPagerState { 1 + extra }
@@ -480,7 +492,7 @@ private fun Modifier.ownsPress() = pointerInput(Unit) {
 
 /** One dock slot: the chosen app, or the default's glyph while the slot is empty or its app is gone. */
 @Composable
-private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, ready: Boolean, apps: AppRepository, actions: Actions) {
+internal fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, ready: Boolean, apps: AppRepository, actions: Actions) {
     val menu = LocalAppMenu.current
     val unread by rememberUnread(app?.pkg)
     val label = app?.label ?: stringResource(d.label)
@@ -489,8 +501,9 @@ private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, read
     val tile = Modifier.size(Dimen.tile)
     val shortcuts by produceState(emptyList<AppShortcut>(), app?.key) { value = if (app != null) apps.shortcuts(app) else emptyList() }
     val swipe = DockSwipe.of(app != null, d, shortcuts)
-    val onSwipe: (() -> Unit)? = when (swipe) {
-        null -> null
+    // A tile with nothing to swipe to still owns the swipe: left to the frame, it would open All apps (G10).
+    val onSwipe: () -> Unit = when (swipe) {
+        null -> ({})
         is DockSwipe.Shortcut -> ({ if (app != null) apps.startShortcut(app, swipe.shortcut) })
         is DockSwipe.Open -> ({ actions.start(swipe.intent, label) })
     }
@@ -502,7 +515,7 @@ private fun DockTile(tune: Tune, d: DockDefault, slot: Int, app: AppEntry?, read
                 CircleShape,
                 onLongClickLabel = longClickLabel,
                 onLongClick = { if (app != null) menu.open(app, slot) else menu.pick(slot) },
-                onClick = { if (app != null) apps.launch(app) else actions.dock(d) },
+                onClick = { if (app != null) apps.launch(app) else if (actions.canOpen(d)) actions.dock(d) else menu.pick(slot) },
             )
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,

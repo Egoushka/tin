@@ -57,7 +57,11 @@ object Lucide {
         "eye-off" to """<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>""",
         "pin" to """<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>""",
         "arrow-up-right" to """<path d="M7 7h10v10"/><path d="M7 17 17 7"/>""",
+        "home" to """<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>""",
     )
+
+    /** What a name without a body draws: a missing glyph must not take Home down with it. */
+    private const val FALLBACK = "info"
 
     private data class Key(val name: String, val sizeDp: Float, val strokeDp: Float, val color: Color)
     private val cache = HashMap<Key, ImageVector>()
@@ -66,7 +70,7 @@ object Lucide {
         cache.getOrPut(Key(name, sizeDp, strokeDp, color)) {
         val stroke = strokeDp * 24f / sizeDp
         ImageVector.Builder(name, sizeDp.dp, sizeDp.dp, 24f, 24f).apply {
-            for (d in toPathData(bodies.getValue(name))) {
+            for (d in toPathData(bodies[name] ?: bodies.getValue(FALLBACK))) {
                 addPath(addPathNodes(d), stroke = SolidColor(color), strokeLineWidth = stroke,
                     strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round)
             }

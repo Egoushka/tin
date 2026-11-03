@@ -25,6 +25,11 @@ class PinStore(private val store: DataStore<Preferences>) {
 
     suspend fun unpin(key: String) = change { it - key }
 
+    /** Stores [defaults] only while no pin list has ever been written, so unpinning everything is not undone. */
+    suspend fun seed(defaults: List<String>) {
+        store.edit { p -> if (pins !in p && defaults.isNotEmpty()) p[pins] = defaults.distinct().take(MAX).joinToString(SEP) }
+    }
+
     private suspend fun change(next: (List<String>) -> List<String>) {
         store.edit { p -> p[pins] = next(decode(p[pins])).joinToString(SEP) }
     }

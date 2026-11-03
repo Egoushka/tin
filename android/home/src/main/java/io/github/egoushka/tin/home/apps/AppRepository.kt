@@ -8,10 +8,6 @@ import android.content.IntentFilter
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.graphics.drawable.AdaptiveIconDrawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -141,7 +137,7 @@ class SystemApps(private val context: Context) : AppSource {
 }
 
 /** What the UI talks to: the live list, the dock, hide, icons and the long-press actions. */
-class AppRepository(context: Context, private val prefs: AppPrefs) {
+open class AppRepository(context: Context, private val prefs: AppPrefs) {
     private val system = SystemApps(context)
     private val model = AppList(system, prefs.saved.map { it.hidden }.distinctUntilChanged())
 
@@ -170,11 +166,11 @@ class AppRepository(context: Context, private val prefs: AppPrefs) {
     suspend fun hide(app: AppEntry) = prefs.hide(app.key)
     suspend fun show(key: String) = prefs.show(key)
 
-    fun launch(app: AppEntry) = system.launch(app)
+    open fun launch(app: AppEntry) = system.launch(app)
     fun appInfo(app: AppEntry) = runCatching { system.appInfo(app) }
     fun uninstall(app: AppEntry) = runCatching { system.uninstall(app) }
-    suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) { system.shortcuts(app) }
-    fun startShortcut(app: AppEntry, shortcut: AppShortcut) = runCatching { system.startShortcut(app, shortcut.id) }
+    open suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) { system.shortcuts(app) }
+    open fun startShortcut(app: AppEntry, shortcut: AppShortcut) = runCatching { system.startShortcut(app, shortcut.id) }
     suspend fun pinShortcuts(pkg: String, user: Long, ids: Set<String>) =
         withContext(Dispatchers.IO) { runCatching { system.pinShortcuts(pkg, user, ids) } }
 
@@ -193,19 +189,7 @@ class AppRepository(context: Context, private val prefs: AppPrefs) {
         val key = cacheKey(app, px)
         icons.get(key)?.let { return it }
         val drawable = system.icon(app) ?: return null
-        val mono = (drawable as? AdaptiveIconDrawable)?.monochrome
-        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        if (mono != null) {
-            // The adaptive foreground spans 108 dp around a 72 dp safe zone; draw it so the zone fills the tile.
-            val extra = (px * 0.25f).toInt()
-            mono.setBounds(-extra, -extra, px + extra, px + extra)
-            mono.colorFilter = PorterDuffColorFilter(tint, PorterDuff.Mode.SRC_IN)
-            mono.draw(canvas)
-        } else {
-            drawable.setBounds(0, 0, px, px)
-            drawable.draw(canvas)
-        }
+        val bmp = renderIcon(drawable, px, tint)
         icons.put(key, bmp)
         return bmp
     }

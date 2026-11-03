@@ -64,6 +64,10 @@ class HomeState(
         }
     }
 
+    fun seedPins(defaults: List<String>) {
+        scope.launch { pinStore.seed(defaults) }
+    }
+
     fun edit(on: Boolean) {
         editing = on
         if (!on) picker = Picker.None

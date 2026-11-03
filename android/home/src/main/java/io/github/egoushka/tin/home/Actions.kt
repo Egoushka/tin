@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
+import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.widget.Toast
@@ -59,6 +60,12 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
         start(intent, context.getString(d.label))
     }
 
+    /** Whether something on this phone opens [d]: its own intent, or the web fallback. */
+    fun canOpen(d: DockDefault): Boolean {
+        val pm = context.packageManager
+        return d.intent().resolveActivity(pm) != null || d.fallback?.invoke()?.resolveActivity(pm) != null
+    }
+
     /** The activity [d] opens now; null when nothing handles it or the system would ask which app ("android" is its chooser). */
     fun handler(d: DockDefault): Pair<String, String>? {
         val info = context.packageManager.resolveActivity(d.intent(), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo ?: return null
@@ -72,6 +79,8 @@ class Actions(private val context: Context, val askCalendar: () -> Unit = {}) {
         ),
         context.getString(R.string.notif_access),
     )
+
+    fun openAlarms() = start(Intent(AlarmClock.ACTION_SHOW_ALARMS), context.getString(R.string.alarm))
 
     /** Opens the approvals app on its queue; the card never decides anything itself. */
     fun openApprovals() {

@@ -127,7 +127,7 @@ private fun SlotContent(slot: Slot, home: HomeState, layout: HomeLayout, signals
                     else -> MusicCard(signals.music, actions)
                 }
             }
-            CardId.Alarm -> AlarmCard(signals.alarm)
+            CardId.Alarm -> AlarmCard(signals.alarm, actions)
             CardId.Homelab -> HomelabCard(signals.homelab)
         }
     }

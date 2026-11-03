@@ -210,6 +210,7 @@ fun TodayCard(calendar: CalendarSource, actions: Actions, onOpen: () -> Unit = {
         return
     }
     val agenda = Agenda.of(state.events, now)
+    if (agenda.items.isEmpty()) return // nothing left today: the sheet behind a tap would say the same
     val stale = Freshness.isStale(now, state.at, CalendarSource.INTERVAL_MS)
     LayerCard(
         label, Freshness.age(now, state.at),
@@ -217,55 +218,52 @@ fun TodayCard(calendar: CalendarSource, actions: Actions, onOpen: () -> Unit = {
         Modifier.plainClickable(onClick = onOpen),
         keepBright = true,
     ) {
-        if (agenda.items.isEmpty()) {
-            Text(stringResource(R.string.today_empty), style = NgType.body)
-        } else {
-            agenda.items.forEach { row ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = Dimen.space6 + Dimen.space3)
-                        .nowLight(row.current)
-                        .padding(horizontal = Dimen.space2),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.ink else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space1))
-                    Text(
-                        row.event.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
+        agenda.items.forEach { row ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Dimen.space6 + Dimen.space3)
+                    .nowLight(row.current)
+                    .padding(horizontal = Dimen.space2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(clock(context, row.event.beginMs), style = NgType.body.copy(color = if (row.current) Ng.ink else Ng.ink2), modifier = Modifier.width(Dimen.target + Dimen.space1))
+                Text(
+                    row.event.title, style = NgType.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (row.clash) {
+                    val clash = stringResource(R.string.clash)
+                    Spacer(Modifier.width(Dimen.space2))
+                    Image(
+                        Lucide.icon("warn", 16f, tune.strokeDp, lerpColor(tune.attention.color, Ng.ink, CLASH_ICON_INK_MIX)), null,
+                        Modifier.size(Dimen.glyphSmall).semantics { contentDescription = clash },
                     )
-                    if (row.clash) {
-                        val clash = stringResource(R.string.clash)
-                        Spacer(Modifier.width(Dimen.space2))
-                        Image(
-                            Lucide.icon("warn", 16f, tune.strokeDp, lerpColor(tune.attention.color, Ng.ink, CLASH_ICON_INK_MIX)), null,
-                            Modifier.size(Dimen.glyphSmall).semantics { contentDescription = clash },
-                        )
-                    }
                 }
             }
-            if (agenda.more > 0) Text(stringResource(R.string.today_more, agenda.more), style = NgType.body)
         }
+        if (agenda.more > 0) Text(stringResource(R.string.today_more, agenda.more), style = NgType.body)
     }
 }
 
-/** What waits for Yehor in the approvals app: lit while anything is open, oldest first, tap opens the queue. */
+/**
+ * What waits for Yehor in the approvals app: lit while anything is open, oldest first, tap opens the queue. While the
+ * provider refuses us (Approvals does not list Home's signing certificate) there is nothing to show or to act on, so no card.
+ */
 @Composable
 fun NeedsYouCard(source: NeedsYouSource, actions: Actions) {
     val state by source.state.collectAsState()
-    if (state.status == NeedsYouSource.Status.Loading) return // first read not back yet
+    if (state.status != NeedsYouSource.Status.Ok) return // first read not back yet, or the provider says no
     val now = rememberNow()
     val label = stringResource(R.string.needs_you)
     val needs = state.needs
-    val unavailable = state.status == NeedsYouSource.Status.Unavailable
-    val stale = !unavailable && Freshness.isStale(now, state.at, NeedsYouSource.INTERVAL_MS)
+    val stale = Freshness.isStale(now, state.at, NeedsYouSource.INTERVAL_MS)
     LayerCard(
-        label, if (unavailable) null else Freshness.age(now, state.at),
+        label, Freshness.age(now, state.at),
         CardLight(if (needs.lit) LightKind.NeedsYou else LightKind.Calm, stale),
         Modifier.plainClickable { actions.openApprovals() },
     ) {
         when {
-            unavailable -> Text(stringResource(R.string.needs_unavailable), style = NgType.body)
             !needs.lit -> Text(stringResource(R.string.needs_empty), style = NgType.body)
             else -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(needs.open.toString(), style = NgType.figure)
@@ -289,21 +287,19 @@ fun NeedsYouCard(source: NeedsYouSource, actions: Actions) {
     }
 }
 
-/** Gatus on the tailnet: calm while everything passes, `bad` once an endpoint has failed two checks in a row. */
+/** Gatus on the tailnet: calm while everything passes, `bad` once an endpoint has failed two checks in a row; no card while it is out of reach. */
 @Composable
 fun HomelabCard(source: HomelabSource) {
     val state by source.state.collectAsState()
-    if (state.status == HomelabSource.Status.Loading) return // first fetch not back yet
+    if (state.status != HomelabSource.Status.Ok) return // first fetch not back yet, or nothing to show
     val now = rememberNow()
-    val unavailable = state.status == HomelabSource.Status.Unavailable
     val lab = state.homelab
-    val stale = !unavailable && Freshness.isStale(now, state.at, HomelabSource.INTERVAL_MS)
+    val stale = Freshness.isStale(now, state.at, HomelabSource.INTERVAL_MS)
     LayerCard(
-        stringResource(R.string.homelab), if (unavailable) null else Freshness.age(now, state.at),
+        stringResource(R.string.homelab), Freshness.age(now, state.at),
         CardLight(if (lab.lit) LightKind.Broken else LightKind.Calm, stale),
     ) {
         when {
-            unavailable -> Text(stringResource(R.string.homelab_unavailable), style = NgType.body)
             !lab.lit -> Text(stringResource(R.string.homelab_ok, lab.total), style = NgType.body)
             else -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(lab.broken.size.toString(), style = NgType.figure, color = Ng.bad)
@@ -320,9 +316,9 @@ fun HomelabCard(source: HomelabSource) {
     }
 }
 
-/** The next alarm clock; absent when none is set. */
+/** The next alarm clock, a tap opens the alarm list; absent when none is set. */
 @Composable
-fun AlarmCard(alarm: AlarmSource) {
+fun AlarmCard(alarm: AlarmSource, actions: Actions) {
     val next = alarm.next.collectAsState().value ?: return
     val tune = LocalTune.current
     val context = LocalContext.current
@@ -339,7 +335,7 @@ fun AlarmCard(alarm: AlarmSource) {
         val pattern = DateFormat.getBestDateTimePattern(locale, if (DateFormat.is24HourFormat(context)) "EEEHm" else "EEEjm")
         android.icu.text.SimpleDateFormat(pattern, locale).format(java.util.Date(next))
     }
-    LayerCard("", null, CardLight()) {
+    LayerCard("", null, CardLight(), Modifier.plainClickable { actions.openAlarms() }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(Lucide.icon("alarm", 20f, tune.strokeDp), null, Modifier.size(Dimen.glyph))
             Spacer(Modifier.width(Dimen.space3))
