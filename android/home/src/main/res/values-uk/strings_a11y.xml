@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_apps">Відкрити всі застосунки</string>
+    <string name="action_notifications">Відкрити сповіщення</string>
+    <string name="action_torch">Увімкнути чи вимкнути ліхтарик</string>
+    <string name="age_now_spoken">щойно</string>
+    <plurals name="age_min_spoken">
+        <item quantity="one">%d хвилину тому</item>
+        <item quantity="few">%d хвилини тому</item>
+        <item quantity="many">%d хвилин тому</item>
+        <item quantity="other">%d хвилини тому</item>
+    </plurals>
+    <plurals name="age_hour_spoken">
+        <item quantity="one">%d годину тому</item>
+        <item quantity="few">%d години тому</item>
+        <item quantity="many">%d годин тому</item>
+        <item quantity="other">%d години тому</item>
+    </plurals>
+    <plurals name="age_day_spoken">
+        <item quantity="one">%d день тому</item>
+        <item quantity="few">%d дні тому</item>
+        <item quantity="many">%d днів тому</item>
+        <item quantity="other">%d дня тому</item>
+    </plurals>
+</resources>

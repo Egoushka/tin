@@ -215,7 +215,7 @@ private fun AppTile(app: AppEntry, apps: AppRepository, onClick: () -> Unit) {
         if (value == null) value = withContext(Dispatchers.IO) { apps.icon(app, px, Ng.ink.toArgb())?.let(Bitmap::asImageBitmap) }
     }
     Column(
-        Modifier.clip(RoundedCornerShape(Dimen.radiusRow)).clickable(onClick = onClick).padding(vertical = Dimen.space1),
+        Modifier.clip(RoundedCornerShape(Dimen.radiusRow)).clickable(role = Role.Button, onClick = onClick).padding(vertical = Dimen.space1),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.size(Dimen.tile).glass(CircleShape), contentAlignment = Alignment.Center) {

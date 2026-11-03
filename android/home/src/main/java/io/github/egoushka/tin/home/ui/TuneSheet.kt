@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -35,9 +38,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import io.github.egoushka.tin.home.R
 import io.github.egoushka.tin.home.theme.Attention
@@ -54,20 +62,24 @@ import kotlin.math.roundToInt
 @Composable
 fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, onClose: () -> Unit) {
     val res = LocalContext.current.resources
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Ng.well)
-            .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClose),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
+    val close = stringResource(R.string.close)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        // A sibling of the panel, not its parent: a clickable parent merges the panel's text into its own node.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Ng.well)
+                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClose)
+                .semantics { contentDescription = close },
+        )
         Column(
             Modifier
                 .navigationBarsPadding()
                 .padding(Dimen.gutter)
                 .fillMaxWidth()
                 .glass(RoundedCornerShape(Dimen.radiusCard))
-                .clickable(remember { MutableInteractionSource() }, indication = null) {}
+                // Takes the tap so it does not fall through to the scrim; unlike clickable it adds no node.
+                .pointerInput(Unit) { detectTapGestures { } }
                 .verticalScroll(rememberScrollState())
                 .padding(tune.padDp.dp + Dimen.space1),
             verticalArrangement = Arrangement.spacedBy(Dimen.space3),
@@ -112,11 +124,16 @@ fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, onCl
                 Tune.STROKES.forEach { s -> Chip(s.toString(), tune.strokeDp == s) { onChange(tune.edit { copy(strokeDp = s) }) } }
             }
 
-            Row(Modifier.heightIn(min = Dimen.target), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .heightIn(min = Dimen.target)
+                    .toggleable(tune.focus, role = Role.Switch) { onChange(tune.edit { copy(focus = it) }) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(stringResource(R.string.tune_focus), style = NgType.title, modifier = Modifier.weight(1f))
                 Switch(
                     checked = tune.focus,
-                    onCheckedChange = { onChange(tune.edit { copy(focus = it) }) },
+                    onCheckedChange = null,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Ng.onAccent, checkedTrackColor = Ng.accent,
                         uncheckedThumbColor = Ng.ink2, uncheckedTrackColor = Ng.track, uncheckedBorderColor = Ng.edge,
@@ -127,7 +144,7 @@ fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, onCl
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val n = tune.changedFromDefault()
                 Text(res.getQuantityString(R.plurals.tune_changed, n, n), style = NgType.body, modifier = Modifier.weight(1f))
-                Chip(stringResource(R.string.tune_reset), selected = false) { onChange(Tune()) }
+                Chip(stringResource(R.string.tune_reset), selected = false, role = Role.Button) { onChange(Tune()) }
             }
         }
     }
@@ -157,7 +174,10 @@ private fun Chip(label: String, selected: Boolean, dot: Color? = null, role: Rol
             .clip(shape)
             .background(if (selected) Ng.accent else Ng.surface2)
             .border(1.dp, if (selected) Color.Transparent else Ng.edge, shape)
-            .clickable(role = role, onClick = onClick)
+            .then(
+                if (role == Role.RadioButton) Modifier.selectable(selected, role = role, onClick = onClick)
+                else Modifier.clickable(role = role, onClick = onClick),
+            )
             .padding(horizontal = Dimen.space3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -171,14 +191,17 @@ private fun Chip(label: String, selected: Boolean, dot: Color? = null, role: Rol
 
 @Composable
 private fun Knob(@StringRes label: Int, value: String, v: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    val name = stringResource(label)
     Column {
-        Row {
-            Text(stringResource(label).uppercase(), style = NgType.label, modifier = Modifier.weight(1f))
+        // The slider carries the name and the value; the row is their sighted copy.
+        Row(Modifier.clearAndSetSemantics { }) {
+            Text(name.uppercase(), style = NgType.label, modifier = Modifier.weight(1f))
             Text(value, style = NgType.label.copy(color = Ng.ink))
         }
         Spacer(Modifier.height(Dimen.space1))
         Slider(
             value = v, onValueChange = onChange, valueRange = range,
+            modifier = Modifier.semantics { contentDescription = name; stateDescription = value },
             colors = SliderDefaults.colors(thumbColor = Ng.accent, activeTrackColor = Ng.accent, inactiveTrackColor = Ng.track),
         )
     }
