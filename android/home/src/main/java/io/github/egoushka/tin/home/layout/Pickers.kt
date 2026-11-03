@@ -118,15 +118,24 @@ fun WidgetPicker(host: WidgetHost, onPick: (ComponentName) -> Unit, onClose: () 
     }
 }
 
-/** Apps not yet pinned, A–Z. */
+/** Apps not yet pinned, A–Z; for a page, [pinned] are the apps already on it and [max] is what it can hold. */
 @Composable
-fun AppPicker(apps: AppRepository, pinned: List<String>, onPick: (AppEntry) -> Unit, onClose: () -> Unit) {
+fun AppPicker(
+    apps: AppRepository,
+    pinned: List<String>,
+    onPick: (AppEntry) -> Unit,
+    onClose: () -> Unit,
+    max: Int = PinStore.MAX,
+    title: Int = R.string.edit_add_app,
+    full: Int = R.string.pins_full,
+    none: Int = R.string.pins_none,
+) {
     val installed by apps.list.collectAsState()
     val free = remember(installed, pinned) { installed.filter { it.key !in pinned } }
-    PickerSheet(stringResource(R.string.edit_add_app), onClose) {
+    PickerSheet(stringResource(title), onClose) {
         when {
-            pinned.size >= PinStore.MAX -> Text(stringResource(R.string.pins_full), style = NgType.body, modifier = Modifier.padding(Dimen.space4))
-            free.isEmpty() && installed.isNotEmpty() -> Text(stringResource(R.string.pins_none), style = NgType.body, modifier = Modifier.padding(Dimen.space4))
+            pinned.size >= max -> Text(stringResource(full), style = NgType.body, modifier = Modifier.padding(Dimen.space4))
+            free.isEmpty() && installed.isNotEmpty() -> Text(stringResource(none), style = NgType.body, modifier = Modifier.padding(Dimen.space4))
             else -> LazyColumn(Modifier.fillMaxWidth()) {
                 items(free, key = { it.key }) { app -> PickerRow(app.label, null) { onPick(app); onClose() } }
             }

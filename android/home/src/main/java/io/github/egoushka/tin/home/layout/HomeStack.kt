@@ -92,7 +92,10 @@ fun HomeStack(home: HomeState, signals: Signals, actions: Actions) {
 @Composable
 private fun SlotContent(slot: Slot, home: HomeState, layout: HomeLayout, signals: Signals, actions: Actions, editing: Boolean) {
     when (slot) {
-        is Slot.Widget -> WidgetCell(slot.id, layout.rows[slot.id], home, editing)
+        is Slot.Widget -> WidgetCell(
+            slot.id, layout.rows[slot.id], home.widgets, editing,
+            onRemove = { home.removeWidget(slot.id) }, sideways = home.pages.count > 0,
+        )
         is Slot.Card -> when (slot.id) {
             CardId.NeedsYou -> NeedsYouCard(signals.needsYou, actions)
             CardId.Today -> {
@@ -164,15 +167,15 @@ internal fun GrantRow(icon: String, text: Int, onGrant: (() -> Unit)?, hide: (()
     }
 }
 
+/** A widget in a glass frame, on the stack or on a page; [sideways] lets a sideways drag over it turn the page. */
 @Composable
-private fun WidgetCell(id: Int, rows: Int?, home: HomeState, editing: Boolean) {
-    val host = home.widgets
+internal fun WidgetCell(id: Int, rows: Int?, host: WidgetHost, editing: Boolean, onRemove: () -> Unit, sideways: Boolean) {
     val known = remember(id) { host.label(id) != null }
     if (!known) {
         // The provider's app is gone; the sweep drops the slot once the host forgets the id.
         GrantRow(
             "warn", R.string.widget_unavailable, onGrant = null,
-            hide = if (editing) null else ({ home.removeWidget(id) }),
+            hide = if (editing) null else onRemove,
         )
         return
     }
@@ -195,6 +198,7 @@ private fun WidgetCell(id: Int, rows: Int?, home: HomeState, editing: Boolean) {
             factory = { ctx -> host.createView(ctx, id) ?: View(ctx) },
             modifier = Modifier.fillMaxSize(),
             update = { view ->
+                (view as? StackWidgetView)?.sideways = sideways
                 if (view is AppWidgetHostView && size != IntSize.Zero) {
                     view.updateAppWidgetSize(Bundle.EMPTY, listOf(SizeF(size.width / density, size.height / density)))
                 }
@@ -260,7 +264,7 @@ private fun EditedSlot(
 
 /** A glyph-sized control with a text face: the Lucide set has no arrows or plus. */
 @Composable
-private fun StepButton(face: String, label: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun StepButton(face: String, label: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         Modifier
             .size(Dimen.target)
@@ -303,14 +307,14 @@ private fun HiddenTray(hidden: List<Slot>, home: HomeState) {
     }
 }
 
-/** What replaces the pins, dock and search bar while Home is being edited. */
+/** What replaces the pins, dock and search bar while Home is being edited; on an extra page ([page]) it adds to that page. */
 @Composable
-fun EditBar(home: HomeState, onTune: () -> Unit) {
+fun EditBar(home: HomeState, page: Int?, onTune: () -> Unit) {
     val gap = Dimen.space2
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(gap)) {
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-            Pill(stringResource(R.string.edit_add_widget), Modifier.weight(1f)) { home.picker = Picker.Widgets }
-            Pill(stringResource(R.string.edit_add_app), Modifier.weight(1f)) { home.picker = Picker.Apps }
+            Pill(stringResource(R.string.edit_add_widget), Modifier.weight(1f)) { home.openPicker(Picker.Widgets, page) }
+            Pill(stringResource(R.string.edit_add_app), Modifier.weight(1f)) { home.openPicker(Picker.Apps, page) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             Pill(stringResource(R.string.tune), Modifier.weight(1f), onClick = onTune)
@@ -320,7 +324,7 @@ fun EditBar(home: HomeState, onTune: () -> Unit) {
 }
 
 @Composable
-private fun Pill(text: String, modifier: Modifier, accent: Boolean = false, onClick: () -> Unit) {
+internal fun Pill(text: String, modifier: Modifier, accent: Boolean = false, onClick: () -> Unit) {
     Box(
         modifier
             .heightIn(min = Dimen.tile)

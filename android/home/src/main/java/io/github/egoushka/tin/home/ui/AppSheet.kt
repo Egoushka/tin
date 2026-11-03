@@ -36,6 +36,8 @@ import io.github.egoushka.tin.home.apps.AppShortcut
 import io.github.egoushka.tin.home.apps.DockSlots
 import io.github.egoushka.tin.home.layout.PinStore
 import io.github.egoushka.tin.home.layout.pinToHome
+import io.github.egoushka.tin.home.pages.PageActions
+import io.github.egoushka.tin.home.pages.PageChooser
 import io.github.egoushka.tin.home.layout.unpinFromHome
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.LocalTune
@@ -59,11 +61,13 @@ fun AppSheet(
     onReplace: () -> Unit,
     onHide: () -> Unit,
     onClose: () -> Unit,
+    pages: PageActions? = null,
 ) {
     val tune = LocalTune.current
     val context = LocalContext.current
     val shortcuts by produceState(emptyList<AppShortcut>(), app.key) { value = apps.shortcuts(app) }
     var choosing by remember { mutableStateOf(false) }
+    var pageFor by remember { mutableStateOf<PageChoice?>(null) }
     SheetFrame(tune, onClose) {
         Row(Modifier.padding(start = Dimen.space3), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(Dimen.tile).glass(CircleShape), contentAlignment = Alignment.Center) {
@@ -75,12 +79,32 @@ fun AppSheet(
         }
 
         shortcuts.forEach { s ->
-            SheetRow("arrow-up-right", s.label) { apps.startShortcut(app, s); onClose() }
+            val toPage: (@Composable () -> Unit)? =
+                if (pages != null && pages.place == null) ({ IconButton("pin", stringResource(R.string.page_shortcut_add, s.label)) { pageFor = PageChoice.Shortcut(s) } })
+                else null
+            SheetRow("arrow-up-right", s.label, toPage) { apps.startShortcut(app, s); onClose() }
+        }
+
+        if (pages != null) {
+            val choice = pageFor
+            val place = pages.place
+            when {
+                choice is PageChoice.Shortcut -> PageChooser(pages.count, null, allowNew = true) { pages.addShortcut(choice.shortcut, it); onClose() }
+                choice == PageChoice.Add -> PageChooser(pages.count, null, allowNew = true) { pages.addApp(it); onClose() }
+                choice == PageChoice.Move && place != null -> PageChooser(pages.count, place.page, allowNew = false) { it?.let(pages.move); onClose() }
+                place == null -> SheetRow("grid", stringResource(R.string.page_add_to)) { pageFor = PageChoice.Add }
+                else -> {
+                    if (pages.count > 1) SheetRow("grid", stringResource(R.string.page_move_menu)) { pageFor = PageChoice.Move }
+                    if (pages.canEarlier) SheetRow("prev", stringResource(R.string.page_earlier)) { pages.step(-1); onClose() }
+                    if (pages.canLater) SheetRow("next", stringResource(R.string.page_later)) { pages.step(1); onClose() }
+                    SheetRow("x", stringResource(R.string.page_item_remove)) { pages.remove(); onClose() }
+                }
+            }
         }
 
         SheetRow("info", stringResource(R.string.app_info)) { apps.appInfo(app); onClose() }
         when {
-            dockSlot != null -> SheetRow("pin", stringResource(R.string.app_replace), onReplace)
+            dockSlot != null -> SheetRow("pin", stringResource(R.string.app_replace), onClick = onReplace)
             choosing -> SlotChooser(apps, dock, onPin)
             else -> SheetRow("pin", stringResource(R.string.app_pin)) { choosing = true }
         }
@@ -88,9 +112,16 @@ fun AppSheet(
             app.key in pins -> SheetRow("home", stringResource(R.string.app_unpin_home)) { unpinFromHome(context, app); onClose() }
             pins.size < PinStore.MAX -> SheetRow("home", stringResource(R.string.app_pin_home)) { pinToHome(context, app); onClose() }
         }
-        SheetRow("eye-off", stringResource(R.string.app_hide), onHide)
+        SheetRow("eye-off", stringResource(R.string.app_hide), onClick = onHide)
         SheetRow("trash-2", stringResource(R.string.app_uninstall)) { apps.uninstall(app); onClose() }
     }
+}
+
+/** What the page rows of the menu are choosing a page for. */
+private sealed interface PageChoice {
+    data object Add : PageChoice
+    data object Move : PageChoice
+    data class Shortcut(val shortcut: AppShortcut) : PageChoice
 }
 
 /** Five circles in the dock's order, each showing what sits there now; a tap puts the app in that slot. */
