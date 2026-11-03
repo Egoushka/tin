@@ -35,7 +35,7 @@ import io.github.egoushka.tin.home.theme.LocalTune
 import io.github.egoushka.tin.home.theme.Lucide
 import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
-import io.github.egoushka.tin.home.theme.glass
+import io.github.egoushka.tin.home.theme.sheetPanel
 import io.github.egoushka.tin.home.tune.Tune
 
 /** The glass sheet of Tune, for the app menu and the hidden list: a tap on the scrim closes it. */
@@ -54,7 +54,7 @@ fun SheetFrame(tune: Tune, onClose: () -> Unit, content: @Composable ColumnScope
                 .navigationBarsPadding()
                 .padding(Dimen.gutter)
                 .fillMaxWidth()
-                .glass(RoundedCornerShape(Dimen.radiusCard))
+                .sheetPanel(RoundedCornerShape(Dimen.radiusCard))
                 .clickable(remember { MutableInteractionSource() }, indication = null) {}
                 .verticalScroll(rememberScrollState())
                 .padding(tune.padDp.dp + Dimen.space1),

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,7 +53,7 @@ import io.github.egoushka.tin.home.theme.Attention
 import io.github.egoushka.tin.home.theme.Dimen
 import io.github.egoushka.tin.home.theme.Ng
 import io.github.egoushka.tin.home.theme.NgType
-import io.github.egoushka.tin.home.theme.glass
+import io.github.egoushka.tin.home.theme.sheetPanel
 import io.github.egoushka.tin.home.tune.Preset
 import io.github.egoushka.tin.home.tune.Tune
 import kotlin.math.roundToInt
@@ -74,10 +75,11 @@ fun TuneSheet(tune: Tune, onChange: (Tune) -> Unit, onEditHome: () -> Unit, hidd
         )
         Column(
             Modifier
+                .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(Dimen.gutter)
                 .fillMaxWidth()
-                .glass(RoundedCornerShape(Dimen.radiusCard))
+                .sheetPanel(RoundedCornerShape(Dimen.radiusCard))
                 // Takes the tap so it does not fall through to the scrim; unlike clickable it adds no node.
                 .pointerInput(Unit) { detectTapGestures { } }
                 .verticalScroll(rememberScrollState())

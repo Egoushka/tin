@@ -61,3 +61,12 @@ The pins row already sits above the dock, but nothing is pinned on a new install
 | B10 | While the Homelab endpoint is unreachable, Home shows no Homelab card | `DeadCardsTest` | pass |
 | B11 | With the calendar readable and no event left today, Home shows no Today card | `DeadCardsTest` | pass |
 | B12 | A tap on the Alarm card starts the alarm list | `DeadCardsTest` | pass |
+
+## Layer 5: opaque sheets
+
+Tune, Hidden apps, Gestures and the pickers (Add widget, Choose an app) paint their panel with the frosted room at the tint knob's alpha, so the page behind shows through the text (F7). Their panel is now `Ng.surface` at full alpha, with the same edge. Tune is also pushed below the status bar, like the other sheets.
+
+| ID | Claim | Test | Result |
+|---|---|---|---|
+| B13 | Over a white backdrop, the top padding of the Tune, Hidden apps, Gestures and picker panels is exactly `Ng.surface`: no backdrop colour reaches the panel | `SheetOpaqueTest` | pass |
+| B14 | With a 48 dp status bar, the Tune panel starts at or below it | `SheetOpaqueTest` | pass |

@@ -4,6 +4,8 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect as PlatformRenderEffect
 import android.graphics.Shader
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -164,6 +166,10 @@ fun colorMix(a: Color, p: Float, b: Color): Color {
 
 /** Linear blend of two colours, premultiplied like CSS: `lerpColor(a, b, t)` is `colorMix(b, t, a)`. */
 fun lerpColor(a: Color, b: Color, t: Float) = colorMix(b, t, a)
+
+/** A sheet's panel: `surface` at full alpha with the glass edge, so the page behind never shows through its text. */
+fun Modifier.sheetPanel(shape: Shape): Modifier =
+    this.background(Ng.surface, shape).border(GlassPaint.BORDER_WIDTH.dp, Ng.edge, shape)
 
 /**
  * Night glass without a card's light: the frosted room behind, `surface` at the tint knob's alpha, a 1 dp edge and the
