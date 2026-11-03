@@ -344,6 +344,8 @@ fun AlarmCard(alarm: AlarmSource) {
             Spacer(Modifier.width(Dimen.space3))
             // Measured first: at font scale 2.0 a weighted label got the leftovers and broke mid-word ("Alar|m").
             Text(stringResource(R.string.alarm), style = NgType.body)
+            // The fixed gap keeps the label off the time when the weighted spacer gets 0 px (2.0).
+            Spacer(Modifier.width(Dimen.space2))
             Spacer(Modifier.weight(1f))
             Text(at, style = NgType.title)
             if (relative != null) {
