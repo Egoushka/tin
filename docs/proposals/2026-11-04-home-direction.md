@@ -5,6 +5,12 @@
 the phone-shell dataset (`personal/research`, `phone-shell/facts.jsonl`, ids `FA-…`), and a web teardown of 19
 launchers done today (sources linked inline).
 
+## Outcome (2026-11-04, Yehor)
+
+None of the options below as written. Yehor chose to keep Tin Home and put Kvaesitso's engine under it: "take their cores and make
+our own implementation on top of that", "Yes, inside tin". The plan is in `docs/specs/2026-11-04-home-on-kvaesitso.md` and the
+harvest map. The rest of this page is the proposal as it stood before that answer.
+
 ## Bottom line
 
 Don't build the frankenstein as a new launcher. You're right that it would never end, and Home is already a
