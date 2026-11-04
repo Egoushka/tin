@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The engine's default grid width. Upstream defines it in its app module, which Home doesn't include, and the
+         engine's own values start at 400dp: a narrower screen has no value and the engine's default settings throw
+         Resources.NotFoundException. -->
+    <integer name="config_columnCount">4</integer>
+</resources>
