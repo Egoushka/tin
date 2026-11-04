@@ -72,7 +72,7 @@ in by later commits.
 | S0.3 | Every launchable app of every profile shows once in the drawer, read from `:data:applications` | EMU | `EngineAppListTest` | drawer set equals `LauncherApps.getActivityList` over all profiles | |
 | S0.4 | Tin Home no longer lists apps or loads icons itself: its own app loading (`SystemApps.load`, `changes` and `icon`) and `IconRender.kt` are gone (the `AppRepository` facade keeps its name and reads the engine), and nothing in `android/home/src/main` calls `getActivityList`, `getLauncherActivityList` or `getApplicationIcon` | BUILD | `scripts/home-release-check.sh` greps | 0 hits | |
 | S0.5 | Licences: `android/home/LICENSE` is GPL-3.0, `android/kvaesitso/LICENSE.txt` is upstream's, and tin's root README names the split | BUILD | `scripts/home-release-check.sh` | all present | |
-| S0.6 | Cold start is at most 20 % slower than Tin Home before S0 (starting value, not a measurement): 20 starts each with `scripts/home-baseline.sh` | DEV | `scripts/home-dev-speed.sh --against <previous apk>` | p50 `TotalTime` ≤ 1.2 × before | |
+| S0.6 | Cold start is at most 20 % slower than Tin Home before S0 (starting value, not a measurement): 20 starts each with `scripts/home-baseline.sh` | DEV | `scripts/home-baseline.sh 20` with the slice's release APK installed, against `docs/results/2026-11-03-home-baseline.md` | p50 `TotalTime` ≤ 1.2 × before | |
 | S0.7 | The release APK size and `android/home`'s production Kotlin lines are recorded; they set M8.6's budget | BUILD | `scripts/home-release-check.sh --measure` | both numbers in the Result column | |
 
 **Stop check for slice 0:** if S0.2 can't pass without editing `android/kvaesitso` beyond the version alignment, or S0.6 still fails
