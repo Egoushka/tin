@@ -28,7 +28,7 @@ git -C "$ROOT" ls-tree -r HEAD:android/kvaesitso >"$tmp/ours"
 # diff exits 1 when the trees differ and 2 when it could not compare them; only the second stops the script.
 diff "$tmp/upstream" "$tmp/ours" >"$tmp/diff" || [ $? -eq 1 ]
 { grep '^[<>]' "$tmp/diff" || true; } | cut -f2 | sort -u >"$tmp/changed"
-grep -v '^#' "$PATCHES" | cut -f1 | sed '/^$/d' | sort -u >"$tmp/listed"
+{ grep -v '^#' "$PATCHES" || true; } | cut -f1 | sed '/^$/d' | sort -u >"$tmp/listed"
 unlisted=$(comm -23 "$tmp/changed" "$tmp/listed")
 if [ -z "$unlisted" ]; then
   pass "S0.1 android/kvaesitso is upstream ${sha:0:9} plus $(grep -c . "$tmp/listed") listed patch(es)"
