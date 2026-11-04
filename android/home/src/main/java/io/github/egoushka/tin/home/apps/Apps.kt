@@ -21,7 +21,7 @@ data class AppEntry(val label: String, val pkg: String, val cls: String, val use
     val key: String get() = "$pkg/$cls#$user"
 }
 
-/** Where apps come from; the system one is [SystemApps]. */
+/** Where apps come from; Home's is the engine's list ([EngineApps]). */
 interface AppSource {
     /** Every launchable activity in every profile, Home itself excluded. */
     fun load(): List<AppEntry>

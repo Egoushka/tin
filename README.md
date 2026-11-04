@@ -174,6 +174,13 @@ reaches 9.6% WER on all 750 Ukrainian test clips at 0.11× real time on 4 CPU th
 - [bench/results.md](bench/results.md): Parakeet vs Whisper on FLEURS uk/en, with the command that made it.
 - [AGENTS.md](AGENTS.md): build and test commands, rules for changing the code.
 
+## Licence
+
+tin is MIT ([LICENSE](LICENSE)) except two folders under GPL-3.0: [android/kvaesitso](android/kvaesitso), the
+[Kvaesitso](https://github.com/MM2-0/Kvaesitso) launcher engine vendored from upstream (patches listed in
+[android/kvaesitso.patches](android/kvaesitso.patches)), and [android/home](android/home),
+Tin Home, which is built on it ([android/home/LICENSE](android/home/LICENSE)).
+
 <!-- readme:footer:start -->
 ---
 

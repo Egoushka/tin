@@ -1,35 +1,27 @@
 package io.github.egoushka.tin.home.apps
 
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-/** The apps the system reports: [LauncherApps] for packages, a broadcast for work-profile switches. */
-class SystemApps(private val context: Context) : AppSource {
+/** What Home asks of [LauncherApps] itself: launch, details, uninstall and shortcuts. The list is the engine's ([EngineApps]). */
+class SystemApps(private val context: Context) {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
     private val users = context.getSystemService(UserManager::class.java)
     private val own = Process.myUserHandle()
@@ -40,43 +32,6 @@ class SystemApps(private val context: Context) : AppSource {
         users.userProfiles.firstOrNull { users.getSerialNumberForUser(it) == serial } ?: own
 
     fun userOf(app: AppEntry): UserHandle = handle(app.user)
-
-    override fun load(): List<AppEntry> = users.userProfiles.flatMap { user ->
-        val serial = users.getSerialNumberForUser(user)
-        launcherApps.getActivityList(null, user)
-            .filter { it.componentName.packageName != context.packageName }
-            .map { AppEntry(it.label.toString(), it.componentName.packageName, it.componentName.className, serial) }
-    }
-
-    override fun changes(): Flow<Set<String>> = callbackFlow {
-        val callback = object : LauncherApps.Callback() {
-            override fun onPackageRemoved(p: String?, u: UserHandle?) { trySend(setOfNotNull(p)) }
-            override fun onPackageAdded(p: String?, u: UserHandle?) { trySend(setOfNotNull(p)) }
-            override fun onPackageChanged(p: String?, u: UserHandle?) { trySend(setOfNotNull(p)) }
-            override fun onPackagesAvailable(p: Array<out String>?, u: UserHandle?, r: Boolean) { trySend(p.orEmpty().toSet()) }
-            override fun onPackagesUnavailable(p: Array<out String>?, u: UserHandle?, r: Boolean) { trySend(p.orEmpty().toSet()) }
-        }
-        // Switching a work profile on or off adds or removes every one of its apps without a package callback.
-        val profiles = object : BroadcastReceiver() {
-            override fun onReceive(c: Context?, i: Intent?) { trySend(emptySet()) }
-        }
-        launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
-        context.registerReceiver(
-            profiles,
-            IntentFilter().apply {
-                addAction(Intent.ACTION_MANAGED_PROFILE_ADDED)
-                addAction(Intent.ACTION_MANAGED_PROFILE_REMOVED)
-                addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
-                addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
-            },
-            Context.RECEIVER_NOT_EXPORTED,
-        )
-        trySend(emptySet())
-        awaitClose {
-            launcherApps.unregisterCallback(callback)
-            context.unregisterReceiver(profiles)
-        }
-    }.buffer(Channel.UNLIMITED)
 
     fun launch(app: AppEntry) {
         launcherApps.startMainActivity(ComponentName(app.pkg, app.cls), userOf(app), null, null)
@@ -121,9 +76,6 @@ class SystemApps(private val context: Context) : AppSource {
         launcherApps.pinShortcuts(pkg, ids.toList(), handle(user))
     }
 
-    fun icon(app: AppEntry): android.graphics.drawable.Drawable? =
-        launcherApps.resolveActivity(Intent(Intent.ACTION_MAIN).setComponent(ComponentName(app.pkg, app.cls)), userOf(app))?.getIcon(0)
-
     private fun raw(s: ShortcutInfo) = RawShortcut(
         id = s.id,
         label = (s.shortLabel ?: s.longLabel)?.toString(),
@@ -139,7 +91,8 @@ class SystemApps(private val context: Context) : AppSource {
 /** What the UI talks to: the live list, the dock, hide, icons and the long-press actions. */
 open class AppRepository(context: Context, private val prefs: AppPrefs) {
     private val system = SystemApps(context)
-    private val model = AppList(system, prefs.saved.map { it.hidden }.distinctUntilChanged())
+    private val engine = EngineApps(context)
+    private val model = AppList(engine, prefs.saved.map { it.hidden }.distinctUntilChanged())
 
     /** Everything, hidden included, for the dock and the hidden list. */
     val state: StateFlow<Apps> = model.state
@@ -185,11 +138,10 @@ open class AppRepository(context: Context, private val prefs: AppPrefs) {
      * The themed monochrome icon drawn in [tint] (Icons card: third-party apps in `ink` on the glass tile); apps
      * without one keep their own icon, inset to the same optical size.
      */
-    fun icon(app: AppEntry, px: Int, tint: Int): Bitmap? {
+    suspend fun icon(app: AppEntry, px: Int, tint: Int): Bitmap? {
         val key = cacheKey(app, px)
         icons.get(key)?.let { return it }
-        val drawable = system.icon(app) ?: return null
-        val bmp = renderIcon(drawable, px, tint)
+        val bmp = engine.icon(app, px, tint) ?: return null
         icons.put(key, bmp)
         return bmp
     }

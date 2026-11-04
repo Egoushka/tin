@@ -9,7 +9,7 @@ targetSdk = "36"
 
 pluginSdk = "2.3.0"
 
-android-gradle-plugin = "9.3.1"
+android-gradle-plugin = "9.4.1"
 ksp-gradle-plugin = "2.3.4"
 
 kotlin = "2.4.10"
