@@ -58,6 +58,7 @@
     </queries>
 
     <application
+        android:name=".HomeApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config"

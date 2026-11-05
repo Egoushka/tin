@@ -76,6 +76,9 @@ jobs:
       - name: Module tests and Home release build
         working-directory: android
         run: ./gradlew --no-daemon :speech:testDebugUnitTest :home:testDebugUnitTest :home:assembleRelease
+      # Home on the Kvaesitso engine: the vendored tree, the licence split, and the APK size and code size it started at.
+      - name: Home engine checks
+        run: scripts/home-release-check.sh --measure
       - name: Check Home's signer
         id: signer
         run: |

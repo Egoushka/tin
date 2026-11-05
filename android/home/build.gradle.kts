@@ -15,7 +15,10 @@ val gitSha = (git("rev-parse", "--short=7", "HEAD") ?: "dev") +
 
 android {
     namespace = "io.github.egoushka.tin.home"
-    compileSdk = 37
+    // The engine's modules compile against 37.1 and ask the same of the app that uses them.
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
 
     defaultConfig {
         applicationId = "io.github.egoushka.tin.home"
@@ -97,6 +100,16 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation(project(":voice-ipc"))
+
+    // Kvaesitso's engine (settings.gradle.kts maps these to the vendored projects): apps and icons, and the Koin
+    // modules their bindings reach.
+    listOf(
+        "core-base", "core-permissions", "core-preferences", "core-profiles", "data-applications",
+        "data-customattrs", "data-database", "data-i18n", "data-searchable", "services-icons",
+    ).forEach { implementation("de.mm20.launcher2:$it") }
+    implementation("io.insert-koin:koin-android:4.2.2")
+    // The engine's app list is an ImmutableList, which its modules keep to themselves.
+    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517") // android.jar's org.json is a stub that returns defaults in unit tests

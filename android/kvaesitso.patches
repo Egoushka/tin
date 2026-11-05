@@ -1,0 +1,4 @@
+# Every edit to android/kvaesitso beyond upstream Kvaesitso v1.41.0 (328073f38f8472118a377f69cce34a2c86372ab9).
+# One line each: path, the change, why. Spec check S0.1 diffs the subtree against upstream and allows only these paths.
+# Re-apply after each `git subtree pull`.
+gradle/libs.versions.toml	android-gradle-plugin 9.3.1 -> 9.4.1	AGP refuses two versions in one composite build; tin's is 9.4.1
