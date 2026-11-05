@@ -28,6 +28,7 @@ android {
         versionCode = commitCount
         versionName = "0.1.$commitCount"
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -117,4 +118,8 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.17")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // On an emulator or the phone: `:home:connectedCheck` (docs/specs/2026-11-04-home-on-kvaesitso.md, the EMU checks).
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
 }
