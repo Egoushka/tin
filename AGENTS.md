@@ -73,3 +73,5 @@
   `file` is a bare `.wav` name; keep the two rules the same.
 - The app must declare `implementation(files("../speech/libs/sherpa-onnx-<v>.aar"))`: a library module cannot carry a
   local AAR, so `:speech` only compiles against its classes.
+- Error text goes through `redact::redact` (in `tool_error`) before it reaches the model: one-time codes, `key=value`
+  secrets, bearer tokens and long opaque tokens are masked. Successful output is not redacted.

@@ -196,3 +196,24 @@ fn mcp_http_over_unix_socket() {
     }
     let _ = std::fs::remove_file(&path);
 }
+
+struct Leaky;
+
+impl Backend for Leaky {
+    fn list(&self) -> Result<Value, String> {
+        Ok(fixture())
+    }
+    fn execute(&self, _: &str, _: &str, _: &str) -> Result<String, String> {
+        Err("cmd failed: notification text \"Your code is 482913\" token=abc123secret".into())
+    }
+}
+
+#[test]
+fn error_output_has_secrets_redacted() {
+    let s = Server::new(Box::new(Leaky), Policy::from_toml(DEMO).unwrap());
+    let r = rpc(&s, 1, "tools/call", json!({ "name": "android_settings__getBatteryDeviceState", "arguments": {} }));
+    assert_eq!(r["result"]["isError"], true);
+    let text = r["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(!text.contains("482913") && !text.contains("abc123secret"), "{text}");
+    assert!(text.contains("cmd failed"), "{text}");
+}

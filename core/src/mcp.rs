@@ -310,5 +310,5 @@ impl Server {
 }
 
 fn tool_error(text: &str) -> Value {
-    json!({ "content": [{ "type": "text", "text": text }], "isError": true })
+    json!({ "content": [{ "type": "text", "text": crate::redact::redact(text) }], "isError": true })
 }
