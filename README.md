@@ -45,10 +45,11 @@ computer to call those same typed functions on my own phone, with a hard rule th
 - Runs as the shell user (uid 2000, the user `adb shell` runs as) under [Shizuku](https://github.com/RikkaApps/Shizuku),
   so it keeps serving after the cable is pulled, and restarts itself if it dies.
 - Answers only the shell user and root. Apps on the phone cannot connect, so no app can borrow its access.
-- Serves system tools next to the AppFunctions, run as the shell user: `system__notifications`, `system__usage`,
+- Serves system tools next to the AppFunctions, run as the shell user: `system__notifications` (banking apps' notifications are left out and counted),
+  `system__usage`,
   `system__foreground_app`, `system__screen_text` (a `uiautomator` dump, refused while a banking app is on screen),
   `system__battery`, `system__connectivity`, and the write verbs `system__tap`, `swipe`, `type_text`, `key`, `launch`
-  and `settings_put`. Arguments are checked before anything runs.
+  (refused for banking apps) and `settings_put`. Arguments are checked before anything runs.
 - Holds every call that changes state (any write verb, any AppFunction the policy does not mark `read_only`) until
   the phone's owner taps Run in the [approvals](https://github.com/Egoushka/approvals) app. The decision comes back
   signed (HMAC-SHA256) to a listener that serves nothing else. Without an approvals server such calls are refused.
