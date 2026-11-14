@@ -621,23 +621,26 @@ fn screen_text_calls_use_distinct_dump_files() {
 #[test]
 fn screen_text_removes_the_dump_when_reading_fails() {
     #[derive(Clone)]
-    struct NoCat(Phone);
-    impl Backend for NoCat {
+    struct Failing(Phone, &'static str);
+    impl Backend for Failing {
         fn execute(&self, a: &str, b: &str, c: &str) -> Result<String, String> {
             self.0.execute(a, b, c)
         }
         fn shell(&self, program: &str, args: &[String]) -> Result<String, String> {
-            if program == "cat" {
-                return Err("cat: no such file".into());
+            if program == self.1 {
+                return Err(format!("{program}: failed"));
             }
             self.0.shell(program, args)
         }
     }
-    let phone = Phone::default();
-    let s = Server::new(Box::new(NoCat(phone.clone())), Policy::from_toml(ALL_SYSTEM).unwrap());
-    let r = call(&s, "system__screen_text", json!({}));
-    assert_eq!(r["isError"], true);
-    assert!(phone.calls.lock().unwrap().iter().any(|c| c[0] == "rm"), "cleanup runs on error");
+    // uiautomator can leave a partial dump before it fails, so cleanup must run for it as well as for cat.
+    for failing in ["uiautomator", "cat"] {
+        let phone = Phone::default();
+        let s = Server::new(Box::new(Failing(phone.clone(), failing)), Policy::from_toml(ALL_SYSTEM).unwrap());
+        let r = call(&s, "system__screen_text", json!({}));
+        assert_eq!(r["isError"], true, "{failing}");
+        assert!(phone.calls.lock().unwrap().iter().any(|c| c[0] == "rm"), "cleanup runs when {failing} fails");
+    }
 }
 
 #[test]
