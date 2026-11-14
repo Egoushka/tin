@@ -165,6 +165,32 @@ pub fn check_key(key: &str, path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// What the `[approvals]` table gives: a working gate, or the reason there is none. A short or unreadable key
+/// turns the gate off rather than stopping tin: reads keep working and writes are refused, as with no table.
+pub enum Built {
+    On(Gate),
+    Off(String),
+}
+
+/// Builds the gate from the policy's `[approvals]` table; the token and key are read from their files. A bad
+/// token or URL is an error (tin does not start); a short or unreadable key gives `Built::Off` with the reason,
+/// which names the file and the length, never the key.
+pub fn build(a: &crate::policy::Approvals) -> Result<Built, String> {
+    let read = |path: &str| std::fs::read_to_string(path).map(|s| s.trim().to_string()).map_err(|e| format!("{path}: {e}"));
+    let approver = HttpApprover::new(&a.url, &read(&a.token_file)?)?;
+    let cfg = GateConfig {
+        source: a.source.clone(),
+        callback: format!("{}decision", a.callback),
+        wait: Duration::from_secs(a.wait_secs),
+        ttl: Duration::from_secs(a.ttl_secs),
+    };
+    let key = match read(&a.key_file).and_then(|k| check_key(&k, &a.key_file).map(|()| k)) {
+        Ok(k) => k,
+        Err(reason) => return Ok(Built::Off(reason)),
+    };
+    Ok(Built::On(Gate::new(Box::new(approver), key.as_bytes(), cfg)))
+}
+
 pub struct Gate {
     approver: Box<dyn Approver>,
     key: Vec<u8>,
