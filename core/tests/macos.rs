@@ -2,19 +2,20 @@
 //! backend answers `ps`, `sysctl`, `vm_stat` and `launchctl` from synthetic outputs, and a fake approvals server records
 //! items. Every test name starts with `macos_`.
 
+mod common;
+
+use common::{Inbox, call, held, text};
 use serde_json::{Value, json};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tin_core::backend::Backend;
-use tin_core::gate::{self, Approver, Gate, GateConfig};
 use tin_core::macos::{self, MacBackend, VERBS};
 use tin_core::mcp::{Server, WAIT_TOOL};
 use tin_core::metadata::Function;
 use tin_core::policy::{Decision, Policy};
 use tin_core::system::Verb;
 
-const KEY: &[u8] = b"test-approval-key";
 const BUNDLE: &str = "com.example.Counter";
 
 fn synthetic(name: &str) -> String {
@@ -79,56 +80,11 @@ impl Backend for Mac {
     }
 }
 
-#[derive(Clone, Default)]
-struct Inbox {
-    items: Arc<Mutex<Vec<Value>>>,
-}
-
-impl Approver for Inbox {
-    fn put(&self, _: &str, item: &Value) -> Result<(), String> {
-        self.items.lock().unwrap().push(item.clone());
-        Ok(())
-    }
-    fn delete(&self, _: &str) -> Result<(), String> {
-        Ok(())
-    }
-}
-
-impl Inbox {
-    fn nth(&self, n: usize) -> Value {
-        let start = Instant::now();
-        loop {
-            if let Some(i) = self.items.lock().unwrap().get(n) {
-                return i.clone();
-            }
-            assert!(start.elapsed() < Duration::from_secs(5), "no item {n} arrived");
-            std::thread::sleep(Duration::from_millis(5));
-        }
-    }
-}
-
 const ALL: &str = "[[allow]]\npackage = \"system\"\nfunction = \"*\"\n\n[[allow]]\npackage = \"com.example.Counter\"\nfunction = \"GetCountIntent\"\nread_only = true\n\n[[allow]]\npackage = \"com.example.Counter\"\nfunction = \"OpenThingIntent\"\n";
 
 fn gated(mac: Mac) -> (Arc<Server>, Mac, Inbox) {
-    let inbox = Inbox::default();
-    let cfg = GateConfig {
-        source: "tin".into(),
-        callback: "https://approvals.example/cb/tin/decision".into(),
-        wait: Duration::from_secs(5),
-        ttl: Duration::from_secs(60),
-    };
-    let gate = Arc::new(Gate::new(Box::new(inbox.clone()), KEY, cfg));
-    let server = Server::new(Box::new(mac.clone()), Policy::from_toml(ALL).unwrap()).with_gate(gate);
-    (Arc::new(server), mac, inbox)
-}
-
-fn call(s: &Server, name: &str, args: Value) -> Value {
-    let r = s.handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { "name": name, "arguments": args } })).unwrap();
-    r["result"].clone()
-}
-
-fn text(result: &Value) -> &str {
-    result["content"][0]["text"].as_str().unwrap()
+    let (server, inbox) = common::gated_server(Box::new(mac.clone()), ALL, Duration::from_secs(5), Duration::from_secs(60));
+    (server, mac, inbox)
 }
 
 fn data(result: &Value) -> Value {
@@ -137,16 +93,7 @@ fn data(result: &Value) -> Value {
 }
 
 fn signed(id: &str, action: &str) -> Vec<u8> {
-    let (decision, at) = ("01JB0000000000000000000009", "2026-11-02T12:00:00.000Z");
-    let sig = gate::sign(KEY, decision, id, action, at, &json!({}));
-    json!({ "decision": decision, "id": id, "action": action, "edited": {}, "at": at, "sig": sig }).to_string().into_bytes()
-}
-
-/// A held call on another thread, the item it opened, and the caller to join after a decision.
-fn held(s: &Arc<Server>, inbox: &Inbox, tool: &'static str, args: Value) -> (String, std::thread::JoinHandle<Value>) {
-    let s2 = s.clone();
-    let caller = std::thread::spawn(move || call(&s2, tool, args));
-    (inbox.nth(0)["id"].as_str().unwrap().to_string(), caller)
+    common::signed_at(id, action, "2026-11-02T12:00:00.000Z")
 }
 
 // M1: the App Intents catalog.

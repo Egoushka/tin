@@ -1,16 +1,17 @@
 //! Acceptance checks S1–S8 from docs/specs/2026-11-01-phone-mcp-system-tools.md, run off the phone: a fake backend
 //! answers shell programs from synthetic dumps, and a fake approvals server records items.
 
+mod common;
+
+use common::{Inbox, KEY, call, text};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tin_core::backend::Backend;
-use tin_core::gate::{self, Approver, Gate, GateConfig, Outcome};
+use tin_core::gate::{self, Gate, GateConfig, Outcome};
 use tin_core::mcp::{Server, WAIT_TOOL};
 use tin_core::policy::{Decision, Policy, SYSTEM, Subject};
 use tin_core::system::{self, VERBS};
-
-const KEY: &[u8] = b"test-approval-key";
 
 fn synthetic(name: &str) -> String {
     std::fs::read_to_string(format!("{}/tests/fixtures/synthetic/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
@@ -62,65 +63,20 @@ impl Backend for Phone {
     }
 }
 
-#[derive(Clone, Default)]
-struct Inbox {
-    items: Arc<Mutex<Vec<Value>>>,
-    withdrawn: Arc<Mutex<Vec<String>>>,
-}
-
-impl Approver for Inbox {
-    fn put(&self, _: &str, item: &Value) -> Result<(), String> {
-        self.items.lock().unwrap().push(item.clone());
-        Ok(())
-    }
-    fn delete(&self, id: &str) -> Result<(), String> {
-        self.withdrawn.lock().unwrap().push(id.to_string());
-        Ok(())
-    }
-}
-
-impl Inbox {
-    /// Waits for the n-th item to arrive (the call that opens it runs on another thread).
-    fn nth(&self, n: usize) -> Value {
-        let start = Instant::now();
-        loop {
-            if let Some(i) = self.items.lock().unwrap().get(n) {
-                return i.clone();
-            }
-            assert!(start.elapsed() < Duration::from_secs(5), "no item {n} arrived");
-            std::thread::sleep(Duration::from_millis(5));
-        }
-    }
-}
-
 const ALL_SYSTEM: &str = "[[allow]]\npackage = \"system\"\nfunction = \"*\"\n";
 
 fn gated(wait: Duration, ttl: Duration) -> (Arc<Server>, Phone, Inbox) {
     let phone = Phone::default();
-    let inbox = Inbox::default();
-    let cfg = GateConfig { source: "tin".into(), callback: "https://approvals.example/cb/tin/decision".into(), wait, ttl };
-    let gate = Arc::new(Gate::new(Box::new(inbox.clone()), KEY, cfg));
-    let server = Server::new(Box::new(phone.clone()), Policy::from_toml(ALL_SYSTEM).unwrap()).with_gate(gate);
-    (Arc::new(server), phone, inbox)
+    let (server, inbox) = common::gated_server(Box::new(phone.clone()), ALL_SYSTEM, wait, ttl);
+    (server, phone, inbox)
+}
+
+fn signed(id: &str, action: &str) -> Vec<u8> {
+    common::signed_at(id, action, "2026-11-01T12:00:00.000Z")
 }
 
 fn ungated(policy: &str, phone: Phone) -> Server {
     Server::new(Box::new(phone), Policy::from_toml(policy).unwrap())
-}
-
-fn call(s: &Server, name: &str, args: Value) -> Value {
-    let r = s.handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { "name": name, "arguments": args } })).unwrap();
-    r["result"].clone()
-}
-
-fn text(result: &Value) -> &str {
-    result["content"][0]["text"].as_str().unwrap()
-}
-
-fn signed(id: &str, action: &str) -> Vec<u8> {
-    let (decision, at) = ("01JB0000000000000000000009", "2026-11-01T12:00:00.000Z");
-    let sig = gate::sign(KEY, decision, id, action, at, &json!({}));
-    json!({ "decision": decision, "id": id, "action": action, "edited": {}, "at": at, "sig": sig }).to_string().into_bytes()
 }
 
 // S1: the registry.
