@@ -139,7 +139,9 @@ mod android {
             }
             "launch" => {
                 let p = package(args, "package")?;
-                refuse_money(&p)?;
+                if MONEY_PACKAGES.contains(&p.as_str()) {
+                    return Err(format!("refused: {p} is a banking app, and tin does not open banking apps"));
+                }
                 Ok(a(&["monkey", "-p", &p, "-c", "android.intent.category.LAUNCHER", "1"]))
             }
             "settings_put" => {

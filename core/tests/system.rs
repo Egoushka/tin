@@ -673,7 +673,7 @@ fn argv_exact() {
 fn launch_refuses_banking_apps() {
     for p in tin_core::policy::MONEY_PACKAGES {
         let e = argv("launch", json!({ "package": p })).unwrap_err();
-        assert!(e.contains("banking app"), "{p}: {e}");
+        assert!(e.contains("does not open banking apps"), "{p}: {e}");
     }
 }
 
