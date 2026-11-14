@@ -32,8 +32,8 @@ data class Board(val layout: HomeLayout = HomeLayout(), val pages: Pages = Pages
         return Board(layout.addWidget(appWidgetId, rows), pages.remove(page, id))
     }
 
-    /** Drops widgets the host no longer knows, from both. */
-    fun reconcile(live: Set<Int>): Board = Board(layout.reconcile(live), pages.reconcile(live))
+    /** Drops widgets the host no longer knows, from both; a null (the host could not be asked) changes nothing. */
+    fun reconcile(live: Set<Int>?): Board = if (live == null) this else Board(layout.reconcile(live), pages.reconcile(live))
 }
 
 /** The extra pages, in Tune's DataStore under a key of their own (`home.pages`). */

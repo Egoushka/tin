@@ -8,6 +8,7 @@ import io.github.egoushka.tin.home.pages.Board
 import io.github.egoushka.tin.home.pages.PageItem
 import io.github.egoushka.tin.home.pages.Pages
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class WidgetsInUseTest {
@@ -43,5 +44,25 @@ class WidgetsInUseTest {
         assertEquals(emptySet<Int>(), kept.layout.widgetIds)
         assertEquals(setOf(2), kept.pages.widgetIds)
         assertEquals(emptySet<Int>(), board.reconcile(emptySet()).widgetIds)
+    }
+
+    private class Unreachable : WidgetBackend {
+        val deleted = mutableListOf<Int>()
+        override fun allocate(): Int? = null
+        override fun delete(id: Int) { deleted += id }
+        override fun liveIds(): Set<Int>? = null
+        override fun bind(id: Int, provider: ComponentName) = true
+        override fun needsConfigure(id: Int) = false
+    }
+
+    @Test fun `a host that cannot be asked leaves the saved board untouched`() {
+        assertSame(board, board.reconcile(null))
+        assertEquals(setOf(1, 2), board.reconcile(Unreachable().liveIds()).widgetIds)
+    }
+
+    @Test fun `a host that cannot be asked gets no sweep deletes`() {
+        val host = Unreachable()
+        assertEquals(emptySet<Int>(), WidgetLifecycle(host).sweep(emptySet()))
+        assertEquals(emptyList<Int>(), host.deleted)
     }
 }

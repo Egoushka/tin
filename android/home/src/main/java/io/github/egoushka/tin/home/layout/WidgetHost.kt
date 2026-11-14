@@ -145,7 +145,7 @@ class WidgetHost(private val activity: Activity) : WidgetBackend {
 
     override fun delete(id: Int) { runCatching { host.deleteAppWidgetId(id) } }
 
-    override fun liveIds(): Set<Int> = runCatching { host.appWidgetIds.toSet() }.getOrDefault(emptySet())
+    override fun liveIds(): Set<Int>? = runCatching { host.appWidgetIds.toSet() }.getOrNull()
 
     override fun bind(id: Int, provider: ComponentName): Boolean =
         runCatching { manager.bindAppWidgetIdIfAllowed(id, provider) }.getOrDefault(false)
