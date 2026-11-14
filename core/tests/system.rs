@@ -171,7 +171,7 @@ fn registry_empty_policy_lists_nothing_and_errors_like_before() {
 #[test]
 fn parse_notifications() {
     let n = system::parse_notifications(&synthetic("notification.txt"));
-    assert_eq!(n.len(), 3);
+    assert_eq!(n.len(), 4);
     assert_eq!(n[0]["package"], "com.whatsapp");
     assert_eq!(n[0]["key"], "0|com.whatsapp|1|null|10234");
     assert_eq!(n[0]["channel"], "individual_chat_defaults_3");
@@ -247,6 +247,7 @@ fn parse_read_tools_end_to_end() {
     let s = ungated(ALL_SYSTEM, phone.clone());
     let n: Value = serde_json::from_str(text(&call(&s, "system__notifications", json!({ "package": "com.spotify.music" })))).unwrap();
     assert_eq!(n["notifications"].as_array().unwrap().len(), 1);
+    assert_eq!(n["banking_apps_omitted"], 0);
     let c: Value = serde_json::from_str(text(&call(&s, "system__connectivity", json!({})))).unwrap();
     assert_eq!(c["airplane_mode"], false);
     let u: Value = serde_json::from_str(text(&call(&s, "system__usage", json!({ "limit": 1 })))).unwrap();
@@ -261,6 +262,19 @@ fn approval_key_must_be_32_bytes() {
         assert!(k.trim().is_empty() || !e.contains(k.trim()), "the error must not print the key");
     }
     assert!(gate::check_key(&"k".repeat(32), "f").is_ok());
+}
+
+#[test]
+fn notifications_leave_out_banking_apps() {
+    let s = ungated(ALL_SYSTEM, Phone::default());
+    let all: Value = serde_json::from_str(text(&call(&s, "system__notifications", json!({})))).unwrap();
+    let pkgs: Vec<&str> = all["notifications"].as_array().unwrap().iter().map(|n| n["package"].as_str().unwrap()).collect();
+    assert_eq!(pkgs, ["com.whatsapp", "com.spotify.music", "android"]);
+    assert_eq!(all["banking_apps_omitted"], 1);
+    assert!(!text(&call(&s, "system__notifications", json!({}))).contains("UAH"));
+    let only: Value = serde_json::from_str(text(&call(&s, "system__notifications", json!({ "package": "com.ftband.mono" })))).unwrap();
+    assert_eq!(only["notifications"], json!([]));
+    assert_eq!(only["banking_apps_omitted"], 1);
 }
 
 // S3: policy.
@@ -652,6 +666,14 @@ fn argv_exact() {
     ];
     for (verb, args, want) in cases {
         assert_eq!(argv(verb, args.clone()).unwrap(), *want, "{verb}");
+    }
+}
+
+#[test]
+fn launch_refuses_banking_apps() {
+    for p in tin_core::policy::MONEY_PACKAGES {
+        let e = argv("launch", json!({ "package": p })).unwrap_err();
+        assert!(e.contains("does not open banking apps"), "{p}: {e}");
     }
 }
 

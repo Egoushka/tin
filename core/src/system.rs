@@ -17,7 +17,7 @@ pub struct Verb {
 }
 
 pub const VERBS: &[Verb] = &[
-    Verb { name: "notifications", read_only: true, description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter.", ops: &ANDROID },
+    Verb { name: "notifications", read_only: true, description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter. Banking apps are left out; `banking_apps_omitted` counts them.", ops: &ANDROID },
     Verb { name: "usage", read_only: true, description: "Today's foreground time and last use per app, most used first (`limit`, default 20).", ops: &ANDROID },
     Verb { name: "foreground_app", read_only: true, description: "The app and activity on screen now.", ops: &ANDROID },
     Verb { name: "screen_text", read_only: true, description: "Text and content descriptions on screen now (uiautomator), with bounds. Refused while a banking app is in front.", ops: &ANDROID },
@@ -27,7 +27,7 @@ pub const VERBS: &[Verb] = &[
     Verb { name: "swipe", read_only: false, description: "Swipe from x1, y1 to x2, y2 over `ms` milliseconds (default 300).", ops: &ANDROID },
     Verb { name: "type_text", read_only: false, description: "Type text into the focused field (ASCII; `input text`).", ops: &ANDROID },
     Verb { name: "key", read_only: false, description: "Press a key: KEYCODE_HOME, KEYCODE_BACK, KEYCODE_ENTER, ...", ops: &ANDROID },
-    Verb { name: "launch", read_only: false, description: "Open an app by package name.", ops: &ANDROID },
+    Verb { name: "launch", read_only: false, description: "Open an app by package name. Banking apps are refused.", ops: &ANDROID },
     Verb { name: "settings_put", read_only: false, description: "Set a value in Android settings (namespace system, secure or global).", ops: &ANDROID },
 ];
 
@@ -137,7 +137,13 @@ mod android {
                 }
                 Ok(a(&["input", "keyevent", k]))
             }
-            "launch" => Ok(a(&["monkey", "-p", &package(args, "package")?, "-c", "android.intent.category.LAUNCHER", "1"])),
+            "launch" => {
+                let p = package(args, "package")?;
+                if MONEY_PACKAGES.contains(&p.as_str()) {
+                    return Err(format!("refused: {p} is a banking app, and tin does not open banking apps"));
+                }
+                Ok(a(&["monkey", "-p", &p, "-c", "android.intent.category.LAUNCHER", "1"]))
+            }
             "settings_put" => {
                 let ns = string(args, "namespace")?;
                 if !["system", "secure", "global"].contains(&ns) {
@@ -173,11 +179,12 @@ mod android {
         match v.name {
             "notifications" => {
                 let only = args.get("package").and_then(Value::as_str);
-                let list: Vec<Value> = parse_notifications(&run(&["dumpsys", "notification", "--noredact"])?)
+                let (bank, rest): (Vec<Value>, Vec<Value>) = parse_notifications(&run(&["dumpsys", "notification", "--noredact"])?)
                     .into_iter()
-                    .filter(|n| only.is_none_or(|p| n["package"] == p))
-                    .collect();
-                Ok(json!({ "notifications": list }))
+                    .partition(|n| n["package"].as_str().is_some_and(|p| MONEY_PACKAGES.contains(&p)));
+                let list: Vec<Value> = rest.into_iter().filter(|n| only.is_none_or(|p| n["package"] == p)).collect();
+                let omitted = bank.iter().filter(|n| only.is_none_or(|p| n["package"] == p)).count();
+                Ok(json!({ "notifications": list, "banking_apps_omitted": omitted }))
             }
             "usage" => {
                 let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(20).clamp(1, 200) as usize;

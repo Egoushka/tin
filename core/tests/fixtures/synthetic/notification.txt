@@ -27,5 +27,12 @@ Current Notification Manager state:
         android.title=String (USB debugging connected)
         android.text=String [length=34]
       }
+    NotificationRecord(0x0d4e5f60: pkg=com.ftband.mono user=UserHandle{0} id=7 tag=null importance=3 key=0|com.ftband.mono|7|null|10412 appImportanceLocked=false: Notification(channel=transactions shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x10 color=0xff000000 category=msg vis=PRIVATE))
+      uid=10412 userId=0
+      mCreationTimeMs=1761989000000
+      extras={
+        android.title=String (Payment received)
+        android.text=String (+1200.00 UAH, balance 5400.00 UAH)
+      }
   Snoozed notifications:
     mSnoozedNotifications: 0
