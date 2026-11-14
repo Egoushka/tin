@@ -31,10 +31,10 @@ class NeedsYouSourceTest {
     class NullId : ContentProvider() {
         override fun onCreate() = true
         override fun query(uri: Uri, p: Array<String>?, s: String?, a: Array<String>?, o: String?): Cursor = when (uri.lastPathSegment) {
-            "counts" -> MatrixCursor(arrayOf("open", "held")).apply { addRow(arrayOf(2, 0)) }
+            "counts" -> MatrixCursor(arrayOf("open", "held")).apply { addRow(arrayOf<Any?>(2, 0)) }
             else -> MatrixCursor(arrayOf("id", "title", "source", "created_at", "held", "deep_link")).apply {
-                addRow(arrayOf(null, "no id", "x", 1L, 0, null))
-                addRow(arrayOf("a1", "kept", "x", 2L, 0, null))
+                addRow(arrayOf<Any?>(null, "no id", "x", 1L, 0, null))
+                addRow(arrayOf<Any?>("a1", "kept", "x", 2L, 0, null))
             }
         }
         override fun getType(uri: Uri): String? = null
