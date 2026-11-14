@@ -1,6 +1,8 @@
 package io.github.egoushka.tin.home.signals
 
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -10,7 +12,8 @@ import kotlinx.coroutines.launch
 /** Everything Home's layer reads: one per process, so a recreated activity registers no second observer or receiver. */
 class Signals private constructor(context: Context) {
     private val app = context.applicationContext
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // A source that throws loses its own update; it must not take Home down with it.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e -> Log.w("Signals", "signal source failed", e) })
     val music = MusicSource(app)
     val calendar = CalendarSource(app)
     val alarm = AlarmSource(app)
