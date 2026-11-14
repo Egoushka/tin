@@ -118,6 +118,26 @@ fn policy_money_never_reaches_backend() {
 }
 
 #[test]
+fn every_listed_tool_carries_annotations_matching_read_only() {
+    let (s, _) = server(DEMO);
+    let r = rpc(&s, 1, "tools/list", json!({}));
+    let tools = r["result"]["tools"].as_array().unwrap();
+    assert!(!tools.is_empty());
+    for t in tools {
+        let a = &t["annotations"];
+        assert!(a.is_object(), "{} has no annotations", t["name"]);
+        for hint in ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"] {
+            assert!(a[hint].is_boolean(), "{} lacks {hint}", t["name"]);
+        }
+        assert_eq!(a["title"], t["title"], "{}", t["name"]);
+        let read_only = ["android_settings__getBatteryDeviceState", mcp::DOCTOR_TOOL].contains(&t["name"].as_str().unwrap());
+        assert_eq!(a["readOnlyHint"], read_only, "{}", t["name"]);
+        // A held or refused tool is conservatively destructive; a read-only one is not.
+        assert_eq!(a["destructiveHint"], !read_only, "{}", t["name"]);
+    }
+}
+
+#[test]
 fn policy_money_rule_covers_every_mono_function() {
     for f in metadata::parse(&fixture()).iter().filter(|f| f.package == "com.ftband.mono") {
         assert!(policy::is_money(f), "{}", f.id);

@@ -58,6 +58,12 @@ impl Tool {
     }
 }
 
+/// The MCP `annotations` object. Hints only: clients may use them to decide what to confirm. A tool that is not
+/// read-only is reported destructive, the conservative reading, since tin cannot know what an app function changes.
+pub fn annotations(title: &str, read_only: bool, open_world: bool) -> Value {
+    json!({ "title": title, "readOnlyHint": read_only, "destructiveHint": !read_only, "idempotentHint": read_only, "openWorldHint": open_world })
+}
+
 pub struct Server {
     backend: Box<dyn Backend>,
     policy: Policy,
@@ -204,7 +210,9 @@ impl Server {
                     Source::App(f) => (format!("{note}{} (app: {}, function: {})", f.description, f.package, f.id), f.input_schema.clone()),
                     Source::System(v) => (format!("{note}{}", v.description), v.input_schema()),
                 };
-                json!({ "name": t.name, "title": t.title(), "description": description, "inputSchema": schema })
+                let read_only = t.decision == Decision::Allow;
+                let open_world = matches!(t.source, Source::App(_));
+                json!({ "name": t.name, "title": t.title(), "description": description, "inputSchema": schema, "annotations": annotations(&t.title(), read_only, open_world) })
             })
             .collect();
         if self.gate.is_some() && tools.iter().any(|t| t.decision == Decision::Approval) {
@@ -213,6 +221,7 @@ impl Server {
                 "title": "Wait for an approval",
                 "description": "Keeps waiting for the owner's decision on a held call, and returns the call's result once it ran.",
                 "inputSchema": { "type": "object", "properties": { "ticket": { "type": "string" } }, "required": ["ticket"] },
+                "annotations": annotations("Wait for an approval", false, false),
             }));
         }
         out.push(json!({
@@ -220,6 +229,7 @@ impl Server {
             "title": "Check tin's own setup",
             "description": "Reports whether the policy was found, how many tools it lets through, whether the approvals server is configured, and what is wrong. Call it when an expected tool is missing or a call is refused. It reads no device data.",
             "inputSchema": { "type": "object", "properties": {} },
+            "annotations": annotations("Check tin's own setup", true, false),
         }));
         if self.speech.is_some() {
             out.extend(Speech::tools());

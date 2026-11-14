@@ -145,8 +145,16 @@ fn registry_lists_system_tools_with_notes_and_wait_tool() {
         let held = t["description"].as_str().unwrap().contains("approvals app");
         assert_eq!(held, !v.read_only, "{}", v.name);
         assert_eq!(t["inputSchema"]["type"], "object");
+        assert_eq!(t["annotations"]["readOnlyHint"], v.read_only, "{}", v.name);
+        assert_eq!(t["annotations"]["destructiveHint"], !v.read_only, "{}", v.name);
     }
     assert!(tools.iter().any(|t| t["name"] == WAIT_TOOL));
+    let doctor = tools.iter().find(|t| t["name"] == "tin__doctor").unwrap();
+    assert_eq!(doctor["annotations"]["readOnlyHint"], true);
+    // approval__wait returns the result of the held call once approved, so it can run a write.
+    let wait = tools.iter().find(|t| t["name"] == WAIT_TOOL).unwrap();
+    assert_eq!(wait["annotations"]["readOnlyHint"], false);
+    assert_eq!(wait["annotations"]["destructiveHint"], true);
 }
 
 #[test]

@@ -31,6 +31,7 @@ impl Speech {
             json!({
                 "name": TRANSCRIBE,
                 "title": "Transcribe speech (on the phone)",
+                "annotations": crate::mcp::annotations("Transcribe speech (on the phone)", true, false),
                 "description": "Records from the phone's mic until the speaker stops (or `seconds` pass) and returns the text, recognised on the phone (Parakeet, Ukrainian and English). With `file`, decodes that WAV from the app's bench folder instead. Returns JSON: text, audio_s, decode_ms.",
                 "inputSchema": {
                     "type": "object",
@@ -44,6 +45,7 @@ impl Speech {
             json!({
                 "name": PUSH_TO_TALK,
                 "title": "Push-to-talk transcripts",
+                "annotations": crate::mcp::annotations("Push-to-talk transcripts", true, false),
                 "description": "What the owner said with the push-to-talk button (notification or Quick Settings tile), newest last. Pass the last id you saw as since_id to get only new ones.",
                 "inputSchema": {
                     "type": "object",
