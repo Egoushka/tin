@@ -126,7 +126,9 @@ pub fn serve_http(server: Arc<Server>, listener: UnixListener) -> std::io::Resul
         let server = server.clone();
         std::thread::spawn(move || {
             let result = stream.try_clone().and_then(|r| handle_connection(&server, r, stream, Routes::All));
-            if let Err(e) = result {
+            if let Err(e) = result
+                && !matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut)
+            {
                 eprintln!("tin: connection: {e}");
             }
         });
@@ -177,19 +179,19 @@ fn read_capped_line(reader: &mut impl BufRead) -> std::io::Result<Option<String>
     Ok(if n > MAX_LINE && !line.ends_with('\n') { None } else { Some(line) })
 }
 
-/// `host` or `host:port` where host is a loopback name; `tin` is the name the built-in probe sends.
+/// `host` or `host:port` where host is a loopback name. The built-in probe sends `Host: tin` but only to /health.
 fn host_allowed(host: &str) -> bool {
     let name = match host.strip_prefix('[') {
         Some(rest) => rest.split_once(']').map(|(h, tail)| (h, tail.trim_start_matches(':'))).map(|(h, _)| format!("[{h}]")),
         None => Some(host.split(':').next().unwrap_or("").to_string()),
     };
-    matches!(name.as_deref(), Some("127.0.0.1" | "localhost" | "[::1]" | "tin"))
+    matches!(name.as_deref(), Some("127.0.0.1" | "localhost" | "[::1]"))
 }
 
 /// An `Origin` header that names a loopback page; anything else is a web page on another site.
 fn origin_allowed(origin: &str) -> bool {
     let Some(rest) = origin.strip_prefix("http://") else { return false };
-    host_allowed(rest) && !rest.starts_with("tin")
+    host_allowed(rest)
 }
 
 fn is_json_type(ctype: &str) -> bool {
@@ -221,14 +223,14 @@ fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, r
             if h.is_empty() {
                 return Ok(());
             }
+            let h = h.trim_end();
+            if h.is_empty() {
+                break;
+            }
             headers += 1;
             if headers > MAX_HEADERS {
                 respond(&mut writer, 431, "Request Header Fields Too Large", None)?;
                 return Ok(());
-            }
-            let h = h.trim_end();
-            if h.is_empty() {
-                break;
             }
             if let Some((k, v)) = h.split_once(':') {
                 match k.trim().to_ascii_lowercase().as_str() {
@@ -302,7 +304,8 @@ fn reason(code: u16) -> &'static str {
 fn respond(w: &mut impl Write, code: u16, reason: &str, body: Option<&str>) -> std::io::Result<()> {
     let body = body.unwrap_or("");
     let ctype = if body.is_empty() { "" } else { "Content-Type: application/json\r\n" };
-    write!(w, "HTTP/1.1 {code} {reason}\r\n{ctype}Content-Length: {}\r\n\r\n{body}", body.len())?;
+    let resp = format!("HTTP/1.1 {code} {reason}\r\n{ctype}Content-Length: {}\r\n\r\n{body}", body.len());
+    w.write_all(resp.as_bytes())?;
     w.flush()
 }
 

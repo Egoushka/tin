@@ -181,7 +181,7 @@ fn mcp_http_over_unix_socket() {
     let mut c = tin_core::transport::connect(&name).unwrap();
     for (i, method) in ["ping", "tools/list"].iter().enumerate() {
         let body = json!({ "jsonrpc": "2.0", "id": i, "method": method }).to_string();
-        write!(c, "POST /mcp HTTP/1.1\r\nHost: tin\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+        write!(c, "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
         let mut head = Vec::new();
         let mut byte = [0u8; 1];
         while !head.ends_with(b"\r\n\r\n") {
@@ -306,11 +306,11 @@ fn mcp_refuses_foreign_origin_host_and_non_json() {
     let name = serve_on_socket("origin");
     let json_ct = "Content-Type: application/json\r\n";
     let ok = |h: &str| raw_status(&name, &mcp_post(&format!("{h}{json_ct}")));
-    // No Origin (native clients) and local origins pass; Host may be any port on a loopback name, or `tin`.
+    // No Origin (native clients) and local origins pass; Host may be any port on a loopback name, .
     assert_eq!(ok("Host: 127.0.0.1:7381\r\n"), 200);
     assert_eq!(ok("Host: localhost:7381\r\nOrigin: http://localhost:3000\r\n"), 200);
     assert_eq!(ok("Host: [::1]:7381\r\nOrigin: http://[::1]\r\n"), 200);
-    assert_eq!(ok("Host: tin\r\nOrigin: http://127.0.0.1:7381\r\n"), 200);
+    assert_eq!(ok("Host: tin\r\n"), 403, "the probe's Host name is for /health only");
     assert_eq!(ok(""), 200);
     // A web page on another site, even one that resolves to 127.0.0.1.
     assert_eq!(ok("Host: 127.0.0.1:7381\r\nOrigin: https://evil.example\r\n"), 403);
@@ -341,14 +341,32 @@ fn http_rejects_oversized_lines_and_header_floods() {
     }
     flood.extend(b"\r\n");
     assert_eq!(raw_status(&name, &flood), 431);
+    // The cap is on headers, not on the blank line that ends them: 100 pass, 101 do not.
+    let with_headers = |n: usize| {
+        let mut r = b"GET /health HTTP/1.1\r\nConnection: close\r\n".to_vec();
+        for i in 0..n - 1 {
+            r.extend(format!("X-{i}: v\r\n").bytes());
+        }
+        r.extend(b"\r\n");
+        r
+    };
+    assert_eq!(raw_status(&name, &with_headers(100)), 200);
+    assert_eq!(raw_status(&name, &with_headers(101)), 431);
     // A line with no newline at all is cut off at the cap rather than buffered: the server answers before more arrives.
     use std::io::{Read, Write};
     let mut c = tin_core::transport::connect(&name).unwrap();
     c.set_read_timeout(Some(std::time::Duration::from_secs(10))).unwrap();
     c.write_all(&vec![b'a'; 16 * 1024]).unwrap();
+    // The server closes with bytes unread, so the peer may see a reset after the status line: keep what arrived.
+    let mut got = Vec::new();
     let mut buf = [0u8; 64];
-    let n = c.read(&mut buf).unwrap();
-    assert!(String::from_utf8_lossy(&buf[..n]).starts_with("HTTP/1.1 431"));
+    while !got.windows(2).any(|w| w == b"\r\n") {
+        match c.read(&mut buf) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => got.extend(&buf[..n]),
+        }
+    }
+    assert!(String::from_utf8_lossy(&got).starts_with("HTTP/1.1 431"), "{:?}", String::from_utf8_lossy(&got));
     assert_eq!(raw_status(&name, b"GET /health HTTP/1.1\r\nConnection: close\r\n\r\n"), 200);
     let _ = std::fs::remove_file(&name);
 }
