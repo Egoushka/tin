@@ -85,7 +85,7 @@ adb shell am start -n io.github.egoushka.tin/.MainActivity   # tap "Allow" in Sh
 adb forward tcp:7381 localabstract:tin
 ```
 
-Then point an MCP client at `http://127.0.0.1:7381/mcp`, or run the acceptance script, which lists the tools and
+Then point an MCP client at `http://127.0.0.1:7381/mcp` (`POST` with `Content-Type: application/json`; a request whose `Origin` or `Host` is not loopback is refused, so a web page cannot drive it), or run the acceptance script, which lists the tools and
 sets one alarm (keep the phone unlocked; Android refuses device-state functions while locked):
 
 ```bash

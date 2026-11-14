@@ -121,10 +121,14 @@ pub fn serve_http(server: Arc<Server>, listener: UnixListener) -> std::io::Resul
                 continue;
             }
         }
+        // A silent client must not hold a thread forever; keep-alive clients idle for less than this.
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(60))).ok();
         let server = server.clone();
         std::thread::spawn(move || {
             let result = stream.try_clone().and_then(|r| handle_connection(&server, r, stream, Routes::All));
-            if let Err(e) = result {
+            if let Err(e) = result
+                && !matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut)
+            {
                 eprintln!("tin: connection: {e}");
             }
         });
@@ -164,31 +168,77 @@ enum Routes {
 /// Largest request body accepted; a tool call's arguments are a few hundred bytes.
 const MAX_BODY: usize = 1 << 20;
 
+/// Longest request or header line, and most headers, accepted before the request is refused.
+const MAX_LINE: usize = 8 * 1024;
+const MAX_HEADERS: usize = 100;
+
+/// Reads one line of at most `MAX_LINE` bytes. `Ok(None)` means the line was longer.
+fn read_capped_line(reader: &mut impl BufRead) -> std::io::Result<Option<String>> {
+    let mut line = String::new();
+    let n = reader.take(MAX_LINE as u64 + 1).read_line(&mut line)?;
+    Ok(if n > MAX_LINE && !line.ends_with('\n') { None } else { Some(line) })
+}
+
+/// `host` or `host:port` where host is a loopback name. The built-in probe sends `Host: tin` but only to /health.
+fn host_allowed(host: &str) -> bool {
+    let name = match host.strip_prefix('[') {
+        Some(rest) => rest.split_once(']').map(|(h, tail)| (h, tail.trim_start_matches(':'))).map(|(h, _)| format!("[{h}]")),
+        None => Some(host.split(':').next().unwrap_or("").to_string()),
+    };
+    matches!(name.as_deref(), Some("127.0.0.1" | "localhost" | "[::1]"))
+}
+
+/// An `Origin` header that names a loopback page; anything else is a web page on another site.
+fn origin_allowed(origin: &str) -> bool {
+    let Some(rest) = origin.strip_prefix("http://") else { return false };
+    host_allowed(rest)
+}
+
+fn is_json_type(ctype: &str) -> bool {
+    ctype.trim().get(..16).is_some_and(|p| p.eq_ignore_ascii_case("application/json"))
+}
+
 /// HTTP/1.1 with keep-alive: one request after another on the same connection until the client closes.
 fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, routes: Routes) -> std::io::Result<()> {
     let mut reader = BufReader::new(read);
     loop {
-        let mut request_line = String::new();
-        if reader.read_line(&mut request_line)? == 0 {
+        let Some(request_line) = read_capped_line(&mut reader)? else {
+            respond(&mut writer, 431, "Request Header Fields Too Large", None)?;
+            return Ok(());
+        };
+        if request_line.is_empty() {
             return Ok(());
         }
         let mut parts = request_line.split_whitespace();
         let (method, path) = (parts.next().unwrap_or("").to_string(), parts.next().unwrap_or("").to_string());
         let mut content_length = 0usize;
         let mut close = false;
+        let (mut origin, mut host, mut ctype) = (None, None, None);
+        let mut headers = 0;
         loop {
-            let mut h = String::new();
-            if reader.read_line(&mut h)? == 0 {
+            let Some(h) = read_capped_line(&mut reader)? else {
+                respond(&mut writer, 431, "Request Header Fields Too Large", None)?;
+                return Ok(());
+            };
+            if h.is_empty() {
                 return Ok(());
             }
             let h = h.trim_end();
             if h.is_empty() {
                 break;
             }
+            headers += 1;
+            if headers > MAX_HEADERS {
+                respond(&mut writer, 431, "Request Header Fields Too Large", None)?;
+                return Ok(());
+            }
             if let Some((k, v)) = h.split_once(':') {
                 match k.trim().to_ascii_lowercase().as_str() {
                     "content-length" => content_length = v.trim().parse().unwrap_or(0),
                     "connection" => close = v.trim().eq_ignore_ascii_case("close"),
+                    "origin" => origin = Some(v.trim().to_string()),
+                    "host" => host = Some(v.trim().to_string()),
+                    "content-type" => ctype = Some(v.trim().to_string()),
                     _ => {}
                 }
             }
@@ -212,6 +262,16 @@ fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, r
                 }
                 None => respond(&mut writer, 404, "Not Found", None)?,
             },
+            // A browser can reach this socket through `adb forward`: refuse other sites' pages (Origin, and Host for DNS
+            // rebinding) and the no-preflight content types a cross-site form or fetch can send.
+            ("POST", "/mcp") if origin.as_deref().is_some_and(|o| !origin_allowed(o)) || host.as_deref().is_some_and(|h| !host_allowed(h)) => {
+                respond(&mut writer, 403, "Forbidden", None)?;
+                return Ok(());
+            }
+            ("POST", "/mcp") if !ctype.as_deref().is_some_and(is_json_type) => {
+                respond(&mut writer, 415, "Unsupported Media Type", None)?;
+                return Ok(());
+            }
             ("POST", "/mcp") => match serde_json::from_slice::<Value>(&body) {
                 Ok(msg) => match server.handle(&msg) {
                     Some(reply) => respond(&mut writer, 200, "OK", Some(&reply.to_string()))?,
@@ -244,7 +304,8 @@ fn reason(code: u16) -> &'static str {
 fn respond(w: &mut impl Write, code: u16, reason: &str, body: Option<&str>) -> std::io::Result<()> {
     let body = body.unwrap_or("");
     let ctype = if body.is_empty() { "" } else { "Content-Type: application/json\r\n" };
-    write!(w, "HTTP/1.1 {code} {reason}\r\n{ctype}Content-Length: {}\r\n\r\n{body}", body.len())?;
+    let resp = format!("HTTP/1.1 {code} {reason}\r\n{ctype}Content-Length: {}\r\n\r\n{body}", body.len());
+    w.write_all(resp.as_bytes())?;
     w.flush()
 }
 
