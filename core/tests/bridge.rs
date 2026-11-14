@@ -273,3 +273,82 @@ fn doctor_reports_a_healthy_setup_and_never_shows_secrets() {
     assert!(d["tools"]["allow"].as_u64().unwrap() > 0, "{d}");
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// Serves `s` on a fresh socket and returns its name.
+fn serve_on_socket(tag: &str) -> String {
+    let (s, _) = server(DEMO);
+    let path = std::env::temp_dir().join(format!("tin-{tag}-{}.sock", std::process::id()));
+    let name = path.to_str().unwrap().to_string();
+    let listener = tin_core::transport::bind(&name).unwrap();
+    let s = Arc::new(s);
+    std::thread::spawn(move || tin_core::transport::serve_http(s, listener));
+    name
+}
+
+/// Sends `raw` on a new connection and returns the status code, or 0 if the server closed without answering.
+fn raw_status(name: &str, raw: &[u8]) -> u16 {
+    use std::io::{Read, Write};
+    let mut c = tin_core::transport::connect(name).unwrap();
+    c.set_read_timeout(Some(std::time::Duration::from_secs(10))).unwrap();
+    let _ = c.write_all(raw);
+    let mut buf = Vec::new();
+    let _ = c.read_to_end(&mut buf);
+    String::from_utf8_lossy(&buf).split_whitespace().nth(1).and_then(|s| s.parse().ok()).unwrap_or(0)
+}
+
+fn mcp_post(headers: &str) -> Vec<u8> {
+    let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "ping" }).to_string();
+    format!("POST /mcp HTTP/1.1\r\n{headers}Connection: close\r\nContent-Length: {}\r\n\r\n{body}", body.len()).into_bytes()
+}
+
+#[test]
+fn mcp_refuses_foreign_origin_host_and_non_json() {
+    let name = serve_on_socket("origin");
+    let json_ct = "Content-Type: application/json\r\n";
+    let ok = |h: &str| raw_status(&name, &mcp_post(&format!("{h}{json_ct}")));
+    // No Origin (native clients) and local origins pass; Host may be any port on a loopback name, or `tin`.
+    assert_eq!(ok("Host: 127.0.0.1:7381\r\n"), 200);
+    assert_eq!(ok("Host: localhost:7381\r\nOrigin: http://localhost:3000\r\n"), 200);
+    assert_eq!(ok("Host: [::1]:7381\r\nOrigin: http://[::1]\r\n"), 200);
+    assert_eq!(ok("Host: tin\r\nOrigin: http://127.0.0.1:7381\r\n"), 200);
+    assert_eq!(ok(""), 200);
+    // A web page on another site, even one that resolves to 127.0.0.1.
+    assert_eq!(ok("Host: 127.0.0.1:7381\r\nOrigin: https://evil.example\r\n"), 403);
+    assert_eq!(ok("Host: 127.0.0.1:7381\r\nOrigin: http://127.0.0.1.evil.example\r\n"), 403);
+    assert_eq!(ok("Host: 127.0.0.1:7381\r\nOrigin: null\r\n"), 403);
+    assert_eq!(ok("Host: evil.example:7381\r\n"), 403);
+    // A simple cross-origin POST (no preflight) must carry a non-JSON type.
+    assert_eq!(raw_status(&name, &mcp_post("Host: 127.0.0.1:7381\r\nContent-Type: text/plain\r\n")), 415);
+    assert_eq!(raw_status(&name, &mcp_post("Host: 127.0.0.1:7381\r\n")), 415);
+    assert_eq!(raw_status(&name, &mcp_post("Host: 127.0.0.1:7381\r\nContent-Type: Application/JSON; charset=utf-8\r\n")), 200);
+    let _ = std::fs::remove_file(&name);
+}
+
+#[test]
+fn http_rejects_oversized_lines_and_header_floods() {
+    let name = serve_on_socket("caps");
+    let mut long_request = b"GET /".to_vec();
+    long_request.extend(std::iter::repeat_n(b'a', 64 * 1024));
+    long_request.extend(b" HTTP/1.1\r\n\r\n");
+    assert_eq!(raw_status(&name, &long_request), 431);
+    let mut long_header = b"GET /health HTTP/1.1\r\nX-A: ".to_vec();
+    long_header.extend(std::iter::repeat_n(b'a', 64 * 1024));
+    long_header.extend(b"\r\n\r\n");
+    assert_eq!(raw_status(&name, &long_header), 431);
+    let mut flood = b"GET /health HTTP/1.1\r\n".to_vec();
+    for i in 0..500 {
+        flood.extend(format!("X-{i}: v\r\n").bytes());
+    }
+    flood.extend(b"\r\n");
+    assert_eq!(raw_status(&name, &flood), 431);
+    // A line with no newline at all is cut off at the cap rather than buffered: the server answers before more arrives.
+    use std::io::{Read, Write};
+    let mut c = tin_core::transport::connect(&name).unwrap();
+    c.set_read_timeout(Some(std::time::Duration::from_secs(10))).unwrap();
+    c.write_all(&vec![b'a'; 16 * 1024]).unwrap();
+    let mut buf = [0u8; 64];
+    let n = c.read(&mut buf).unwrap();
+    assert!(String::from_utf8_lossy(&buf[..n]).starts_with("HTTP/1.1 431"));
+    assert_eq!(raw_status(&name, b"GET /health HTTP/1.1\r\nConnection: close\r\n\r\n"), 200);
+    let _ = std::fs::remove_file(&name);
+}
