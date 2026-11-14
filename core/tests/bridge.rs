@@ -4,7 +4,9 @@
 use serde_json::{Value, json};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tin_core::backend::Backend;
+use tin_core::gate::{self, Gate, HttpApprover};
 use tin_core::mcp::{self, Server};
 use tin_core::metadata;
 use tin_core::policy::{self, Policy};
@@ -271,27 +273,50 @@ fn doctor_flags_rules_that_match_nothing_and_missing_approvals() {
     assert_eq!(d["backend"]["app_functions"], 61);
 }
 
-#[test]
-fn doctor_reports_a_healthy_setup_and_never_shows_secrets() {
-    let dir = std::env::temp_dir().join(format!("tin-doctor-{}", std::process::id()));
+/// A doctor report for a policy whose approvals server is at `url`, with the gate built the way `main` builds it.
+fn doctor_with_approvals(url: &str) -> Value {
+    let dir = std::env::temp_dir().join(format!("tin-doctor-{}-{}", std::process::id(), url.replace(|c: char| !c.is_ascii_alphanumeric(), "")));
     std::fs::create_dir_all(&dir).unwrap();
     let (token, key) = (dir.join("token"), dir.join("key"));
     std::fs::write(&token, "tok-SECRET-1").unwrap();
     std::fs::write(&key, "key-SECRET-2").unwrap();
     let toml = format!(
-        "[[allow]]\npackage = \"com.android.settings\"\nfunction = \"*\"\nread_only = true\n\n[approvals]\nurl = \"http://approvals.invalid:1\"\ntoken_file = \"{}\"\nkey_file = \"{}\"\ncallback = \"/cb/\"\n",
+        "[[allow]]\npackage = \"com.android.settings\"\nfunction = \"*\"\nread_only = true\n\n[approvals]\nurl = \"{url}\"\ntoken_file = \"{}\"\nkey_file = \"{}\"\ncallback = \"/cb/\"\n",
         token.display(),
         key.display()
     );
-    let s = Server::new(Box::new(Recording::default()), Policy::from_toml(&toml).unwrap()).with_policy_source(mcp::PolicySource::File("p".into()));
+    let cfg = gate::GateConfig { source: "tin".into(), callback: "/cb/decision".into(), wait: Duration::from_millis(10), ttl: Duration::from_secs(60) };
+    let gate = Gate::new(Box::new(HttpApprover::new(url, "tok-SECRET-1").unwrap()), b"key-SECRET-2", cfg);
+    let s = Server::new(Box::new(Recording::default()), Policy::from_toml(&toml).unwrap())
+        .with_policy_source(mcp::PolicySource::File("p".into()))
+        .with_gate(Arc::new(gate));
     let r = rpc(&s, 1, "tools/call", json!({ "name": mcp::DOCTOR_TOOL, "arguments": {} }));
     let text = r["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(!text.contains("SECRET") && !text.contains("approvals.invalid"), "{text}");
-    let d = &r["result"]["structuredContent"];
+    assert!(!text.contains("SECRET") && !text.contains("127.0.0.1"), "{text}");
+    std::fs::remove_dir_all(&dir).unwrap();
+    r["result"]["structuredContent"].clone()
+}
+
+#[test]
+fn doctor_reports_a_healthy_setup_and_never_shows_secrets() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let d = doctor_with_approvals(&format!("http://{}", listener.local_addr().unwrap()));
     assert_eq!(d["approvals"]["token_file"], "readable");
     assert_eq!(d["approvals"]["key_file"], "readable");
+    assert_eq!(d["approvals"]["reachable"], true, "{d}");
+    assert_eq!(d["ok"], true, "{d}");
     assert!(d["tools"]["allow"].as_u64().unwrap() > 0, "{d}");
-    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn doctor_reports_unreachable_approvals_as_a_problem() {
+    // Bind and drop to get a port nothing listens on.
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let d = doctor_with_approvals(&format!("http://127.0.0.1:{port}"));
+    assert_eq!(d["approvals"]["reachable"], false, "{d}");
+    assert_eq!(d["ok"], false, "{d}");
+    let problems = d["problems"].to_string();
+    assert!(problems.contains("approvals server is not reachable"), "{problems}");
 }
 
 /// Serves `s` on a fresh socket and returns its name.
