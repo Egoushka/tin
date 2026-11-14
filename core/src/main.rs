@@ -1,7 +1,6 @@
 use std::sync::Arc;
-use std::time::Duration;
 use tin_core::backend::{Backend, CmdBackend};
-use tin_core::gate::{Gate, GateConfig, HttpApprover};
+use tin_core::gate::Built;
 use tin_core::mcp::{self, PolicySource, Server};
 use tin_core::policy::{Decision, Policy};
 use tin_core::macos::MacBackend;
@@ -43,11 +42,21 @@ fn main() {
         Some("serve") => load_policy(&policy_path).and_then(|(policy, source)| {
             let approvals = policy.approvals.clone();
             let mut server = Server::new(backend()?, policy).with_policy_source(source);
+            let mut gate_on = false;
             if let Some(a) = &approvals {
-                server = server.with_gate(Arc::new(gate(a)?));
+                match tin_core::gate::build(a)? {
+                    Built::On(g) => {
+                        server = server.with_gate(Arc::new(g));
+                        gate_on = true;
+                    }
+                    Built::Off(reason) => {
+                        eprintln!("tin: approvals gate is off, so writes are refused and reads still work: {reason}");
+                        server = server.with_gate_off(reason);
+                    }
+                }
             }
             let server = Arc::new(server);
-            if let Some(addr) = approvals.as_ref().and_then(|a| a.callback_listen.clone()) {
+            if let Some(addr) = approvals.as_ref().filter(|_| gate_on).and_then(|a| a.callback_listen.clone()) {
                 let listener = std::net::TcpListener::bind(&addr).map_err(|e| format!("bind {addr}: {e}"))?;
                 eprintln!("tin: approvals callback on {addr}");
                 let s = server.clone();
@@ -89,21 +98,6 @@ fn load_policy(path: &str) -> Result<(Policy, PolicySource), String> {
         }
         Err(e) => Err(format!("{path}: {e}")),
     }
-}
-
-/// The approvals gate from the policy's `[approvals]` table; the token and key are read from their files.
-fn gate(a: &tin_core::policy::Approvals) -> Result<Gate, String> {
-    let read = |path: &str| std::fs::read_to_string(path).map(|s| s.trim().to_string()).map_err(|e| format!("{path}: {e}"));
-    let approver = HttpApprover::new(&a.url, &read(&a.token_file)?)?;
-    let cfg = GateConfig {
-        source: a.source.clone(),
-        callback: format!("{}decision", a.callback),
-        wait: Duration::from_secs(a.wait_secs),
-        ttl: Duration::from_secs(a.ttl_secs),
-    };
-    let key = read(&a.key_file)?;
-    tin_core::gate::check_key(&key, &a.key_file)?;
-    Ok(Gate::new(Box::new(approver), key.as_bytes(), cfg))
 }
 
 fn list(backend: &dyn Backend, policy: &Policy, all: bool) -> Result<(), String> {

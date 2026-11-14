@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tin_core::backend::Backend;
 use tin_core::gate::{self, Gate, GateConfig, Outcome};
-use tin_core::mcp::{Server, WAIT_TOOL};
+use tin_core::mcp::{DOCTOR_TOOL, Server, WAIT_TOOL};
 use tin_core::policy::{Decision, Policy, SYSTEM, Subject};
 use tin_core::system::{self, VERBS};
 
@@ -867,4 +867,70 @@ fn notifications_show_codes_opt_out_is_per_app() {
     let r = notify(&policy, "Code 482913", "x", "com.other.app");
     assert_eq!(r["notifications"][0]["title"], "Code [code]");
     assert_eq!(r["codes_masked"], 1);
+}
+
+/// A server built the way `main` builds it, from a policy whose key file holds `key` (None: no such file).
+fn served_with_key(tag: &str, key: Option<&str>) -> (Server, Option<String>, std::path::PathBuf) {
+    let dir = std::env::temp_dir().join(format!("tin-key-{}-{tag}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (token, key_file) = (dir.join("token"), dir.join("key"));
+    std::fs::write(&token, "tok").unwrap();
+    if let Some(k) = key {
+        std::fs::write(&key_file, k).unwrap();
+    }
+    let toml = format!(
+        "{ALL_SYSTEM}\n[approvals]\nurl = \"http://127.0.0.1:9\"\ntoken_file = \"{}\"\nkey_file = \"{}\"\ncallback = \"/cb/\"\n",
+        token.display(),
+        key_file.display()
+    );
+    let policy = Policy::from_toml(&toml).unwrap();
+    let approvals = policy.approvals.clone().unwrap();
+    let server = Server::new(Box::new(Phone::default()), policy);
+    match gate::build(&approvals).unwrap() {
+        gate::Built::On(g) => (server.with_gate(Arc::new(g)), None, dir),
+        gate::Built::Off(reason) => (server.with_gate_off(reason.clone()), Some(reason), dir),
+    }
+}
+
+#[test]
+fn short_key_starts_with_the_gate_off() {
+    let (s, reason, dir) = served_with_key("short", Some("short-SECRET-key\n"));
+    let reason = reason.expect("a short key must turn the gate off, not stop tin");
+    assert!(reason.contains(&dir.join("key").display().to_string()) && reason.contains("16 bytes"), "{reason}");
+    assert!(!reason.contains("SECRET"));
+    // Reads work.
+    let r = call(&s, "system__battery", json!({}));
+    assert_eq!(r["isError"], false, "{r}");
+    // A write is refused exactly as with no [approvals] table.
+    let w = call(&s, "system__key", json!({ "key": "HOME" }));
+    assert_eq!(w["isError"], true);
+    assert!(text(&w).contains("no approvals gate running"), "{}", text(&w));
+    // The doctor says the gate is off and why.
+    let d = call(&s, DOCTOR_TOOL, json!({}))["structuredContent"].clone();
+    assert_eq!(d["ok"], false, "{d}");
+    assert_eq!(d["approvals"]["gate"], "off");
+    assert_eq!(d["approvals"]["reason"], json!(reason));
+    assert!(d["problems"].to_string().contains("gate is off"), "{d}");
+    assert!(!d.to_string().contains("SECRET"));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn unreadable_key_also_turns_the_gate_off() {
+    let (s, reason, dir) = served_with_key("missing", None);
+    assert!(reason.unwrap().contains(&dir.join("key").display().to_string()));
+    assert_eq!(call(&s, "system__battery", json!({}))["isError"], false);
+    assert_eq!(call(&s, DOCTOR_TOOL, json!({}))["structuredContent"]["ok"], false);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn full_length_key_turns_the_gate_on() {
+    let (s, reason, dir) = served_with_key("long", Some(&"k".repeat(32)));
+    assert_eq!(reason, None);
+    let d = call(&s, DOCTOR_TOOL, json!({}))["structuredContent"].clone();
+    assert_eq!(d["approvals"]["gate"], Value::Null, "{d}");
+    assert_eq!(d["approvals"]["key_file"], "readable");
+    assert!(s.gate().is_some());
+    std::fs::remove_dir_all(dir).unwrap();
 }

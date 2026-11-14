@@ -68,6 +68,8 @@ pub struct Server {
     backend: Box<dyn Backend>,
     policy: Policy,
     gate: Option<Arc<Gate>>,
+    /// Why the `[approvals]` gate could not be built (a short key), for the doctor.
+    gate_off: Option<String>,
     tools: RwLock<HashMap<String, Tool>>,
     speech: Option<Speech>,
     policy_source: Option<PolicySource>,
@@ -105,7 +107,7 @@ pub fn name_all(functions: Vec<Function>) -> Vec<(String, Function)> {
 impl Server {
     pub fn new(backend: Box<dyn Backend>, policy: Policy) -> Self {
         let speech = policy.speech.enabled.then(|| Speech::new(speech::SOCKET));
-        Self { backend, policy, gate: None, tools: RwLock::new(HashMap::new()), speech, policy_source: None }
+        Self { backend, policy, gate: None, gate_off: None, tools: RwLock::new(HashMap::new()), speech, policy_source: None }
     }
 
     /// Points the speech tools at another socket (tests); does not enable them.
@@ -125,6 +127,12 @@ impl Server {
     /// Held calls go to `gate`. Without one, a call that needs approval is refused.
     pub fn with_gate(mut self, gate: Arc<Gate>) -> Self {
         self.gate = Some(gate);
+        self
+    }
+
+    /// The `[approvals]` table is set but its gate could not be built. Writes are refused as with no gate; the doctor says why.
+    pub fn with_gate_off(mut self, reason: String) -> Self {
+        self.gate_off = Some(reason);
         self
     }
 
@@ -285,7 +293,7 @@ impl Server {
                 let Some(gate) = &self.gate else {
                     eprintln!("tin: refused {name}: needs approval, no approvals server");
                     return tool_error(&format!(
-                        "approval required: {name} changes state, and no approvals server is configured to ask the owner, so tin does not run it."
+                        "approval required: {name} changes state, and tin has no approvals gate running to ask the owner (no [approvals] table, or its key was refused at startup; tin__doctor says which), so tin does not run it."
                     ));
                 };
                 // Bad arguments fail here, before anyone is asked to approve a call that cannot run.
@@ -387,6 +395,11 @@ impl Server {
                 }
                 json!({ "configured": false })
             }
+            Some(_) if self.gate_off.is_some() => {
+                let reason = self.gate_off.as_deref().unwrap_or_default();
+                problems.push(format!("the approvals gate is off, so tools that need a tap are refused: {reason}"));
+                json!({ "configured": true, "gate": "off", "reason": reason })
+            }
             Some(a) => {
                 let (token, key) = (readable(&a.token_file), readable(&a.key_file));
                 for (what, state) in [("token_file", token), ("key_file", key)] {
@@ -394,7 +407,7 @@ impl Server {
                         problems.push(format!("[approvals] {what} is {state}, so tin cannot ask for approval"));
                     }
                 }
-                // `main` refuses to serve when the gate cannot be built, so a configured table always has a gate here.
+                // A configured table has a gate here, unless the key was short or unreadable (the branch above).
                 let reachable = self.gate.as_ref().map(|g| g.probe());
                 if let Some(Err(e)) = &reachable {
                     problems.push(format!("the approvals server is not reachable ({e}), so held calls cannot reach the phone"));
