@@ -2,12 +2,12 @@
 //! `shortcuts run`, and Mac system verbs (memory, processes, stale build and test processes, launchd agents). Every
 //! program runs with argv, never through a shell; write verbs only run after an approvals tap.
 
-use crate::backend::{Backend, run_argv};
+use crate::backend::{Backend, run_argv, run_with_timeout};
 use crate::metadata::Function;
 use crate::system::{Ops, Shell, Verb};
 use serde_json::{Map, Value, json};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -381,29 +381,6 @@ fn uuid_v4() -> String {
 }
 
 static RUNS: AtomicU64 = AtomicU64::new(0);
-
-/// Runs a command with stdin closed, killing it after `timeout`. `Ok` is (exit success, stdout, stderr).
-fn run_with_timeout(mut cmd: Command, timeout: Duration) -> Result<(bool, String, String), String> {
-    let child = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|e| e.to_string())?;
-    let pid = child.id() as libc::pid_t;
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
-    match rx.recv_timeout(timeout) {
-        Ok(Ok(out)) => Ok((
-            out.status.success(),
-            String::from_utf8_lossy(&out.stdout).into_owned(),
-            String::from_utf8_lossy(&out.stderr).into_owned(),
-        )),
-        Ok(Err(e)) => Err(e.to_string()),
-        Err(_) => {
-            // SAFETY: kill(2) on the child we spawned; it has not been reaped, the waiting thread still holds it.
-            unsafe { libc::kill(pid, libc::SIGKILL) };
-            Err(format!("timed out after {} s", timeout.as_secs()))
-        }
-    }
-}
 
 impl Backend for MacBackend {
     fn functions(&self) -> Result<Vec<Function>, String> {
