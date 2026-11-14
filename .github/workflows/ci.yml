@@ -144,7 +144,7 @@ jobs:
 
   # One release per main commit: Obtainium on the phone follows the latest release (docs/home-updates.md).
   release:
-    needs: android
+    needs: [core, android, emulator]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.android.outputs.signed == 'true'
     runs-on: ubuntu-latest
     permissions:

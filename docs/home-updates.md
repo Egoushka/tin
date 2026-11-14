@@ -1,10 +1,10 @@
 # Home updates: the phone follows `main`
 
-Every commit on `main` that passes CI becomes a GitHub release of Home (`v0.1.<commit count>`, one APK, signed with
-the Tin release key). Obtainium on the Pixel polls the releases and updates Home in place. No cable, no `adb install`.
+Every commit on `main` where every CI job passes (Rust tests and clippy, the Android build, the emulator tests)
+becomes a GitHub release of Home (`v0.1.<commit count>`, one APK, signed with the Tin release key). Obtainium on the Pixel polls the releases and updates Home in place. No cable, no `adb install`.
 
 ```
-merge to main -> CI android job -> signed home-release.apk -> release job -> GitHub Release v0.1.N -> Obtainium -> phone
+merge to main -> CI core, android and emulator jobs green -> signed home-release.apk -> release job -> GitHub Release v0.1.N -> Obtainium -> phone
 ```
 
 Why this route and not an updater inside Home or an adb push from a Mac/box: it needs no app code (Home would
