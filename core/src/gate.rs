@@ -41,8 +41,7 @@ impl HttpApprover {
     }
 
     fn request(&self, method: &str, path: &str, body: Option<&str>) -> Result<(u16, String), String> {
-        let addr = self.host.to_socket_addrs().map_err(|e| format!("{}: {e}", self.host))?.next().ok_or_else(|| format!("{}: no address", self.host))?;
-        let mut s = TcpStream::connect_timeout(&addr, HTTP_TIMEOUT).map_err(|e| format!("connect {}: {e}", self.host))?;
+        let mut s = self.connect().map_err(|e| format!("connect {}: {e}", self.host))?;
         s.set_read_timeout(Some(HTTP_TIMEOUT)).ok();
         s.set_write_timeout(Some(HTTP_TIMEOUT)).ok();
         let body = body.unwrap_or("");
@@ -74,8 +73,20 @@ impl Approver for HttpApprover {
     /// The approvals contract has no read endpoint (only `PUT` and `DELETE` on `/items/{id}`), and a probe must not
     /// create or remove an item, so this is a TCP connect to the server's host and port.
     fn probe(&self) -> Result<(), String> {
-        let addr = self.host.to_socket_addrs().map_err(|e| format!("address does not resolve: {e}"))?.next().ok_or("address does not resolve")?;
-        TcpStream::connect_timeout(&addr, HTTP_TIMEOUT).map(drop).map_err(|e| format!("cannot connect: {e}"))
+        self.connect().map(drop).map_err(|e| format!("cannot connect: {e}"))
+    }
+
+    /// Tries every address the host resolves to (a name can give `::1` first and listen only on IPv4), each with a timeout.
+    fn connect(&self) -> Result<TcpStream, String> {
+        let addrs = self.host.to_socket_addrs().map_err(|e| format!("address does not resolve: {e}"))?;
+        let mut last = "address does not resolve".to_string();
+        for addr in addrs {
+            match TcpStream::connect_timeout(&addr, HTTP_TIMEOUT) {
+                Ok(s) => return Ok(s),
+                Err(e) => last = format!("{addr}: {e}"),
+            }
+        }
+        Err(last)
     }
 
     fn delete(&self, id: &str) -> Result<(), String> {
