@@ -4,7 +4,7 @@
 
 use crate::backend::{Backend, run_argv, run_with_timeout};
 use crate::metadata::Function;
-use crate::system::{Ops, Shell, Verb};
+use crate::system::{Action, Verb, arg_text, exec_plain, object, sh};
 use serde_json::{Map, Value, json};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -433,17 +433,7 @@ impl Backend for MacBackend {
 
 // System verbs.
 
-pub const VERBS: &[Verb] = &[
-    Verb { name: "memory", read_only: true, description: "RAM, memory pressure level (normal, warning, critical), swap in use, and page classes in MB.", ops: &MAC },
-    Verb { name: "processes", read_only: true, description: "Processes with the most resident memory (RSS): pid, parent, MB, age, start time, command (`limit`, default 15).", ops: &MAC },
-    Verb { name: "stale_processes", read_only: true, description: "Leftover build and test processes (MSBuild nodes, VBCSCompiler, vstest, test hosts) older than `min_age_minutes` (default 30), with swap in use. When swap in use is at least `swap_threshold_mb` (default 4096) it proposes a system__kill call for each.", ops: &MAC },
-    Verb { name: "launch_agents", read_only: true, description: "launchd jobs in this login session: label, pid (null when not running), last exit status. Apple's own are left out unless `include_apple`; `prefix` filters labels.", ops: &MAC },
-    Verb { name: "kill", read_only: false, description: "Send TERM (default), INT or KILL to a process. Takes `pid` and `started` exactly as system__processes or system__stale_processes print them; a pid whose start time changed is not killed.", ops: &MAC },
-    Verb { name: "quit_app", read_only: false, description: "Ask an app to quit by bundle id (as File > Quit; the app may ask to save).", ops: &MAC },
-    Verb { name: "unload_agent", read_only: false, description: "Unload a launchd agent of this user (`launchctl bootout`) until the next login or a bootstrap. Never an Apple agent.", ops: &MAC },
-];
-
-const MAC: Ops = Ops { schema, argv, describe, run };
+pub const VERBS: &[Verb] = &[MEMORY, PROCESSES, STALE_PROCESSES, LAUNCH_AGENTS, KILL, QUIT_APP, UNLOAD_AGENT];
 
 pub fn verb(name: &str) -> Option<&'static Verb> {
     VERBS.iter().find(|v| v.name == name)
@@ -453,32 +443,6 @@ pub const DEFAULT_MIN_AGE_MINUTES: u64 = 30;
 pub const DEFAULT_SWAP_THRESHOLD_MB: u64 = 4096;
 const SIGNALS: &[&str] = &["TERM", "INT", "KILL"];
 const PS: &[&str] = &["-axww", "-o", "pid=,ppid=,rss=,etime=,lstart=,command="];
-
-fn schema(v: &Verb) -> Value {
-    let (props, required): (Value, &[&str]) = match v.name {
-        "processes" => (json!({ "limit": { "type": "integer", "minimum": 1, "maximum": 200 } }), &[]),
-        "stale_processes" => (
-            json!({
-                "min_age_minutes": { "type": "integer", "minimum": 0, "description": "only processes at least this old" },
-                "swap_threshold_mb": { "type": "integer", "minimum": 0, "description": "propose kills when swap in use is at least this" }
-            }),
-            &[],
-        ),
-        "launch_agents" => (json!({ "prefix": { "type": "string" }, "include_apple": { "type": "boolean" } }), &[]),
-        "kill" => (
-            json!({
-                "pid": { "type": "integer", "minimum": 2 },
-                "started": { "type": "string", "description": "the process's start time as listed, e.g. \"Sun Nov 1 18:51:12 2026\"" },
-                "signal": { "type": "string", "enum": SIGNALS }
-            }),
-            &["pid", "started"],
-        ),
-        "quit_app" => (json!({ "bundle_id": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" } }), &["bundle_id"]),
-        "unload_agent" => (json!({ "label": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" } }), &["label"]),
-        _ => (json!({}), &[]),
-    };
-    json!({ "type": "object", "properties": props, "required": required })
-}
 
 fn string<'a>(args: &'a Value, k: &str) -> Result<&'a str, String> {
     args.get(k).and_then(Value::as_str).ok_or_else(|| format!("{k}: a string is required"))
@@ -508,9 +472,96 @@ fn started(args: &Value) -> Result<String, String> {
     Ok(s)
 }
 
-fn argv(v: &Verb, args: &Value) -> Result<Vec<String>, String> {
-    match v.name {
-        "kill" => {
+const MEMORY: Verb = Verb {
+    name: "memory",
+    read_only: true,
+    description: "RAM, memory pressure level (normal, warning, critical), swap in use, and page classes in MB.",
+    schema: || object(json!({}), &[]),
+    action: Action::Read {
+        run: |_, shell| {
+            let mut m = parse_sysctl(&sh(shell, &["sysctl", "hw.memsize", "vm.swapusage", "kern.memorystatus_vm_pressure_level"])?);
+            m["pages_mb"] = parse_vm_stat(&sh(shell, &["vm_stat"])?);
+            Ok(m)
+        },
+    },
+};
+
+const PROCESSES: Verb = Verb {
+    name: "processes",
+    read_only: true,
+    description: "Processes with the most resident memory (RSS): pid, parent, MB, age, start time, command (`limit`, default 15).",
+    schema: || object(json!({ "limit": { "type": "integer", "minimum": 1, "maximum": 200 } }), &[]),
+    action: Action::Read {
+        run: |args, shell| {
+            let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(15).clamp(1, 200) as usize;
+            let mut procs = parse_ps(&sh(shell, &[&["ps"], PS].concat())?);
+            procs.sort_by_key(|p| std::cmp::Reverse(p.rss_kb));
+            Ok(json!({ "processes": procs.iter().take(limit).map(Proc::to_json).collect::<Vec<_>>() }))
+        },
+    },
+};
+
+const STALE_PROCESSES: Verb = Verb {
+    name: "stale_processes",
+    read_only: true,
+    description: "Leftover build and test processes (MSBuild nodes, VBCSCompiler, vstest, test hosts) older than `min_age_minutes` (default 30), with swap in use. When swap in use is at least `swap_threshold_mb` (default 4096) it proposes a system__kill call for each.",
+    schema: || {
+        object(
+            json!({
+                "min_age_minutes": { "type": "integer", "minimum": 0, "description": "only processes at least this old" },
+                "swap_threshold_mb": { "type": "integer", "minimum": 0, "description": "propose kills when swap in use is at least this" }
+            }),
+            &[],
+        )
+    },
+    action: Action::Read {
+        run: |args, shell| {
+            let min_age = args.get("min_age_minutes").and_then(Value::as_u64).unwrap_or(DEFAULT_MIN_AGE_MINUTES);
+            let threshold = args.get("swap_threshold_mb").and_then(Value::as_u64).unwrap_or(DEFAULT_SWAP_THRESHOLD_MB);
+            let swap = parse_sysctl(&sh(shell, &["sysctl", "vm.swapusage"])?)["swap"].clone();
+            let procs = parse_ps(&sh(shell, &[&["ps"], PS].concat())?);
+            Ok(stale_report(&procs, &swap, min_age, threshold))
+        },
+    },
+};
+
+const LAUNCH_AGENTS: Verb = Verb {
+    name: "launch_agents",
+    read_only: true,
+    description: "launchd jobs in this login session: label, pid (null when not running), last exit status. Apple's own are left out unless `include_apple`; `prefix` filters labels.",
+    schema: || object(json!({ "prefix": { "type": "string" }, "include_apple": { "type": "boolean" } }), &[]),
+    action: Action::Read {
+        run: |args, shell| {
+            let prefix = args.get("prefix").and_then(Value::as_str).unwrap_or("");
+            let apple = args.get("include_apple").and_then(Value::as_bool).unwrap_or(false);
+            let agents: Vec<Value> = parse_launchctl(&sh(shell, &["launchctl", "list"])?)
+                .into_iter()
+                .filter(|a| {
+                    let l = a["label"].as_str().unwrap_or("");
+                    l.starts_with(prefix) && (apple || !l.starts_with("com.apple."))
+                })
+                .collect();
+            Ok(json!({ "agents": agents }))
+        },
+    },
+};
+
+const KILL: Verb = Verb {
+    name: "kill",
+    read_only: false,
+    description: "Send TERM (default), INT or KILL to a process. Takes `pid` and `started` exactly as system__processes or system__stale_processes print them; a pid whose start time changed is not killed.",
+    schema: || {
+        object(
+            json!({
+                "pid": { "type": "integer", "minimum": 2 },
+                "started": { "type": "string", "description": "the process's start time as listed, e.g. \"Sun Nov 1 18:51:12 2026\"" },
+                "signal": { "type": "string", "enum": SIGNALS }
+            }),
+            &["pid", "started"],
+        )
+    },
+    action: Action::Write {
+        argv: |args| {
             let p = pid(args)?;
             started(args)?;
             let sig = args.get("signal").map(|s| s.as_str().ok_or("signal: a string is required")).transpose()?.unwrap_or("TERM");
@@ -518,15 +569,57 @@ fn argv(v: &Verb, args: &Value) -> Result<Vec<String>, String> {
                 return Err(format!("signal: {sig:?} is not TERM, INT or KILL"));
             }
             Ok(vec!["kill".into(), format!("-{sig}"), p.to_string()])
-        }
-        "quit_app" => {
+        },
+        describe: |args, shell| {
+            let pid = arg_text(args, "pid");
+            let sig = args.get("signal").and_then(Value::as_str).unwrap_or("TERM");
+            let what = shell("ps", &["-p".into(), pid.clone(), "-o".into(), "rss=,command=".into()])
+                .ok()
+                .and_then(|out| {
+                    let line = out.lines().next()?.trim().to_string();
+                    let (rss, cmd) = line.split_once(char::is_whitespace)?;
+                    let mb = rss.parse::<u64>().ok()? / 1024;
+                    Some(format!("{}, {mb} MB", clip(short_command(cmd.trim()), 80)))
+                })
+                .unwrap_or_else(|| "not running".into());
+            format!("kill -{sig} {pid} ({what})")
+        },
+        exec: |argv, args, shell| {
+            let want = started(args)?;
+            let now = sh(shell, &["ps", "-p", &argv[2], "-o", "lstart="]).map(|s| normalize(&s)).unwrap_or_default();
+            if now != want {
+                return Err(format!("pid {} started {now:?}, not {want:?}: a different process or gone; not killed", argv[2]));
+            }
+            exec_plain(argv, args, shell)
+        },
+    },
+};
+
+const QUIT_APP: Verb = Verb {
+    name: "quit_app",
+    read_only: false,
+    description: "Ask an app to quit by bundle id (as File > Quit; the app may ask to save).",
+    schema: || object(json!({ "bundle_id": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" } }), &["bundle_id"]),
+    action: Action::Write {
+        argv: |args| {
             let b = string(args, "bundle_id")?;
             if b.len() < 3 || b.len() > 155 || !b.contains('.') || !b.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
                 return Err(format!("bundle_id: {b:?} is not a bundle id"));
             }
             Ok(vec!["osascript".into(), "-e".into(), format!("tell application id \"{b}\" to quit")])
-        }
-        "unload_agent" => {
+        },
+        describe: |args, _| format!("quit {}", arg_text(args, "bundle_id")),
+        exec: exec_plain,
+    },
+};
+
+const UNLOAD_AGENT: Verb = Verb {
+    name: "unload_agent",
+    read_only: false,
+    description: "Unload a launchd agent of this user (`launchctl bootout`) until the next login or a bootstrap. Never an Apple agent.",
+    schema: || object(json!({ "label": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" } }), &["label"]),
+    action: Action::Write {
+        argv: |args| {
             let l = string(args, "label")?;
             if l.is_empty() || l.len() > 200 || !l.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)) {
                 return Err(format!("label: {l:?} is not a launchd label"));
@@ -537,83 +630,11 @@ fn argv(v: &Verb, args: &Value) -> Result<Vec<String>, String> {
             // SAFETY: getuid(2) cannot fail.
             let uid = unsafe { libc::getuid() };
             Ok(vec!["launchctl".into(), "bootout".into(), format!("gui/{uid}/{l}")])
-        }
-        other => Err(format!("{other} is not a write verb")),
-    }
-}
-
-fn describe(v: &Verb, args: &Value, shell: Shell) -> String {
-    let s = |k: &str| args.get(k).map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())).unwrap_or_default();
-    match v.name {
-        "kill" => {
-            let sig = args.get("signal").and_then(Value::as_str).unwrap_or("TERM");
-            let what = shell("ps", &["-p".into(), s("pid"), "-o".into(), "rss=,command=".into()])
-                .ok()
-                .and_then(|out| {
-                    let line = out.lines().next()?.trim().to_string();
-                    let (rss, cmd) = line.split_once(char::is_whitespace)?;
-                    let mb = rss.parse::<u64>().ok()? / 1024;
-                    Some(format!("{}, {mb} MB", clip(short_command(cmd.trim()), 80)))
-                })
-                .unwrap_or_else(|| "not running".into());
-            format!("kill -{sig} {} ({what})", s("pid"))
-        }
-        "quit_app" => format!("quit {}", s("bundle_id")),
-        "unload_agent" => format!("unload launchd agent {}", s("label")),
-        other => other.to_string(),
-    }
-}
-
-fn run(v: &Verb, args: &Value, shell: Shell) -> Result<Value, String> {
-    let call = |argv: &[&str]| shell(argv[0], &argv[1..].iter().map(|s| s.to_string()).collect::<Vec<_>>());
-    match v.name {
-        "memory" => {
-            let mut m = parse_sysctl(&call(&["sysctl", "hw.memsize", "vm.swapusage", "kern.memorystatus_vm_pressure_level"])?);
-            m["pages_mb"] = parse_vm_stat(&call(&["vm_stat"])?);
-            Ok(m)
-        }
-        "processes" => {
-            let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(15).clamp(1, 200) as usize;
-            let mut procs = parse_ps(&call(&[&["ps"], PS].concat())?);
-            procs.sort_by_key(|p| std::cmp::Reverse(p.rss_kb));
-            Ok(json!({ "processes": procs.iter().take(limit).map(Proc::to_json).collect::<Vec<_>>() }))
-        }
-        "stale_processes" => {
-            let min_age = args.get("min_age_minutes").and_then(Value::as_u64).unwrap_or(DEFAULT_MIN_AGE_MINUTES);
-            let threshold = args.get("swap_threshold_mb").and_then(Value::as_u64).unwrap_or(DEFAULT_SWAP_THRESHOLD_MB);
-            let swap = parse_sysctl(&call(&["sysctl", "vm.swapusage"])?)["swap"].clone();
-            let procs = parse_ps(&call(&[&["ps"], PS].concat())?);
-            Ok(stale_report(&procs, &swap, min_age, threshold))
-        }
-        "launch_agents" => {
-            let prefix = args.get("prefix").and_then(Value::as_str).unwrap_or("");
-            let apple = args.get("include_apple").and_then(Value::as_bool).unwrap_or(false);
-            let agents: Vec<Value> = parse_launchctl(&call(&["launchctl", "list"])?)
-                .into_iter()
-                .filter(|a| {
-                    let l = a["label"].as_str().unwrap_or("");
-                    l.starts_with(prefix) && (apple || !l.starts_with("com.apple."))
-                })
-                .collect();
-            Ok(json!({ "agents": agents }))
-        }
-        "kill" => {
-            let argv = argv(v, args)?;
-            let want = started(args)?;
-            let now = call(&["ps", "-p", &argv[2], "-o", "lstart="]).map(|s| normalize(&s)).unwrap_or_default();
-            if now != want {
-                return Err(format!("pid {} started {now:?}, not {want:?}: a different process or gone; not killed", argv[2]));
-            }
-            let out = shell(&argv[0], &argv[1..])?;
-            Ok(json!({ "ok": true, "output": out.trim() }))
-        }
-        _ => {
-            let argv = argv(v, args)?;
-            let out = shell(&argv[0], &argv[1..])?;
-            Ok(json!({ "ok": true, "output": out.trim() }))
-        }
-    }
-}
+        },
+        describe: |args, _| format!("unload launchd agent {}", arg_text(args, "label")),
+        exec: exec_plain,
+    },
+};
 
 fn clip(s: &str, n: usize) -> String {
     if s.chars().count() <= n { s.to_string() } else { format!("{}…", s.chars().take(n).collect::<String>()) }

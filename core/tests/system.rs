@@ -774,3 +774,19 @@ fn policy_system_example_loads() {
     assert_eq!(tools.len(), 7);
     assert_eq!(tools.iter().filter(|(_, d)| *d == Decision::Approval).map(|(n, _)| n.as_str()).collect::<Vec<_>>(), ["system__key"]);
 }
+
+#[test]
+fn every_verb_has_a_schema_and_write_verbs_a_title() {
+    for v in system::VERBS.iter().chain(tin_core::macos::VERBS) {
+        let schema = v.input_schema();
+        assert_eq!(schema["type"], "object", "{}", v.name);
+        assert_eq!(v.read_only, matches!(v.action, system::Action::Read { .. }), "{}: read_only matches the action", v.name);
+        if v.read_only {
+            continue;
+        }
+        let required = schema["required"].as_array().unwrap();
+        assert!(!required.is_empty() && !schema["properties"].as_object().unwrap().is_empty(), "{}: empty schema", v.name);
+        let title = v.describe(&json!({}), &|_, _| Err("no shell".into()));
+        assert_ne!(title, v.name, "{}: approvals title is the bare name", v.name);
+    }
+}
