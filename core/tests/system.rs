@@ -55,7 +55,7 @@ impl Backend for Phone {
             ("dumpsys", "battery") => synthetic("battery.txt"),
             ("dumpsys", "connectivity") => synthetic("connectivity.txt"),
             ("settings", "get") => "0\n".into(),
-            ("uiautomator", _) => format!("UI hierchary dumped to: {}\n", system::UI_DUMP),
+            ("uiautomator", _) => format!("UI hierchary dumped to: {}\n", args.last().cloned().unwrap_or_default()),
             ("cat", _) => synthetic(self.ui),
             _ => String::new(),
         })
@@ -600,8 +600,44 @@ fn screen_text_normal() {
     assert_eq!(r["isError"], false, "{r}");
     assert!(text(&r).contains("Олена"));
     let calls = phone.calls.lock().unwrap().clone();
-    assert!(calls.contains(&vec!["uiautomator".into(), "dump".into(), system::UI_DUMP.into()]));
-    assert!(calls.contains(&vec!["rm".into(), "-f".into(), system::UI_DUMP.into()]), "the dump is removed");
+    let dump = calls.iter().find(|c| c[0] == "uiautomator").expect("dumped")[2].clone();
+    assert!(dump.starts_with("/data/local/tmp/tin/") && dump.ends_with(".xml"), "{dump}");
+    assert!(calls.contains(&vec!["cat".into(), dump.clone()]));
+    assert!(calls.contains(&vec!["rm".into(), "-f".into(), dump]), "the dump is removed");
+}
+
+#[test]
+fn screen_text_calls_use_distinct_dump_files() {
+    let phone = Phone::default();
+    let s = ungated(ALL_SYSTEM, phone.clone());
+    call(&s, "system__screen_text", json!({}));
+    call(&s, "system__screen_text", json!({}));
+    let calls = phone.calls.lock().unwrap().clone();
+    let dumps: Vec<_> = calls.iter().filter(|c| c[0] == "uiautomator").map(|c| c[2].clone()).collect();
+    assert_eq!(dumps.len(), 2);
+    assert_ne!(dumps[0], dumps[1], "concurrent calls must not share a file");
+}
+
+#[test]
+fn screen_text_removes_the_dump_when_reading_fails() {
+    #[derive(Clone)]
+    struct NoCat(Phone);
+    impl Backend for NoCat {
+        fn execute(&self, a: &str, b: &str, c: &str) -> Result<String, String> {
+            self.0.execute(a, b, c)
+        }
+        fn shell(&self, program: &str, args: &[String]) -> Result<String, String> {
+            if program == "cat" {
+                return Err("cat: no such file".into());
+            }
+            self.0.shell(program, args)
+        }
+    }
+    let phone = Phone::default();
+    let s = Server::new(Box::new(NoCat(phone.clone())), Policy::from_toml(ALL_SYSTEM).unwrap());
+    let r = call(&s, "system__screen_text", json!({}));
+    assert_eq!(r["isError"], true);
+    assert!(phone.calls.lock().unwrap().iter().any(|c| c[0] == "rm"), "cleanup runs on error");
 }
 
 #[test]

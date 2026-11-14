@@ -4,6 +4,7 @@
 
 use crate::policy::MONEY_PACKAGES;
 use serde_json::{Map, Value, json};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Runs one program with argv as the shell user. `Ok` is stdout; `Err` the failure text.
 pub type Shell<'a> = &'a dyn Fn(&str, &[String]) -> Result<String, String>;
@@ -37,8 +38,12 @@ pub fn verb(name: &str) -> Option<&'static Verb> {
     VERBS.iter().find(|v| v.name == name)
 }
 
-/// Where `screen_text` has uiautomator write its dump; removed after reading.
-pub const UI_DUMP: &str = "/data/local/tmp/tin/ui.xml";
+/// Where `screen_text` has uiautomator write its dump. Each call gets its own file (HTTP connections run in
+/// parallel); it is removed after reading.
+fn ui_dump_path() -> String {
+    static CALLS: AtomicU64 = AtomicU64::new(0);
+    format!("/data/local/tmp/tin/ui-{}-{}.xml", std::process::id(), CALLS.fetch_add(1, Ordering::Relaxed))
+}
 
 const MAX_COORD: i64 = 10_000;
 const MAX_TEXT: usize = 1000;
@@ -192,13 +197,16 @@ mod android {
                 if let Some(fg) = parse_foreground(&run(&["dumpsys", "activity", "activities"])?) {
                     refuse_money(fg["package"].as_str().unwrap_or(""))?;
                 }
-                let out = run(&["uiautomator", "dump", UI_DUMP])?;
-                if !out.contains("dumped to") {
-                    return Err(format!("uiautomator: {out}"));
-                }
-                let xml = run(&["cat", UI_DUMP]);
-                let _ = run(&["rm", "-f", UI_DUMP]);
-                let screen = parse_ui(&xml?)?;
+                let dump = ui_dump_path();
+                let read = (|| {
+                    let out = run(&["uiautomator", "dump", &dump])?;
+                    if !out.contains("dumped to") {
+                        return Err(format!("uiautomator: {out}"));
+                    }
+                    run(&["cat", &dump])
+                })();
+                let _ = run(&["rm", "-f", &dump]);
+                let screen = parse_ui(&read?)?;
                 for p in screen["packages"].as_array().into_iter().flatten() {
                     refuse_money(p.as_str().unwrap_or(""))?;
                 }
