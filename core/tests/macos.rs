@@ -198,7 +198,7 @@ fn macos_tools_list_names_notes_and_instructions() {
     let r = s.handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })).unwrap();
     let tools = r["result"]["tools"].as_array().unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(tools.len(), VERBS.len() + 2 + 1, "7 verbs, 2 intents the policy names, approval__wait: {names:?}");
+    assert_eq!(tools.len(), VERBS.len() + 2 + 2, "7 verbs, 2 intents the policy names, approval__wait, tin__doctor: {names:?}");
     let count = tools.iter().find(|t| t["name"] == "example_Counter__GetCountIntent").unwrap();
     assert!(!count["description"].as_str().unwrap().contains("approvals app"), "marked read-only in the policy");
     let open = tools.iter().find(|t| t["name"] == "example_Counter__OpenThingIntent").unwrap();

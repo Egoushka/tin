@@ -94,7 +94,9 @@ fn fixture_tool_names_are_unique_and_valid() {
 fn policy_empty_lists_nothing() {
     let (s, _) = server("");
     let r = rpc(&s, 1, "tools/list", json!({}));
-    assert_eq!(r["result"]["tools"], json!([]));
+    // The doctor is the one tool a policy cannot hide: it is how a client learns the policy is empty.
+    let names: Vec<&str> = r["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert_eq!(names, [mcp::DOCTOR_TOOL]);
 }
 
 #[test]
@@ -103,7 +105,7 @@ fn policy_money_never_reaches_backend() {
     let r = rpc(&s, 1, "tools/list", json!({}));
     let tools = r["result"]["tools"].as_array().unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["android_settings__getBatteryDeviceState", "ftband_mono__topUpPhone", "urbandroid_sleep__createAlarm"]);
+    assert_eq!(names, ["android_settings__getBatteryDeviceState", "ftband_mono__topUpPhone", "urbandroid_sleep__createAlarm", "tin__doctor"]);
     let mono = tools.iter().find(|t| t["name"] == "ftband_mono__topUpPhone").unwrap();
     assert!(mono["description"].as_str().unwrap().contains("never runs"));
     let alarm = tools.iter().find(|t| t["name"] == "urbandroid_sleep__createAlarm").unwrap();
@@ -216,4 +218,58 @@ fn error_output_has_secrets_redacted() {
     let text = r["result"]["content"][0]["text"].as_str().unwrap();
     assert!(!text.contains("482913") && !text.contains("abc123secret"), "{text}");
     assert!(text.contains("cmd failed"), "{text}");
+}
+
+fn doctor(s: &Server) -> Value {
+    let r = rpc(s, 1, "tools/call", json!({ "name": mcp::DOCTOR_TOOL, "arguments": {} }));
+    assert_eq!(r["result"]["isError"], false);
+    r["result"]["structuredContent"].clone()
+}
+
+fn problems(d: &Value) -> String {
+    d["problems"].as_array().unwrap().iter().map(|p| p.as_str().unwrap()).collect::<Vec<_>>().join("\n")
+}
+
+#[test]
+fn doctor_says_why_a_missing_policy_denies_everything() {
+    let s = Server::new(Box::new(Recording::default()), Policy::default()).with_policy_source(mcp::PolicySource::Missing("/x/policy.toml".into()));
+    let d = doctor(&s);
+    assert_eq!(d["ok"], false);
+    assert_eq!(d["policy"]["status"], "missing");
+    assert!(problems(&d).contains("no policy file at /x/policy.toml"), "{d}");
+}
+
+#[test]
+fn doctor_flags_rules_that_match_nothing_and_missing_approvals() {
+    let toml = "[[approval]]\npackage = \"urbandroid.sleep\"\nfunction = \"*\"\n\n[[allow]]\npackage = \"com.android.settings\"\nfunction = \"*\"\nread_only = true\n";
+    let s = Server::new(Box::new(Recording::default()), Policy::from_toml(toml).unwrap()).with_policy_source(mcp::PolicySource::File("p".into()));
+    let d = doctor(&s);
+    let p = problems(&d);
+    assert!(p.contains("rule urbandroid.sleep * matches no function"), "{p}");
+    assert!(!p.contains("com.android.settings"), "{p}");
+    assert_eq!(d["policy"]["status"], "loaded");
+    assert_eq!(d["backend"]["app_functions"], 61);
+}
+
+#[test]
+fn doctor_reports_a_healthy_setup_and_never_shows_secrets() {
+    let dir = std::env::temp_dir().join(format!("tin-doctor-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (token, key) = (dir.join("token"), dir.join("key"));
+    std::fs::write(&token, "tok-SECRET-1").unwrap();
+    std::fs::write(&key, "key-SECRET-2").unwrap();
+    let toml = format!(
+        "[[allow]]\npackage = \"com.android.settings\"\nfunction = \"*\"\nread_only = true\n\n[approvals]\nurl = \"http://approvals.invalid:1\"\ntoken_file = \"{}\"\nkey_file = \"{}\"\ncallback = \"/cb/\"\n",
+        token.display(),
+        key.display()
+    );
+    let s = Server::new(Box::new(Recording::default()), Policy::from_toml(&toml).unwrap()).with_policy_source(mcp::PolicySource::File("p".into()));
+    let r = rpc(&s, 1, "tools/call", json!({ "name": mcp::DOCTOR_TOOL, "arguments": {} }));
+    let text = r["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(!text.contains("SECRET") && !text.contains("approvals.invalid"), "{text}");
+    let d = &r["result"]["structuredContent"];
+    assert_eq!(d["approvals"]["token_file"], "readable");
+    assert_eq!(d["approvals"]["key_file"], "readable");
+    assert!(d["tools"]["allow"].as_u64().unwrap() > 0, "{d}");
+    std::fs::remove_dir_all(&dir).unwrap();
 }

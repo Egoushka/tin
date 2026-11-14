@@ -75,3 +75,5 @@
   local AAR, so `:speech` only compiles against its classes.
 - Error text goes through `redact::redact` (in `tool_error`) before it reaches the model: one-time codes, `key=value`
   secrets, bearer tokens and long opaque tokens are masked. Successful output is not redacted.
+- `tin__doctor` is the one tool the policy cannot hide. It reports setup health only (policy found, rule typos,
+  approvals files readable) and never a secret value or device data; keep it that way when adding fields.
