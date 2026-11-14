@@ -33,6 +33,6 @@ function = "key"
 url = "http://<approvals server tailnet ip>:<port>"
 source = "tin"
 token_file = "/data/local/tmp/tin/approvals.token"   # the approvals source token for "tin", mode 600
-key_file = "/data/local/tmp/tin/approvals.key"       # APPROVAL_HMAC_KEY, mode 600
+key_file = "/data/local/tmp/tin/approvals.key"       # APPROVAL_HMAC_KEY (at least 32 bytes), mode 600
 callback = "https://tin.phone.invalid/approvals/"    # must be a prefix in the server's APPROVALS_CALLBACK_ROUTES
 callback_listen = "<phone tailnet ip>:7382"

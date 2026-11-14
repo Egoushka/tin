@@ -39,6 +39,6 @@ read_only = true
 # url = "http://<approvals server tailnet ip>:<port>"
 # source = "tin"
 # token_file = "~/.config/tin/approvals.token"   # the approvals source token for "tin", mode 600
-# key_file = "~/.config/tin/approvals.key"       # APPROVAL_HMAC_KEY, mode 600
+# key_file = "~/.config/tin/approvals.key"       # APPROVAL_HMAC_KEY (at least 32 bytes), mode 600
 # callback = "https://tin.mac.invalid/approvals/"
 # callback_listen = "<mac tailnet ip>:7382"

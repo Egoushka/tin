@@ -101,7 +101,9 @@ fn gate(a: &tin_core::policy::Approvals) -> Result<Gate, String> {
         wait: Duration::from_secs(a.wait_secs),
         ttl: Duration::from_secs(a.ttl_secs),
     };
-    Ok(Gate::new(Box::new(approver), read(&a.key_file)?.as_bytes(), cfg))
+    let key = read(&a.key_file)?;
+    tin_core::gate::check_key(&key, &a.key_file)?;
+    Ok(Gate::new(Box::new(approver), key.as_bytes(), cfg))
 }
 
 fn list(backend: &dyn Backend, policy: &Policy, all: bool) -> Result<(), String> {

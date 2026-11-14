@@ -253,6 +253,16 @@ fn parse_read_tools_end_to_end() {
     assert_eq!(u["apps"].as_array().unwrap().len(), 1);
 }
 
+#[test]
+fn approval_key_must_be_32_bytes() {
+    for k in ["", "   \n", "short-key", &"k".repeat(31)] {
+        let e = gate::check_key(k, "/keys/approvals.key").unwrap_err();
+        assert!(e.contains("/keys/approvals.key") && e.contains("32"), "{e}");
+        assert!(k.trim().is_empty() || !e.contains(k.trim()), "the error must not print the key");
+    }
+    assert!(gate::check_key(&"k".repeat(32), "f").is_ok());
+}
+
 // S3: policy.
 
 fn decide(policy: &str, package: &str, id: &str, read_only: Option<bool>) -> Decision {
