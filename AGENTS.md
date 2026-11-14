@@ -4,9 +4,9 @@
 
 - `core/`: Rust crate `tin-core`, binary `tin`. `metadata.rs` (AppSearch documents → tools), `policy.rs`,
   `mcp.rs` (protocol 2025-06-18), `backend.rs` (`cmd app_function`, shell argv), `transport.rs` (stdio, HTTP on
-  `@tin`, the decision-only TCP listener), `system.rs` (the verb table, Android verbs, their argv and dump parsers),
+  `@tin`, the decision-only TCP listener), `system.rs` (the `Verb` type and the Android verbs: each verb's schema, argv, describe and run sit in one definition, no wildcard arms; their dump parsers),
   `gate.rs` (held calls, the approvals client, decision signatures), `macos.rs` (the macOS backend: actionsdata →
-  tools, the shortcut writer, Mac verbs and their parsers), `speech.rs` (speech tools, a client of `@tin-speech`).
+  tools, the shortcut writer, Mac verbs defined the same way, and their parsers), `speech.rs` (speech tools, a client of `@tin-speech`).
 - `android/app`: Kotlin host app `io.github.egoushka.tin`; `TinService` is the Shizuku user service, `SpeechBridge`
   serves `@tin-speech` inside it, `SpeechService` owns the mic and the model in the app process.
 - `android/speech`: speech library (no tin dependency): VAD + Parakeet through sherpa-onnx, push-to-talk, protocol.
@@ -65,7 +65,7 @@
 - Shizuku starts the service with umask 0: set every file mode explicitly (`Os.chmod`).
 - Tool names are `<last two package segments>__<method>`; tests and `accept.py` depend on them.
 - `policy.rs` and `gate.rs` stay platform-free: platform code goes behind `Backend` (`functions`, `verbs`,
-  `instructions`) and each verb's `Ops`.
+  `instructions`) and each verb's `Action`.
 - Mac write verbs validate their arguments in `argv` so a bad call fails before an approvals item exists; never
   unload a `com.apple.` agent, and `kill` re-reads the start time before signalling.
 - Never commit raw `ps`, `launchctl` or `vm_stat` output from a real Mac: the Mac fixtures are synthetic.

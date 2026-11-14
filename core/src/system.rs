@@ -9,28 +9,48 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Runs one program with argv as the shell user. `Ok` is stdout; `Err` the failure text.
 pub type Shell<'a> = &'a dyn Fn(&str, &[String]) -> Result<String, String>;
 
+pub type ReadFn = fn(&Value, Shell) -> Result<Value, String>;
+pub type ArgvFn = fn(&Value) -> Result<Vec<String>, String>;
+pub type DescribeFn = fn(&Value, Shell) -> String;
+/// Runs a write verb's validated argv. `args` are the call's arguments, for checks beyond the argv.
+pub type ExecFn = fn(&[String], &Value, Shell) -> Result<Value, String>;
+
+/// What a verb does when called. A read verb runs at once; a write verb validates into an argv (before an approvals
+/// item exists), names itself for the item's title, and runs the argv only after the approval.
+#[derive(Debug)]
+pub enum Action {
+    Read { run: ReadFn },
+    Write { argv: ArgvFn, describe: DescribeFn, exec: ExecFn },
+}
+
+/// One system verb, whole: its tool name, description, schema and behaviour live in one value, so a missing piece is a
+/// compile error rather than an empty schema or a bare approvals title.
 #[derive(Debug)]
 pub struct Verb {
     pub name: &'static str,
     pub read_only: bool,
     pub description: &'static str,
-    pub ops: &'static Ops,
+    pub schema: fn() -> Value,
+    pub action: Action,
 }
 
-pub const VERBS: &[Verb] = &[
-    Verb { name: "notifications", read_only: true, description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter. Banking apps are left out; `banking_apps_omitted` counts them.", ops: &ANDROID },
-    Verb { name: "usage", read_only: true, description: "Today's foreground time and last use per app, most used first (`limit`, default 20).", ops: &ANDROID },
-    Verb { name: "foreground_app", read_only: true, description: "The app and activity on screen now.", ops: &ANDROID },
-    Verb { name: "screen_text", read_only: true, description: "Text and content descriptions on screen now (uiautomator), with bounds. Refused while a banking app is in front.", ops: &ANDROID },
-    Verb { name: "battery", read_only: true, description: "Battery level, status, plug, temperature, health, voltage.", ops: &ANDROID },
-    Verb { name: "connectivity", read_only: true, description: "Default network's transports and validation, every network's transports, airplane mode.", ops: &ANDROID },
-    Verb { name: "tap", read_only: false, description: "Tap the screen at x, y (pixels).", ops: &ANDROID },
-    Verb { name: "swipe", read_only: false, description: "Swipe from x1, y1 to x2, y2 over `ms` milliseconds (default 300).", ops: &ANDROID },
-    Verb { name: "type_text", read_only: false, description: "Type text into the focused field (ASCII; `input text`).", ops: &ANDROID },
-    Verb { name: "key", read_only: false, description: "Press a key: KEYCODE_HOME, KEYCODE_BACK, KEYCODE_ENTER, ...", ops: &ANDROID },
-    Verb { name: "launch", read_only: false, description: "Open an app by package name. Banking apps are refused.", ops: &ANDROID },
-    Verb { name: "settings_put", read_only: false, description: "Set a value in Android settings (namespace system, secure or global).", ops: &ANDROID },
-];
+/// A tool input schema: an object with these properties and required names.
+pub fn object(properties: Value, required: &[&str]) -> Value {
+    json!({ "type": "object", "properties": properties, "required": required })
+}
+
+/// Runs `argv` (program first) through `shell`.
+pub fn sh(shell: Shell, argv: &[&str]) -> Result<String, String> {
+    shell(argv[0], &argv[1..].iter().map(|s| s.to_string()).collect::<Vec<_>>())
+}
+
+/// The `exec` of a write verb with nothing to check around the run.
+pub fn exec_plain(argv: &[String], _: &Value, shell: Shell) -> Result<Value, String> {
+    let out = shell(&argv[0], &argv[1..])?;
+    Ok(json!({ "ok": true, "output": out.trim() }))
+}
+
+pub const VERBS: &[Verb] = &[NOTIFICATIONS, USAGE, FOREGROUND_APP, SCREEN_TEXT, BATTERY, CONNECTIVITY, TAP, SWIPE, TYPE_TEXT, KEY, LAUNCH, SETTINGS_PUT];
 
 pub const INSTRUCTIONS: &str = "Android AppFunctions and system tools on this phone. Only what the phone's policy allows is listed. Read-only tools run at once; anything that changes state waits for a tap in the approvals app (call approval__wait with the ticket if the first wait runs out). Functions that move money are refused.";
 
@@ -48,195 +68,275 @@ fn ui_dump_path() -> String {
 const MAX_COORD: i64 = 10_000;
 const MAX_TEXT: usize = 1000;
 
+fn int(d: &str) -> Value {
+    json!({ "type": "integer", "minimum": 0, "maximum": MAX_COORD, "description": d })
+}
+
+/// The title's view of one argument: a string as is, anything else as JSON, a missing one empty.
+pub fn arg_text(args: &Value, k: &str) -> String {
+    args.get(k).map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())).unwrap_or_default()
+}
+
 impl Verb {
     pub fn tool_name(&self) -> String {
         format!("system__{}", self.name)
     }
 
     pub fn input_schema(&self) -> Value {
-        (self.ops.schema)(self)
+        (self.schema)()
     }
 
     /// The argv a write verb runs, after validating every argument. Read verbs have no single argv.
     pub fn argv(&self, args: &Value) -> Result<Vec<String>, String> {
-        (self.ops.argv)(self, args)
+        match &self.action {
+            Action::Write { argv, .. } => argv(args),
+            Action::Read { .. } => Err(format!("{} is not a write verb", self.name)),
+        }
     }
 
     /// One line for the approvals item's title: what will happen. May read state through `shell` to name the target.
     pub fn describe(&self, args: &Value, shell: Shell) -> String {
-        (self.ops.describe)(self, args, shell)
+        match &self.action {
+            Action::Write { describe, .. } => describe(args, shell),
+            Action::Read { .. } => self.name.to_string(),
+        }
     }
 
     /// Runs the verb. Write verbs must only be reached after an approval; the server enforces that.
     pub fn run(&self, args: &Value, shell: Shell) -> Result<Value, String> {
-        (self.ops.run)(self, args, shell)
-    }
-}
-
-/// How one platform's verbs build their schema and argv, describe a held call, and run.
-pub struct Ops {
-    pub schema: fn(&Verb) -> Value,
-    pub argv: fn(&Verb, &Value) -> Result<Vec<String>, String>,
-    pub describe: fn(&Verb, &Value, Shell) -> String,
-    pub run: fn(&Verb, &Value, Shell) -> Result<Value, String>,
-}
-
-impl std::fmt::Debug for Ops {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("Ops")
-    }
-}
-
-const ANDROID: Ops = Ops { schema: android::schema, argv: android::argv, describe: android::describe, run: android::run };
-
-mod android {
-    use super::*;
-
-    pub(super) fn schema(v: &Verb) -> Value {
-        let int = |d: &str| json!({ "type": "integer", "minimum": 0, "maximum": MAX_COORD, "description": d });
-        let (props, required): (Value, &[&str]) = match v.name {
-            "notifications" => (json!({ "package": { "type": "string", "description": "only this app's notifications" } }), &[]),
-            "usage" => (json!({ "limit": { "type": "integer", "minimum": 1, "maximum": 200 } }), &[]),
-            "tap" => (json!({ "x": int("pixels from the left"), "y": int("pixels from the top") }), &["x", "y"]),
-            "swipe" => (
-                json!({ "x1": int("start x"), "y1": int("start y"), "x2": int("end x"), "y2": int("end y"), "ms": int("duration in milliseconds") }),
-                &["x1", "y1", "x2", "y2"],
-            ),
-            "type_text" => (json!({ "text": { "type": "string", "maxLength": MAX_TEXT } }), &["text"]),
-            "key" => (json!({ "key": { "type": "string", "pattern": "^KEYCODE_[A-Z0-9_]+$" } }), &["key"]),
-            "launch" => (json!({ "package": { "type": "string" } }), &["package"]),
-            "settings_put" => (
-                json!({
-                    "namespace": { "type": "string", "enum": ["system", "secure", "global"] },
-                    "key": { "type": "string" },
-                    "value": { "type": "string", "maxLength": MAX_TEXT }
-                }),
-                &["namespace", "key", "value"],
-            ),
-            _ => (json!({}), &[]),
-        };
-        json!({ "type": "object", "properties": props, "required": required })
-    }
-
-    /// The argv a write verb runs, after validating every argument. Read verbs have no single argv.
-    pub(super) fn argv(v: &Verb, args: &Value) -> Result<Vec<String>, String> {
-        let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        match v.name {
-            "tap" => Ok(a(&["input", "tap", &coord(args, "x")?, &coord(args, "y")?])),
-            "swipe" => {
-                let ms = if args.get("ms").is_some() { coord(args, "ms")? } else { "300".into() };
-                Ok(a(&["input", "swipe", &coord(args, "x1")?, &coord(args, "y1")?, &coord(args, "x2")?, &coord(args, "y2")?, &ms]))
-            }
-            "type_text" => {
-                let t = text(args, "text")?;
-                if t.contains("%s") {
-                    return Err("text: `%s` cannot be typed (`input text` reads it as a space)".into());
-                }
-                Ok(a(&["input", "text", &t.replace(' ', "%s")]))
-            }
-            "key" => {
-                let k = string(args, "key")?;
-                let ok = k.strip_prefix("KEYCODE_").is_some_and(|r| !r.is_empty() && r.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'));
-                if !ok {
-                    return Err(format!("key: {k:?} is not a KEYCODE_ name"));
-                }
-                Ok(a(&["input", "keyevent", k]))
-            }
-            "launch" => {
-                let p = package(args, "package")?;
-                if MONEY_PACKAGES.contains(&p.as_str()) {
-                    return Err(format!("refused: {p} is a banking app, and tin does not open banking apps"));
-                }
-                Ok(a(&["monkey", "-p", &p, "-c", "android.intent.category.LAUNCHER", "1"]))
-            }
-            "settings_put" => {
-                let ns = string(args, "namespace")?;
-                if !["system", "secure", "global"].contains(&ns) {
-                    return Err(format!("namespace: {ns:?} is not system, secure or global"));
-                }
-                let key = string(args, "key")?;
-                if key.is_empty() || key.len() > 100 || !key.chars().all(|c| c.is_ascii_alphanumeric() || "_.:-".contains(c)) {
-                    return Err(format!("key: {key:?} is not a settings key"));
-                }
-                Ok(a(&["settings", "put", ns, key, &text(args, "value")?]))
-            }
-            other => Err(format!("{other} is not a write verb")),
-        }
-    }
-
-    /// One line for the approvals item's title: what will happen on the phone.
-    pub(super) fn describe(v: &Verb, args: &Value, _: Shell) -> String {
-        let s = |k: &str| args.get(k).map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())).unwrap_or_default();
-        match v.name {
-            "tap" => format!("tap at ({}, {})", s("x"), s("y")),
-            "swipe" => format!("swipe from ({}, {}) to ({}, {})", s("x1"), s("y1"), s("x2"), s("y2")),
-            "type_text" => format!("type \"{}\"", clip(&s("text"), 120)),
-            "key" => format!("press {}", s("key")),
-            "launch" => format!("open {}", s("package")),
-            "settings_put" => format!("set {} {} = {}", s("namespace"), s("key"), clip(&s("value"), 80)),
-            other => other.to_string(),
-        }
-    }
-
-    /// Runs the verb. Write verbs must only be reached after an approval; the server enforces that.
-    pub(super) fn run(v: &Verb, args: &Value, shell: Shell) -> Result<Value, String> {
-        let run = |argv: &[&str]| shell(argv[0], &argv[1..].iter().map(|s| s.to_string()).collect::<Vec<_>>());
-        match v.name {
-            "notifications" => {
-                let only = args.get("package").and_then(Value::as_str);
-                let (bank, rest): (Vec<Value>, Vec<Value>) = parse_notifications(&run(&["dumpsys", "notification", "--noredact"])?)
-                    .into_iter()
-                    .partition(|n| n["package"].as_str().is_some_and(|p| MONEY_PACKAGES.contains(&p)));
-                let list: Vec<Value> = rest.into_iter().filter(|n| only.is_none_or(|p| n["package"] == p)).collect();
-                let omitted = bank.iter().filter(|n| only.is_none_or(|p| n["package"] == p)).count();
-                Ok(json!({ "notifications": list, "banking_apps_omitted": omitted }))
-            }
-            "usage" => {
-                let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(20).clamp(1, 200) as usize;
-                let mut u = parse_usage(&run(&["dumpsys", "usagestats"])?);
-                if let Some(apps) = u.get_mut("apps").and_then(Value::as_array_mut) {
-                    apps.truncate(limit);
-                }
-                Ok(u)
-            }
-            "foreground_app" => parse_foreground(&run(&["dumpsys", "activity", "activities"])?).ok_or_else(|| "no resumed activity found".into()),
-            "screen_text" => {
-                if let Some(fg) = parse_foreground(&run(&["dumpsys", "activity", "activities"])?) {
-                    refuse_money(fg["package"].as_str().unwrap_or(""))?;
-                }
-                let dump = ui_dump_path();
-                let read = (|| {
-                    let out = run(&["uiautomator", "dump", &dump])?;
-                    if !out.contains("dumped to") {
-                        return Err(format!("uiautomator: {out}"));
-                    }
-                    run(&["cat", &dump])
-                })();
-                let _ = run(&["rm", "-f", &dump]);
-                let screen = parse_ui(&read?)?;
-                for p in screen["packages"].as_array().into_iter().flatten() {
-                    refuse_money(p.as_str().unwrap_or(""))?;
-                }
-                Ok(screen)
-            }
-            "battery" => Ok(parse_battery(&run(&["dumpsys", "battery"])?)),
-            "connectivity" => {
-                let mut c = parse_connectivity(&run(&["dumpsys", "connectivity"])?);
-                let airplane = run(&["settings", "get", "global", "airplane_mode_on"]).ok().map(|s| s.trim() == "1");
-                c["airplane_mode"] = json!(airplane);
-                Ok(c)
-            }
-            _ => {
-                let argv = argv(v, args)?;
-                let out = shell(&argv[0], &argv[1..])?;
-                if v.name == "launch" && out.contains("No activities found") {
-                    return Err(format!("no launcher activity in {}", argv[2]));
-                }
-                Ok(json!({ "ok": true, "output": out.trim() }))
-            }
+        match &self.action {
+            Action::Read { run } => run(args, shell),
+            Action::Write { argv, exec, .. } => exec(&argv(args)?, args, shell),
         }
     }
 }
+
+const NOTIFICATIONS: Verb = Verb {
+    name: "notifications",
+    read_only: true,
+    description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter. Banking apps are left out; `banking_apps_omitted` counts them.",
+    schema: || object(json!({ "package": { "type": "string", "description": "only this app's notifications" } }), &[]),
+    action: Action::Read {
+        run: |args, shell| {
+            let only = args.get("package").and_then(Value::as_str);
+            let (bank, rest): (Vec<Value>, Vec<Value>) = parse_notifications(&sh(shell, &["dumpsys", "notification", "--noredact"])?)
+                .into_iter()
+                .partition(|n| n["package"].as_str().is_some_and(|p| MONEY_PACKAGES.contains(&p)));
+            let list: Vec<Value> = rest.into_iter().filter(|n| only.is_none_or(|p| n["package"] == p)).collect();
+            let omitted = bank.iter().filter(|n| only.is_none_or(|p| n["package"] == p)).count();
+            Ok(json!({ "notifications": list, "banking_apps_omitted": omitted }))
+        },
+    },
+};
+
+const USAGE: Verb = Verb {
+    name: "usage",
+    read_only: true,
+    description: "Today's foreground time and last use per app, most used first (`limit`, default 20).",
+    schema: || object(json!({ "limit": { "type": "integer", "minimum": 1, "maximum": 200 } }), &[]),
+    action: Action::Read {
+        run: |args, shell| {
+            let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(20).clamp(1, 200) as usize;
+            let mut u = parse_usage(&sh(shell, &["dumpsys", "usagestats"])?);
+            if let Some(apps) = u.get_mut("apps").and_then(Value::as_array_mut) {
+                apps.truncate(limit);
+            }
+            Ok(u)
+        },
+    },
+};
+
+const FOREGROUND_APP: Verb = Verb {
+    name: "foreground_app",
+    read_only: true,
+    description: "The app and activity on screen now.",
+    schema: || object(json!({}), &[]),
+    action: Action::Read {
+        run: |_, shell| parse_foreground(&sh(shell, &["dumpsys", "activity", "activities"])?).ok_or_else(|| "no resumed activity found".into()),
+    },
+};
+
+const SCREEN_TEXT: Verb = Verb {
+    name: "screen_text",
+    read_only: true,
+    description: "Text and content descriptions on screen now (uiautomator), with bounds. Refused while a banking app is in front.",
+    schema: || object(json!({}), &[]),
+    action: Action::Read {
+        run: |_, shell| {
+            if let Some(fg) = parse_foreground(&sh(shell, &["dumpsys", "activity", "activities"])?) {
+                refuse_money(fg["package"].as_str().unwrap_or(""))?;
+            }
+            let dump = ui_dump_path();
+            let read = (|| {
+                let out = sh(shell, &["uiautomator", "dump", &dump])?;
+                if !out.contains("dumped to") {
+                    return Err(format!("uiautomator: {out}"));
+                }
+                sh(shell, &["cat", &dump])
+            })();
+            let _ = sh(shell, &["rm", "-f", &dump]);
+            let screen = parse_ui(&read?)?;
+            for p in screen["packages"].as_array().into_iter().flatten() {
+                refuse_money(p.as_str().unwrap_or(""))?;
+            }
+            Ok(screen)
+        },
+    },
+};
+
+const BATTERY: Verb = Verb {
+    name: "battery",
+    read_only: true,
+    description: "Battery level, status, plug, temperature, health, voltage.",
+    schema: || object(json!({}), &[]),
+    action: Action::Read { run: |_, shell| Ok(parse_battery(&sh(shell, &["dumpsys", "battery"])?)) },
+};
+
+const CONNECTIVITY: Verb = Verb {
+    name: "connectivity",
+    read_only: true,
+    description: "Default network's transports and validation, every network's transports, airplane mode.",
+    schema: || object(json!({}), &[]),
+    action: Action::Read {
+        run: |_, shell| {
+            let mut c = parse_connectivity(&sh(shell, &["dumpsys", "connectivity"])?);
+            let airplane = sh(shell, &["settings", "get", "global", "airplane_mode_on"]).ok().map(|s| s.trim() == "1");
+            c["airplane_mode"] = json!(airplane);
+            Ok(c)
+        },
+    },
+};
+
+fn argv_of(parts: &[&str]) -> Vec<String> {
+    parts.iter().map(|s| s.to_string()).collect()
+}
+
+const TAP: Verb = Verb {
+    name: "tap",
+    read_only: false,
+    description: "Tap the screen at x, y (pixels).",
+    schema: || object(json!({ "x": int("pixels from the left"), "y": int("pixels from the top") }), &["x", "y"]),
+    action: Action::Write {
+        argv: |args| Ok(argv_of(&["input", "tap", &coord(args, "x")?, &coord(args, "y")?])),
+        describe: |args, _| format!("tap at ({}, {})", arg_text(args, "x"), arg_text(args, "y")),
+        exec: exec_plain,
+    },
+};
+
+const SWIPE: Verb = Verb {
+    name: "swipe",
+    read_only: false,
+    description: "Swipe from x1, y1 to x2, y2 over `ms` milliseconds (default 300).",
+    schema: || {
+        object(
+            json!({ "x1": int("start x"), "y1": int("start y"), "x2": int("end x"), "y2": int("end y"), "ms": int("duration in milliseconds") }),
+            &["x1", "y1", "x2", "y2"],
+        )
+    },
+    action: Action::Write {
+        argv: |args| {
+            let ms = if args.get("ms").is_some() { coord(args, "ms")? } else { "300".into() };
+            Ok(argv_of(&["input", "swipe", &coord(args, "x1")?, &coord(args, "y1")?, &coord(args, "x2")?, &coord(args, "y2")?, &ms]))
+        },
+        describe: |args, _| {
+            let s = |k| arg_text(args, k);
+            format!("swipe from ({}, {}) to ({}, {})", s("x1"), s("y1"), s("x2"), s("y2"))
+        },
+        exec: exec_plain,
+    },
+};
+
+const TYPE_TEXT: Verb = Verb {
+    name: "type_text",
+    read_only: false,
+    description: "Type text into the focused field (ASCII; `input text`).",
+    schema: || object(json!({ "text": { "type": "string", "maxLength": MAX_TEXT } }), &["text"]),
+    action: Action::Write {
+        argv: |args| {
+            let t = text(args, "text")?;
+            if t.contains("%s") {
+                return Err("text: `%s` cannot be typed (`input text` reads it as a space)".into());
+            }
+            Ok(argv_of(&["input", "text", &t.replace(' ', "%s")]))
+        },
+        describe: |args, _| format!("type \"{}\"", clip(&arg_text(args, "text"), 120)),
+        exec: exec_plain,
+    },
+};
+
+const KEY: Verb = Verb {
+    name: "key",
+    read_only: false,
+    description: "Press a key: KEYCODE_HOME, KEYCODE_BACK, KEYCODE_ENTER, ...",
+    schema: || object(json!({ "key": { "type": "string", "pattern": "^KEYCODE_[A-Z0-9_]+$" } }), &["key"]),
+    action: Action::Write {
+        argv: |args| {
+            let k = string(args, "key")?;
+            let ok = k.strip_prefix("KEYCODE_").is_some_and(|r| !r.is_empty() && r.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'));
+            if !ok {
+                return Err(format!("key: {k:?} is not a KEYCODE_ name"));
+            }
+            Ok(argv_of(&["input", "keyevent", k]))
+        },
+        describe: |args, _| format!("press {}", arg_text(args, "key")),
+        exec: exec_plain,
+    },
+};
+
+const LAUNCH: Verb = Verb {
+    name: "launch",
+    read_only: false,
+    description: "Open an app by package name. Banking apps are refused.",
+    schema: || object(json!({ "package": { "type": "string" } }), &["package"]),
+    action: Action::Write {
+        argv: |args| {
+            let p = package(args, "package")?;
+            if MONEY_PACKAGES.contains(&p.as_str()) {
+                return Err(format!("refused: {p} is a banking app, and tin does not open banking apps"));
+            }
+            Ok(argv_of(&["monkey", "-p", &p, "-c", "android.intent.category.LAUNCHER", "1"]))
+        },
+        describe: |args, _| format!("open {}", arg_text(args, "package")),
+        exec: |argv, _, shell| {
+            let out = shell(&argv[0], &argv[1..])?;
+            if out.contains("No activities found") {
+                return Err(format!("no launcher activity in {}", argv[2]));
+            }
+            Ok(json!({ "ok": true, "output": out.trim() }))
+        },
+    },
+};
+
+const SETTINGS_PUT: Verb = Verb {
+    name: "settings_put",
+    read_only: false,
+    description: "Set a value in Android settings (namespace system, secure or global).",
+    schema: || {
+        object(
+            json!({
+                "namespace": { "type": "string", "enum": ["system", "secure", "global"] },
+                "key": { "type": "string" },
+                "value": { "type": "string", "maxLength": MAX_TEXT }
+            }),
+            &["namespace", "key", "value"],
+        )
+    },
+    action: Action::Write {
+        argv: |args| {
+            let ns = string(args, "namespace")?;
+            if !["system", "secure", "global"].contains(&ns) {
+                return Err(format!("namespace: {ns:?} is not system, secure or global"));
+            }
+            let key = string(args, "key")?;
+            if key.is_empty() || key.len() > 100 || !key.chars().all(|c| c.is_ascii_alphanumeric() || "_.:-".contains(c)) {
+                return Err(format!("key: {key:?} is not a settings key"));
+            }
+            Ok(argv_of(&["settings", "put", ns, key, &text(args, "value")?]))
+        },
+        describe: |args, _| format!("set {} {} = {}", arg_text(args, "namespace"), arg_text(args, "key"), clip(&arg_text(args, "value"), 80)),
+        exec: exec_plain,
+    },
+};
 
 fn refuse_money(package: &str) -> Result<(), String> {
     if MONEY_PACKAGES.contains(&package) {
