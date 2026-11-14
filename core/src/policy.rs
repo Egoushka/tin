@@ -114,7 +114,7 @@ fn is_money_id(package: &str, id: &str) -> bool {
 }
 
 impl Rule {
-    fn matches(&self, s: &Subject) -> bool {
+    pub fn matches(&self, s: &Subject) -> bool {
         self.package == s.package && (self.function == "*" || self.function == s.id)
     }
 }

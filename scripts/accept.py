@@ -27,7 +27,7 @@ from mcp.client.streamable_http import streamable_http_client
 
 PORT = 7381
 URL = f"http://127.0.0.1:{PORT}/mcp"
-DEMO_TOOLS = {"android_settings__getBatteryDeviceState", "ftband_mono__topUpPhone", "urbandroid_sleep__createAlarm"}
+DEMO_TOOLS = {"android_settings__getBatteryDeviceState", "ftband_mono__topUpPhone", "urbandroid_sleep__createAlarm", "tin__doctor"}
 BENCH_TOOL = "android_settings__getBatteryDeviceState"
 BENCH_RAW = ["adb", "shell", "cmd", "app_function", "execute-app-function",
              "--package", "com.android.settings", "--function", "getBatteryDeviceState", "--parameters", "{}"]

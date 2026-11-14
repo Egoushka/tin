@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tin_core::backend::{Backend, CmdBackend};
 use tin_core::gate::{Gate, GateConfig, HttpApprover};
-use tin_core::mcp::{self, Server};
+use tin_core::mcp::{self, PolicySource, Server};
 use tin_core::policy::{Decision, Policy};
 use tin_core::macos::MacBackend;
 use tin_core::transport;
@@ -40,9 +40,9 @@ fn main() {
         }
     };
     let result = match args.first().map(String::as_str) {
-        Some("serve") => load_policy(&policy_path).and_then(|policy| {
+        Some("serve") => load_policy(&policy_path).and_then(|(policy, source)| {
             let approvals = policy.approvals.clone();
-            let mut server = Server::new(backend()?, policy);
+            let mut server = Server::new(backend()?, policy).with_policy_source(source);
             if let Some(a) = &approvals {
                 server = server.with_gate(Arc::new(gate(a)?));
             }
@@ -61,7 +61,7 @@ fn main() {
                 transport::serve_http(server, listener).map_err(|e| e.to_string())
             }
         }),
-        Some("list") => load_policy(&policy_path).and_then(|policy| list(&*backend()?, &policy, flag("--all"))),
+        Some("list") => load_policy(&policy_path).and_then(|(policy, _)| list(&*backend()?, &policy, flag("--all"))),
         Some("shortcut") => match (args.get(1), args.get(2)) {
             (Some(bundle), Some(intent)) if !bundle.starts_with("--") && !intent.starts_with("--") => {
                 MacBackend::default().write_shortcut(bundle, intent, std::path::Path::new(&value("--out", "."))).map(|path| {
@@ -80,12 +80,12 @@ fn main() {
     }
 }
 
-fn load_policy(path: &str) -> Result<Policy, String> {
+fn load_policy(path: &str) -> Result<(Policy, PolicySource), String> {
     match std::fs::read_to_string(path) {
-        Ok(text) => Policy::from_toml(&text),
+        Ok(text) => Policy::from_toml(&text).map(|p| (p, PolicySource::File(path.to_string()))),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             eprintln!("tin: no policy at {path}; every function is denied");
-            Ok(Policy::default())
+            Ok((Policy::default(), PolicySource::Missing(path.to_string())))
         }
         Err(e) => Err(format!("{path}: {e}")),
     }

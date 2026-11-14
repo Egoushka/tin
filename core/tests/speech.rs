@@ -50,7 +50,7 @@ fn rpc(s: &Server, method: &str, params: Value) -> Value {
 }
 
 fn names(s: &Server) -> Vec<String> {
-    rpc(s, "tools/list", json!({}))["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect()
+    rpc(s, "tools/list", json!({}))["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).filter(|n| n != "tin__doctor").collect()
 }
 
 const ON: &str = "[speech]\nenabled = true\n";

@@ -139,7 +139,7 @@ fn registry_lists_system_tools_with_notes_and_wait_tool() {
     let (s, _, _) = gated(Duration::from_millis(10), Duration::from_secs(60));
     let r = s.handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })).unwrap();
     let tools = r["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 13, "12 verbs and approval__wait");
+    assert_eq!(tools.len(), 14, "12 verbs, approval__wait and tin__doctor");
     for v in VERBS {
         let t = tools.iter().find(|t| t["name"] == v.tool_name()).unwrap();
         let held = t["description"].as_str().unwrap().contains("approvals app");
@@ -153,9 +153,10 @@ fn registry_lists_system_tools_with_notes_and_wait_tool() {
 fn registry_serves_system_tools_when_appfunctions_fail() {
     let s = ungated("[[allow]]\npackage = \"system\"\nfunction = \"battery\"\n", Phone::default());
     let r = s.handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })).unwrap();
-    assert_eq!(r["result"]["tools"].as_array().unwrap().len(), 1);
+    assert_eq!(r["result"]["tools"].as_array().unwrap().len(), 2);
     // No gate configured and nothing held: no wait tool either.
     assert_eq!(r["result"]["tools"][0]["name"], "system__battery");
+    assert_eq!(r["result"]["tools"][1]["name"], "tin__doctor");
 }
 
 #[test]

@@ -16,6 +16,18 @@ pub const PROTOCOL_VERSION: &str = "2025-06-18";
 /// The tool a client calls to keep waiting on a held call after its first wait ran out.
 pub const WAIT_TOOL: &str = "approval__wait";
 
+/// The self-check tool. Always listed, whatever the policy says: it reads no device data, and it is how a client finds
+/// out why every other tool is missing.
+pub const DOCTOR_TOOL: &str = "tin__doctor";
+
+/// Where the policy came from, so the doctor can say why it is empty.
+#[derive(Debug, Clone)]
+pub enum PolicySource {
+    File(String),
+    /// No file at the path: the policy is empty and everything is denied.
+    Missing(String),
+}
+
 #[derive(Debug, Clone)]
 pub enum Source {
     App(Function),
@@ -52,6 +64,7 @@ pub struct Server {
     gate: Option<Arc<Gate>>,
     tools: RwLock<HashMap<String, Tool>>,
     speech: Option<Speech>,
+    policy_source: Option<PolicySource>,
 }
 
 /// `<last two package segments>__<method>`, limited to `[A-Za-z0-9_-]` and 64 characters (what MCP clients accept).
@@ -86,7 +99,7 @@ pub fn name_all(functions: Vec<Function>) -> Vec<(String, Function)> {
 impl Server {
     pub fn new(backend: Box<dyn Backend>, policy: Policy) -> Self {
         let speech = policy.speech.enabled.then(|| Speech::new(speech::SOCKET));
-        Self { backend, policy, gate: None, tools: RwLock::new(HashMap::new()), speech }
+        Self { backend, policy, gate: None, tools: RwLock::new(HashMap::new()), speech, policy_source: None }
     }
 
     /// Points the speech tools at another socket (tests); does not enable them.
@@ -94,6 +107,12 @@ impl Server {
         if self.speech.is_some() {
             self.speech = Some(Speech::new(socket));
         }
+        self
+    }
+
+    /// Tells the doctor where the policy was read from.
+    pub fn with_policy_source(mut self, source: PolicySource) -> Self {
+        self.policy_source = Some(source);
         self
     }
 
@@ -196,6 +215,12 @@ impl Server {
                 "inputSchema": { "type": "object", "properties": { "ticket": { "type": "string" } }, "required": ["ticket"] },
             }));
         }
+        out.push(json!({
+            "name": DOCTOR_TOOL,
+            "title": "Check tin's own setup",
+            "description": "Reports whether the policy was found, how many tools it lets through, whether the approvals server is configured, and what is wrong. Call it when an expected tool is missing or a call is refused. It reads no device data.",
+            "inputSchema": { "type": "object", "properties": {} },
+        }));
         if self.speech.is_some() {
             out.extend(Speech::tools());
         }
@@ -215,6 +240,10 @@ impl Server {
                 Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
                 Err(e) => tool_error(&e),
             };
+        }
+        if name == DOCTOR_TOOL {
+            let report = self.doctor();
+            return json!({ "content": [{ "type": "text", "text": report.to_string() }], "structuredContent": report, "isError": false });
         }
         if name == WAIT_TOOL {
             return match (&self.gate, args.get("ticket").and_then(Value::as_str)) {
@@ -293,6 +322,85 @@ impl Server {
             Outcome::Expired => tool_error(&format!("{ticket} expired without a decision; not run")),
             Outcome::Unknown => tool_error(&format!("no such ticket: {ticket}")),
         }
+    }
+
+    /// A health report of tin's own setup: no device data, no secret values, only whether things are there.
+    fn doctor(&self) -> Value {
+        let mut problems: Vec<String> = Vec::new();
+        let policy = match &self.policy_source {
+            Some(PolicySource::File(path)) => json!({ "path": path, "status": "loaded" }),
+            Some(PolicySource::Missing(path)) => {
+                problems.push(format!("no policy file at {path}, so every function is denied; push a policy there (examples/ has samples)"));
+                json!({ "path": path, "status": "missing" })
+            }
+            None => json!({ "status": "built in" }),
+        };
+        if self.policy.allow.is_empty() && self.policy.approval.is_empty() && self.policy_source.as_ref().is_none_or(|s| matches!(s, PolicySource::File(_))) {
+            problems.push("the policy has no [[allow]] or [[approval]] rule, so every function is denied".into());
+        }
+
+        let functions = self.backend.functions();
+        let verbs = self.backend.verbs();
+        let backend = match &functions {
+            Ok(f) => json!({ "app_functions": f.len(), "system_verbs": verbs.len() }),
+            Err(e) => {
+                let e: String = e.chars().take(200).collect();
+                problems.push(format!("listing app functions failed: {e}"));
+                json!({ "app_functions": null, "system_verbs": verbs.len(), "error": e })
+            }
+        };
+
+        // Rules that match nothing the backend offers are the usual typo.
+        let listed: Vec<Subject> = verbs
+            .iter()
+            .map(|v| Subject { package: SYSTEM, id: v.name, read_only: Some(v.read_only) })
+            .chain(functions.iter().flatten().map(Subject::from))
+            .collect();
+        if functions.is_ok() || !verbs.is_empty() {
+            for r in self.policy.allow.iter().chain(&self.policy.approval) {
+                if !listed.iter().any(|s| r.matches(s)) && !(functions.is_err() && r.package != SYSTEM) {
+                    problems.push(format!("rule {} {} matches no function on this device (check the spelling and that the app is installed)", r.package, r.function));
+                }
+            }
+        }
+
+        let _ = self.refresh(); // a failure is already in `problems` through the listing above
+        let tools = self.tools();
+        let count = |d: Decision| tools.iter().filter(|t| t.decision == d).count();
+        let (allow, approval, refuse) = (count(Decision::Allow), count(Decision::Approval), count(Decision::Refuse));
+
+        let readable = |path: &str| if std::fs::File::open(path).is_ok() { "readable" } else { "missing or unreadable" };
+        let approvals = match &self.policy.approvals {
+            None => {
+                if approval > 0 {
+                    problems.push(format!("{approval} tool(s) need an approval tap but the policy has no [approvals] table, so calls to them are refused"));
+                }
+                json!({ "configured": false })
+            }
+            Some(a) => {
+                let (token, key) = (readable(&a.token_file), readable(&a.key_file));
+                for (what, state) in [("token_file", token), ("key_file", key)] {
+                    if state != "readable" {
+                        problems.push(format!("[approvals] {what} is {state}, so tin cannot ask for approval"));
+                    }
+                }
+                json!({ "configured": true, "gate_ready": self.gate.is_some(), "token_file": token, "key_file": key, "callback_listen": a.callback_listen.is_some() })
+            }
+        };
+        if self.policy.approvals.is_some() && self.gate.is_none() {
+            problems.push("the policy has an [approvals] table but the approvals gate did not start".into());
+        }
+
+        json!({
+            "version": env!("CARGO_PKG_VERSION"),
+            "ok": problems.is_empty(),
+            "policy": policy,
+            "backend": backend,
+            "tools": { "allow": allow, "approval": approval, "refuse": refuse },
+            "approvals": approvals,
+            "speech": { "enabled": self.speech.is_some() },
+            "problems": problems,
+        })
     }
 
     fn run(&self, tool: &Tool, args: &Value) -> Value {
