@@ -114,7 +114,7 @@ impl Verb {
 const NOTIFICATIONS: Verb = Verb {
     name: "notifications",
     read_only: true,
-    description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter. Banking apps are left out; `banking_apps_omitted` counts them.",
+    description: "Active notifications: key, app, channel, title, text, posted time, ongoing. Optional `package` filter. Banking apps are left out; `banking_apps_omitted` counts them. One-time codes in the title and text are replaced with `[code]` (apps the owner lists in the policy keep theirs); `codes_masked` counts them.",
     schema: || object(json!({ "package": { "type": "string", "description": "only this app's notifications" } }), &[]),
     action: Action::Read {
         run: |args, shell| {
@@ -124,7 +124,7 @@ const NOTIFICATIONS: Verb = Verb {
                 .partition(|n| n["package"].as_str().is_some_and(|p| MONEY_PACKAGES.contains(&p)));
             let list: Vec<Value> = rest.into_iter().filter(|n| only.is_none_or(|p| n["package"] == p)).collect();
             let omitted = bank.iter().filter(|n| only.is_none_or(|p| n["package"] == p)).count();
-            Ok(json!({ "notifications": list, "banking_apps_omitted": omitted }))
+            Ok(json!({ "notifications": list, "banking_apps_omitted": omitted, "codes_masked": 0 }))
         },
     },
 };
@@ -402,6 +402,122 @@ fn fields(line: &str) -> Vec<(String, String)> {
         rest = next.trim_start();
     }
     out
+}
+
+/// What a masked one-time code is replaced with.
+pub const CODE_MASK: &str = "[code]";
+
+/// Masks code-like tokens in each notification's title and text, except for the apps in `show`, and sets
+/// `codes_masked` to how many it replaced.
+pub fn mask_notification_codes(result: &mut Value, show: &[String]) {
+    let mut masked = 0;
+    if let Some(list) = result["notifications"].as_array_mut() {
+        for n in list.iter_mut().filter(|n| !n["package"].as_str().is_some_and(|p| show.iter().any(|s| s == p))) {
+            for field in ["title", "text"] {
+                if let Some(t) = n[field].as_str() {
+                    let (out, count) = mask_codes(t);
+                    if count > 0 {
+                        n[field] = json!(out);
+                        masked += count;
+                    }
+                }
+            }
+        }
+    }
+    result["codes_masked"] = json!(masked);
+}
+
+/// Replaces one-time-code-like tokens in `text` with `[code]` and returns the new text and how many it replaced.
+/// A code is a run of 4-8 digits, or two runs of 3+ digits joined by one space or dash (8 at most), with an optional
+/// short letter prefix (`G-123456`). Times, dates, amounts, percentages, phone numbers and digits inside words are
+/// left alone. A bare four-digit year looks like a code and is masked: the safe direction.
+pub fn mask_codes(text: &str) -> (String, usize) {
+    let c: Vec<char> = text.chars().collect();
+    let digit = |i: usize| c.get(i).is_some_and(char::is_ascii_digit);
+    let mut groups: Vec<(usize, usize)> = Vec::new();
+    let mut i = 0;
+    while i < c.len() {
+        if digit(i) {
+            let s = i;
+            while digit(i) {
+                i += 1;
+            }
+            groups.push((s, i));
+        } else {
+            i += 1;
+        }
+    }
+    let at = |i: isize| usize::try_from(i).ok().and_then(|i| c.get(i)).copied();
+    let is_digit_at = |i: isize| at(i).is_some_and(|ch| ch.is_ascii_digit());
+    // A separator with a digit on its far side: the group continues a time, date, amount or longer number.
+    let chained_left = |s: usize| at(s as isize - 1).is_some_and(|p| ".,:/- ".contains(p)) && is_digit_at(s as isize - 2) && at(s as isize - 1) != Some(' ');
+    let chained_right = |e: usize| at(e as isize).is_some_and(|p| ".,:/-".contains(p)) && is_digit_at(e as isize + 1);
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    let mut g = 0;
+    while g < groups.len() {
+        let (s, e) = groups[g];
+        let len = e - s;
+        let mut end = e;
+        let mut total = len;
+        let mut used = 1;
+        if let Some(&(s2, e2)) = groups.get(g + 1)
+            && s2 == e + 1
+            && matches!(c[e], ' ' | '-')
+            && len >= 3
+            && e2 - s2 >= 3
+            && len + (e2 - s2) <= 8
+        {
+            end = e2;
+            total = len + (e2 - s2);
+            used = 2;
+        }
+        let ok_len = (4..=8).contains(&total);
+        // A space before or after a further 3+ digit group is a phone number or grouped figure.
+        let spaced_before = at(s as isize - 1) == Some(' ') && is_digit_at(s as isize - 2) && g > 0 && groups[g - 1].1 - groups[g - 1].0 >= 3;
+        let spaced_after = at(end as isize) == Some(' ') && groups.get(g + used).is_some_and(|&(s3, e3)| s3 == end + 1 && e3 - s3 >= 3);
+        let before = at(s as isize - 1);
+        let after = at(end as isize);
+        let money = |ch: Option<char>| ch.is_some_and(|ch| "$€£₴%".contains(ch));
+        let word_after: String = c[end..].iter().skip_while(|ch| **ch == ' ').take_while(|ch| ch.is_alphabetic()).collect::<String>().to_lowercase();
+        let symbol_after = c[end..].iter().find(|ch| **ch != ' ').copied();
+        let currency = money(symbol_after) || ["uah", "usd", "eur", "pln", "gbp", "грн", "гривень", "гривні", "гривня", "zł", "руб"].contains(&word_after.as_str());
+        let reject = !ok_len
+            || chained_left(s)
+            || chained_right(end)
+            || spaced_before
+            || spaced_after
+            || before == Some('+')
+            || money(before)
+            || money(after)
+            || currency
+            || after.is_some_and(char::is_alphabetic);
+        if !reject {
+            // A short letter prefix, with or without a dash, belongs to the code; a longer one means the digits sit in a word.
+            let mut ps = s;
+            if before == Some('-') && at(s as isize - 2).is_some_and(char::is_alphabetic) {
+                ps -= 1;
+            }
+            let run_end = ps;
+            while ps > 0 && c[ps - 1].is_alphabetic() {
+                ps -= 1;
+            }
+            let letters = run_end - ps;
+            let embedded = ps > 0 && c[ps - 1].is_alphanumeric();
+            if letters <= 3 && !embedded {
+                spans.push((ps, end));
+            }
+        }
+        g += used;
+    }
+    let mut out = String::new();
+    let mut last = 0;
+    for &(s, e) in &spans {
+        out.extend(&c[last..s]);
+        out.push_str(CODE_MASK);
+        last = e;
+    }
+    out.extend(&c[last..]);
+    (out, spans.len())
 }
 
 /// `dumpsys notification --noredact`: the records under "Notification List:".

@@ -45,7 +45,7 @@ computer to call those same typed functions on my own phone, with a hard rule th
 - Runs as the shell user (uid 2000, the user `adb shell` runs as) under [Shizuku](https://github.com/RikkaApps/Shizuku),
   so it keeps serving after the cable is pulled, and restarts itself if it dies.
 - Answers only the shell user and root. Apps on the phone cannot connect, so no app can borrow its access.
-- Serves system tools next to the AppFunctions, run as the shell user: `system__notifications` (banking apps' notifications are left out and counted),
+- Serves system tools next to the AppFunctions, run as the shell user: `system__notifications` (banking apps' notifications are left out and counted; one-time codes in titles and text are masked as `[code]` and counted in `codes_masked`, per-app opt-out with `[notifications] show_codes`),
   `system__usage`,
   `system__foreground_app`, `system__screen_text` (a `uiautomator` dump, refused while a banking app is on screen),
   `system__battery`, `system__connectivity`, and the write verbs `system__tap`, `swipe`, `type_text`, `key`, `launch`

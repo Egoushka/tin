@@ -790,3 +790,81 @@ fn every_verb_has_a_schema_and_write_verbs_a_title() {
         assert_ne!(title, v.name, "{}: approvals title is the bare name", v.name);
     }
 }
+
+#[test]
+fn mask_codes_masks_one_time_codes() {
+    for (input, want) in [
+        ("Your code is 482913", "Your code is [code]"),
+        ("G-123456 is your Google code", "[code] is your Google code"),
+        ("Use 123-456 to log in", "Use [code] to log in"),
+        ("Код: 4821", "Код: [code]"),
+        ("Ваш код підтвердження 482913. Нікому не кажіть", "Ваш код підтвердження [code]. Нікому не кажіть"),
+        ("Code 1234 5678 expires in 5 min", "Code [code] expires in 5 min"),
+        ("12345678", "[code]"),
+    ] {
+        let (out, n) = system::mask_codes(input);
+        assert_eq!((out.as_str(), n), (want, 1), "{input}");
+    }
+    assert_eq!(system::mask_codes("codes 1111 and 2222"), ("codes [code] and [code]".to_string(), 2));
+}
+
+#[test]
+fn mask_codes_leaves_other_numbers() {
+    for input in [
+        "Meeting at 12:30", "Meeting at 12:30:45", "Due 2026-11-14", "14.11.2026", "14/11/2026", "Paid 1500.50 UAH",
+        "1,500.00 balance", "Баланс 5400 грн", "Баланс 5400 ₴", "$1500", "50% charged", "Call +380501234567",
+        "Call 380501234567", "Call 050 123 4567", "Order abcd123456", "iPhone15", "5000mAh", "Room 12", "123", "123456789",
+        "1 2 3", "+1200.00 UAH, balance 5400.00 UAH",
+    ] {
+        assert_eq!(system::mask_codes(input), (input.to_string(), 0), "{input}");
+    }
+}
+
+fn notification_policy(extra: &str) -> String {
+    format!("{ALL_SYSTEM}{extra}")
+}
+
+fn notify(policy: &str, title: &str, text: &str, pkg: &str) -> Value {
+    let dump = format!(
+        "Notification List:\n  NotificationRecord(0x1 key=0|{pkg}|1|null|1 pkg={pkg} flags=0x0)\n    extras={{\n        android.title=String ({title})\n        android.text=String ({text})\n    }}\n"
+    );
+    struct One(String);
+    impl Backend for One {
+        fn list(&self) -> Result<Value, String> {
+            Err("none".into())
+        }
+        fn execute(&self, _: &str, _: &str, _: &str) -> Result<String, String> {
+            Err("none".into())
+        }
+        fn shell(&self, _: &str, _: &[String]) -> Result<String, String> {
+            Ok(self.0.clone())
+        }
+    }
+    let s = Server::new(Box::new(One(dump)), Policy::from_toml(policy).unwrap());
+    serde_json::from_str(text_of(&call(&s, "system__notifications", json!({})))).unwrap()
+}
+
+fn text_of(v: &Value) -> &str {
+    text(v)
+}
+
+#[test]
+fn notifications_mask_codes_and_count_them() {
+    let r = notify(&notification_policy(""), "Code 482913", "G-123456 or Код: 4821, at 12:30", "com.example.app");
+    let n = &r["notifications"][0];
+    assert_eq!(n["title"], "Code [code]");
+    assert_eq!(n["text"], "[code] or Код: [code], at 12:30");
+    assert_eq!(r["codes_masked"], 3);
+    assert!(!r.to_string().contains("482913"));
+}
+
+#[test]
+fn notifications_show_codes_opt_out_is_per_app() {
+    let policy = notification_policy("[notifications]\nshow_codes = [\"com.example.app\"]\n");
+    let r = notify(&policy, "Code 482913", "x", "com.example.app");
+    assert_eq!(r["notifications"][0]["title"], "Code 482913");
+    assert_eq!(r["codes_masked"], 0);
+    let r = notify(&policy, "Code 482913", "x", "com.other.app");
+    assert_eq!(r["notifications"][0]["title"], "Code [code]");
+    assert_eq!(r["codes_masked"], 1);
+}

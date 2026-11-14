@@ -29,6 +29,9 @@ function = "connectivity"
 package = "system"
 function = "key"
 
+[notifications]               # one-time codes in notifications are masked as [code]; list apps that may show them
+# show_codes = ["com.example.app"]
+
 [approvals]
 url = "http://<approvals server tailnet ip>:<port>"
 source = "tin"

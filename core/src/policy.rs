@@ -27,6 +27,17 @@ pub struct Policy {
     pub approvals: Option<Approvals>,
     #[serde(default)]
     pub speech: SpeechPolicy,
+    #[serde(default)]
+    pub notifications: NotificationsPolicy,
+}
+
+/// `[notifications] show_codes = ["com.example.app"]` lists apps whose notifications reach the model with one-time
+/// codes intact. Every other app's code-like numbers are masked.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NotificationsPolicy {
+    #[serde(default)]
+    pub show_codes: Vec<String>,
 }
 
 /// `[speech] enabled = true` lists the speech tools. Off by default: an agent with them can switch on the mic.
