@@ -384,12 +384,20 @@ impl Server {
                         problems.push(format!("[approvals] {what} is {state}, so tin cannot ask for approval"));
                     }
                 }
-                json!({ "configured": true, "gate_ready": self.gate.is_some(), "token_file": token, "key_file": key, "callback_listen": a.callback_listen.is_some() })
+                // `main` refuses to serve when the gate cannot be built, so a configured table always has a gate here.
+                let reachable = self.gate.as_ref().map(|g| g.probe());
+                if let Some(Err(e)) = &reachable {
+                    problems.push(format!("the approvals server is not reachable ({e}), so held calls cannot reach the phone"));
+                }
+                json!({
+                    "configured": true,
+                    "reachable": reachable.as_ref().map(|r| r.is_ok()),
+                    "token_file": token,
+                    "key_file": key,
+                    "callback_listen": a.callback_listen.is_some()
+                })
             }
         };
-        if self.policy.approvals.is_some() && self.gate.is_none() {
-            problems.push("the policy has an [approvals] table but the approvals gate did not start".into());
-        }
 
         json!({
             "version": env!("CARGO_PKG_VERSION"),

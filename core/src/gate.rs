@@ -17,6 +17,10 @@ pub trait Approver: Send + Sync {
     fn put(&self, id: &str, item: &Value) -> Result<(), String>;
     /// Withdraws it (`DELETE /items/{id}`).
     fn delete(&self, id: &str) -> Result<(), String>;
+    /// Whether the server can be reached at all, for the doctor. The reason never names the host.
+    fn probe(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 /// `PUT`/`DELETE` over plain HTTP/1.1 (the tailnet is the encryption; tin carries no TLS stack).
@@ -65,6 +69,13 @@ impl Approver for HttpApprover {
             (200 | 201, _) => Ok(()),
             (code, body) => Err(format!("approvals answered {code}: {}", body.chars().take(300).collect::<String>())),
         }
+    }
+
+    /// The approvals contract has no read endpoint (only `PUT` and `DELETE` on `/items/{id}`), and a probe must not
+    /// create or remove an item, so this is a TCP connect to the server's host and port.
+    fn probe(&self) -> Result<(), String> {
+        let addr = self.host.to_socket_addrs().map_err(|e| format!("address does not resolve: {e}"))?.next().ok_or("address does not resolve")?;
+        TcpStream::connect_timeout(&addr, HTTP_TIMEOUT).map(drop).map_err(|e| format!("cannot connect: {e}"))
     }
 
     fn delete(&self, id: &str) -> Result<(), String> {
@@ -142,6 +153,11 @@ pub struct Gate {
 impl Gate {
     pub fn new(approver: Box<dyn Approver>, key: &[u8], cfg: GateConfig) -> Self {
         Self { approver, key: key.to_vec(), cfg, tickets: Mutex::new(HashMap::new()), changed: Condvar::new() }
+    }
+
+    /// Whether the approvals server answers a connection (see `Approver::probe`).
+    pub fn probe(&self) -> Result<(), String> {
+        self.approver.probe()
     }
 
     /// Opens a ticket and its approvals item, or returns the pending ticket for the same call (same tool and arguments)
