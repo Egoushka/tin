@@ -4,7 +4,7 @@ use crate::backend::Backend;
 use crate::gate::{Gate, Outcome};
 use crate::metadata::Function;
 use crate::policy::{Decision, Policy, SYSTEM, Subject};
-use crate::system::Verb;
+use crate::system::{self, Verb};
 use crate::speech::{self, Speech};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -425,7 +425,12 @@ impl Server {
         let start = Instant::now();
         let outcome = match &tool.source {
             Source::App(f) => self.backend.execute(&f.package, &f.id, &args.to_string()),
-            Source::System(v) => v.run(args, &|p, a| self.backend.shell(p, a)).map(|v| v.to_string()),
+            Source::System(v) => v.run(args, &|p, a| self.backend.shell(p, a)).map(|mut r| {
+                if v.name == "notifications" {
+                    system::mask_notification_codes(&mut r, &self.policy.notifications.show_codes);
+                }
+                r.to_string()
+            }),
         };
         eprintln!("tin: called {} ok={} {} ms", tool.name, outcome.is_ok(), start.elapsed().as_millis());
         match outcome {
