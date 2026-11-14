@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Copies Parakeet-tdt-0.6b-v3 int8 and Silero VAD from the bench cache into the debug app's files/models/, where
+# Copies Parakeet-tdt-0.6b-v3 int8 and Silero VAD from the bench cache into the app's files/models/, where
 # ModelStore looks (names and sizes pinned in android/speech/.../ModelStore.kt). Run bench/run-all.sh first, or pass
-# the models dir. Pipes through run-as, so it needs a debug build; it changes nothing outside the app's own folder.
+# the models dir. Pipes through run-as, so it needs a debuggable build (debug, or the release from CI, which is debuggable for this); it changes nothing outside the app's own folder.
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 models=${1:-$here/bench/.cache/models}

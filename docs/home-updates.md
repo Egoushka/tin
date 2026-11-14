@@ -1,10 +1,10 @@
 # Home updates: the phone follows `main`
 
 Every commit on `main` where every CI job passes (Rust tests and clippy, the Android build, the emulator tests)
-becomes a GitHub release of Home (`v0.1.<commit count>`, one APK, signed with the Tin release key). Obtainium on the Pixel polls the releases and updates Home in place. No cable, no `adb install`.
+becomes a GitHub release (`v0.1.<commit count>`, two APKs, both signed with the Tin release key): Home as `home-<version>.apk` and the tin host app as `tin-<version>.apk`. Obtainium on the Pixel polls the releases and updates both in place. No cable, no `adb install`.
 
 ```
-merge to main -> CI core, android and emulator jobs green -> signed home-release.apk -> release job -> GitHub Release v0.1.N -> Obtainium -> phone
+merge to main -> CI core, android and emulator jobs green -> signed home + tin APKs -> release job -> GitHub Release v0.1.N -> Obtainium -> phone
 ```
 
 Why this route and not an updater inside Home or an adb push from a Mac/box: it needs no app code (Home would
@@ -40,11 +40,39 @@ Then re-run CI on `main` (push any commit, or "Re-run all jobs" on the last `ci`
    adb uninstall io.github.egoushka.tin.home
    ```
 3. In Obtainium: Add App > `https://github.com/Egoushka/tin` (the repo is public, no token). In the app's options keep
-   "Include prereleases" off; if the repo later ships more APKs, set the APK filter to `home-.*\.apk`.
+   "Include prereleases" off and set the APK filter to `home-.*\.apk`. The release has two APKs, so the filter is required.
 4. Install the Home it offers, then set it as the default home app again (Settings > Apps > Default apps > Home app).
-5. In Obtainium's settings set the background update interval (for example 1 hour) and allow it to install updates
+5. Add the tin app as a second entry on the same repo: Add App > `https://github.com/Egoushka/tin` again, APK filter
+   `tin-.*\.apk`. First remove the tin that is on the phone (see "Moving tin to the release build" below), then install the
+   one Obtainium offers.
+6. In Obtainium's settings set the background update interval (for example 1 hour) and allow it to install updates
    without asking. Android only skips the confirmation for an update when Obtainium is the installer that installed
    the app, which is why step 2 matters; if a confirmation still shows, accept it once and check this setting.
+
+### Moving tin to the release build (once)
+
+The tin app on the phone now is a laptop debug build, so it has another signer than Home, and Android never grants
+Home the signature-level `VOICE` permission (Home's mic falls back to the assistant). Remove it once; the release build
+is signed with the Tin key:
+
+```bash
+adb uninstall io.github.egoushka.tin
+```
+
+What this loses, and what does not:
+
+- Kept: everything in `/data/local/tmp/tin/` (the tin binary, `policy.toml`, `tin.log`). It belongs to the shell user,
+  not the app, so the policy stays. The app copies the binary again on its next start.
+- Lost: the app's own folder. That is the speech model (`files/models/`, about 650 MB) and the speech bench output. Push the
+  model again after installing the release build:
+  ```bash
+  scripts/speech-push-model.sh
+  ```
+  It needs the bench cache (`bench/run-all.sh` fills it) or a models folder as its argument. The release build is
+  debuggable on purpose so `run-as` in that script works.
+- Lost: Shizuku's permission for the app and the microphone and notification grants. Open tin once and tap "Allow" in
+  Shizuku's dialog, then start Shizuku's service as in the README Quick start (`libshizuku.so`) if it is not running.
+- Not touched: Home and its data. Re-open Home after tin is installed so it binds `VoiceService` again.
 
 Obtainium compares the release tag (`v0.1.N`) with Home's `versionName` (`0.1.N`), so both sides stay in the same format.
 
@@ -54,6 +82,7 @@ Obtainium compares the release tag (`v0.1.N`) with Home's `versionName` (`0.1.N`
 - From the Mac: the phone's version against the newest release.
   ```bash
   adb shell dumpsys package io.github.egoushka.tin.home | grep versionName
+  adb shell dumpsys package io.github.egoushka.tin | grep versionName
   ```
   ```bash
   gh release list -R Egoushka/tin --limit 1
@@ -69,4 +98,8 @@ Obtainium compares the release tag (`v0.1.N`) with Home's `versionName` (`0.1.N`
 | CI `Check Home's signer` fails with `CN=Android Debug` | key secret present but Gradle did not pick it up | check the `Release signing key` step ran (main pushes only) |
 | Obtainium or `adb install` says update incompatible | installed Home has another signer (hand-installed debug or an old CI build) | `adb uninstall io.github.egoushka.tin.home` once |
 | Home's mic falls back to the assistant | tin and Home have different signers (the `VOICE` permission is signature-level) | build tin with the same key: `tin.signing.*` in `~/.gradle/gradle.properties` is already set by step 1 |
+| CI `Check the APK signers` fails with "different signers" | tin and Home were built with different keys | check `tin.signing.*` reaches both modules (`android/build.gradle.kts`) |
+| Obtainium offers `home-*.apk` for the tin entry, or the reverse | APK filter missing or wrong | set `home-.*\.apk` on the Home entry and `tin-.*\.apk` on the tin entry |
+| tin: `adb install` or Obtainium says update incompatible | installed tin is a laptop debug build | `adb uninstall io.github.egoushka.tin` once (loses the speech model, see above) |
+| tin says "model missing" after the move | the model lived in the old app's folder | `scripts/speech-push-model.sh` |
 | No new release after a merge | a newer `main` commit exists (its run publishes), or the run was red | open the `ci` run |

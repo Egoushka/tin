@@ -2,6 +2,12 @@ plugins {
     id("com.android.application")
 }
 
+// Same scheme as Home: versionCode is the commit count, so each release is an in-place update for Obtainium.
+val commitCount = runCatching {
+    providers.exec { commandLine("git", "rev-list", "--count", "HEAD"); workingDir = rootProject.projectDir }
+        .standardOutput.asText.get().trim().toInt()
+}.getOrDefault(1)
+
 android {
     namespace = "io.github.egoushka.tin"
     compileSdk = 37
@@ -11,8 +17,8 @@ android {
         // AppFunctions arrived in Android 16 (API 36).
         minSdk = 36
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = commitCount
+        versionName = "0.1.$commitCount"
         ndk { abiFilters += "arm64-v8a" }
     }
 
@@ -24,6 +30,16 @@ android {
     // The Shizuku user service copies libtin.so out of nativeLibraryDir, so it must exist as a file there.
     packaging {
         jniLibs { useLegacyPackaging = true }
+    }
+
+    buildTypes {
+        release {
+            // No R8: the Shizuku user service, the AIDL stubs and the JNI entry points are found by name.
+            isMinifyEnabled = false
+            // scripts/speech-push-model.sh copies the speech model into the app's folder with `run-as`, which only
+            // works on a debuggable app. The signature-level VOICE permission, not debuggability, guards the mic.
+            isDebuggable = true
+        }
     }
 
     compileOptions {
