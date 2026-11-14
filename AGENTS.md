@@ -65,7 +65,7 @@
 - Shizuku starts the service with umask 0: set every file mode explicitly (`Os.chmod`).
 - Tool names are `<last two package segments>__<method>`; tests and `accept.py` depend on them.
 - `policy.rs` and `gate.rs` stay platform-free: platform code goes behind `Backend` (`functions`, `verbs`,
-  `instructions`) and each verb's `Ops`.
+  `instructions`) and each verb's `Action`.
 - Mac write verbs validate their arguments in `argv` so a bad call fails before an approvals item exists; never
   unload a `com.apple.` agent, and `kill` re-reads the start time before signalling.
 - Never commit raw `ps`, `launchctl` or `vm_stat` output from a real Mac: the Mac fixtures are synthetic.
