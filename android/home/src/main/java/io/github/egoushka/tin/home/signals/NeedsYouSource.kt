@@ -85,7 +85,7 @@ class NeedsYouSource(private val context: Context, private val authority: String
         null // a column the provider does not have yet
     } catch (e: RuntimeException) {
         // A provider that dies or answers oddly must leave the last good read, not take Home down.
-        Log.d(TAG, "needs-you read failed: $e")
+        Log.w(TAG, "needs-you read failed", e)
         null
     }
 
