@@ -131,6 +131,18 @@ pub enum Outcome {
     Unknown,
 }
 
+/// The shortest approvals key tin accepts: a 32-byte HMAC-SHA256 key, what approvals' own `randomBytes(32)` gives.
+pub const MIN_KEY_LEN: usize = 32;
+
+/// Checks the (already trimmed) contents of `key_file` before a gate is built; never echoes the key.
+/// Lives here, called from `main`, so `Gate::new` stays usable with short keys in tests.
+pub fn check_key(key: &str, path: &str) -> Result<(), String> {
+    if key.len() < MIN_KEY_LEN {
+        return Err(format!("{path}: approvals key is {} bytes after trimming, need at least {MIN_KEY_LEN}", key.len()));
+    }
+    Ok(())
+}
+
 pub struct Gate {
     approver: Box<dyn Approver>,
     key: Vec<u8>,
