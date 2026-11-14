@@ -904,7 +904,7 @@ fn short_key_starts_with_the_gate_off() {
     // A write is refused exactly as with no [approvals] table.
     let w = call(&s, "system__key", json!({ "key": "HOME" }));
     assert_eq!(w["isError"], true);
-    assert!(text(&w).contains("no approvals server is configured"), "{}", text(&w));
+    assert!(text(&w).contains("no approvals gate running"), "{}", text(&w));
     // The doctor says the gate is off and why.
     let d = call(&s, DOCTOR_TOOL, json!({}))["structuredContent"].clone();
     assert_eq!(d["ok"], false, "{d}");

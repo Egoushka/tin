@@ -293,7 +293,7 @@ impl Server {
                 let Some(gate) = &self.gate else {
                     eprintln!("tin: refused {name}: needs approval, no approvals server");
                     return tool_error(&format!(
-                        "approval required: {name} changes state, and no approvals server is configured to ask the owner, so tin does not run it."
+                        "approval required: {name} changes state, and tin has no approvals gate running to ask the owner (no [approvals] table, or its key was refused at startup; tin__doctor says which), so tin does not run it."
                     ));
                 };
                 // Bad arguments fail here, before anyone is asked to approve a call that cannot run.
