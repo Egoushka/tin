@@ -76,7 +76,12 @@ async def demo(alarm: str, c: Checks):
         c.check(f"A6 createAlarm {alarm} held without approvals", r.is_error and "approval required" in text_of(r), text_of(r)[:300])
 
         r = await s.call_tool("ftband_mono__topUpPhone", {"phoneNumber": "+380000000000", "amount": 1.0})
-        c.check("A6 topUpPhone refused", r.is_error and "approval" in text_of(r), text_of(r)[:200])
+        # The money refusal (core/src/mcp.rs, Decision::Refuse) is not the "approval required" answer and opens no ticket:
+        # a held call says "approval required" or "waiting for a tap" and names a ticket, a refusal names neither.
+        text = text_of(r)
+        refused = r.is_error and text.startswith("refused: ") and "moves money" in text and "never runs such functions" in text
+        no_item = "approval required" not in text and "ticket" not in text.lower() and "tap" not in text.lower()
+        c.check("A6 topUpPhone refused as money, no approvals item opened", refused and no_item, text[:200])
 
 
 async def bench_bridge(n: int) -> tuple[list[float], list[str]]:
