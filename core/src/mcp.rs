@@ -221,7 +221,7 @@ impl Server {
                 "title": "Wait for an approval",
                 "description": "Keeps waiting for the owner's decision on a held call, and returns the call's result once it ran.",
                 "inputSchema": { "type": "object", "properties": { "ticket": { "type": "string" } }, "required": ["ticket"] },
-                "annotations": annotations("Wait for an approval", true, false),
+                "annotations": annotations("Wait for an approval", false, false),
             }));
         }
         out.push(json!({
