@@ -7,8 +7,8 @@ interface WidgetBackend {
     /** A fresh id, or null when the host refuses. */
     fun allocate(): Int?
     fun delete(id: Int)
-    /** Every id the host still holds for Home. */
-    fun liveIds(): Set<Int>
+    /** Every id the host still holds for Home; null when the host could not be asked, which is not the same as none. */
+    fun liveIds(): Set<Int>?
     /** True when the id is bound; false when the user has to allow it first. */
     fun bind(id: Int, provider: ComponentName): Boolean
     fun needsConfigure(id: Int): Boolean
@@ -56,7 +56,7 @@ class WidgetLifecycle(private val backend: WidgetBackend) {
 
     /** Deletes host ids Home's layout does not list and no flow is waiting on; returns them. */
     fun sweep(listed: Set<Int>): Set<Int> {
-        val strays = backend.liveIds() - listed - setOfNotNull(pending)
+        val strays = (backend.liveIds() ?: return emptySet()) - listed - setOfNotNull(pending)
         strays.forEach(backend::delete)
         return strays
     }

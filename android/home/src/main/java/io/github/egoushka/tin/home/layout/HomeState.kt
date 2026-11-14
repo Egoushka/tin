@@ -60,7 +60,8 @@ class HomeState(
         scope.launch {
             // Ids no list holds (a flow the process died in) and widgets the host lost are cleaned up once per start.
             widgets.sweep(pageStore.board.first().widgetIds)
-            pageStore.updateBoard { it.reconcile(widgets.liveIds()) }
+            val live = widgets.liveIds() ?: return@launch
+            pageStore.updateBoard { it.reconcile(live) }
         }
     }
 
