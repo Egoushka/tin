@@ -1,0 +1,82 @@
+<!--
+Direction: Swiss grid
+Idea: Home as a timetable poster: one 4-column grid, hairline rules instead of cards, a huge flush-left clock, and red used only where something needs you or is broken.
+Fonts: Inter Tight (Google Fonts), tabular figures throughout.
+Palette: paper #F4F2EC, ink #0A0A0A, rule #0A0A0A (2px heavy / 1px hair), grey #6B6B66, signal red #E5171F (attention and errors only).
+Cost/risk on a real phone: light theme on an OLED costs battery (about 2-3x a dark launcher at the same brightness); very dense type needs a font-size floor of 12 px in settings; no cards means touch rows rely on rule spacing, so row heights are held at 48 px.
+-->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=412">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F4F2EC;--ink:#0A0A0A;--grey:#66665F;--red:#E5171F;--sw:1.75}
+*{box-sizing:border-box}
+body{margin:0;width:412px;height:915px;overflow:hidden;background:var(--paper);color:var(--ink);font:400 15px/1.2 'Inter Tight',Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;position:relative}
+.ic{fill:none;stroke:currentColor;stroke-width:var(--sw);stroke-linecap:round;stroke-linejoin:round;display:block}
+.screen{position:absolute;inset:0;padding:0 24px;display:flex;flex-direction:column}
+.sb{height:34px;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px}
+.sb .r{display:flex;gap:6px;align-items:center}
+.clock{font-weight:600;font-size:142px;line-height:.82;letter-spacing:-.055em;margin:14px 0 8px -7px;height:112px}
+.g{display:grid;grid-template-columns:repeat(4,1fr);column-gap:12px}
+.lab{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--grey)}
+.rule2{border-top:2px solid var(--ink)}
+.hair{border-top:1px solid var(--ink)}
+.info{padding:10px 0 12px;align-items:end}
+.info .big{font-size:20px;font-weight:600;line-height:1.1}
+.info .sm{font-size:14px;color:var(--grey);margin-top:2px}
+.c12{grid-column:1/3}.c34{grid-column:3/5}.c1{grid-column:1}.c23{grid-column:2/4}.c24{grid-column:2/5}.c4{grid-column:4;text-align:right}.c3{grid-column:3}
+.need{padding:8px 0 10px;align-items:end}
+.need .n{font-size:112px;font-weight:700;line-height:.78;letter-spacing:-.05em;color:var(--red);margin-left:-5px;height:84px}
+.need ul{list-style:none;margin:0;padding:0;font-size:15px;line-height:1.35}
+.need li b{font-weight:600}
+.need .lab{color:var(--red);margin-bottom:6px}
+.row{min-height:46px;padding:7px 0;align-items:start}
+.row .t{font-size:17px;font-weight:600}
+.row .n{font-size:17px;font-weight:600;line-height:1.1}
+.row .s{font-size:13px;color:var(--grey);margin-top:2px}
+.row .m{font-size:13px;color:var(--grey);text-align:right;padding-top:2px}
+.row.now .m{color:var(--ink);font-weight:600}
+.red{color:var(--red)!important;font-weight:600}
+.sect{display:flex;justify-content:space-between;padding:7px 0 0}
+.score{font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.nudge{font-style:italic;font-size:13px;color:var(--grey);margin-top:2px}
+.ctl{display:flex;justify-content:flex-end;margin-right:-12px}
+.ctl span{width:48px;height:46px;display:flex;align-items:center;justify-content:center}
+.dock{display:flex;border-top:2px solid var(--ink);margin-top:auto}
+.dock span{flex:1;height:54px;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--ink)}
+.dock span:first-child{border-left:0}
+.search{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--ink);height:60px}
+.search .q{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:600}
+.mic{width:48px;height:48px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;margin-right:-4px}
+.pill{height:22px;display:flex;justify-content:center;align-items:center}
+.pill i{width:120px;height:4px;background:var(--ink);border-radius:2px}
+.notif{display:flex;gap:14px;font-size:14px;font-weight:600;padding-top:7px}
+.notif span span{font-weight:400;color:var(--grey);margin-left:3px}
+</style></head><body><div class="screen">
+<div class="sb"><span>10:12</span><span class="r"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/></svg>82%</span></div>
+<div class="clock">10:12</div>
+<div class="g rule2 info">
+ <div class="c12"><div class="lab">Date · Weather</div><div class="big">Sat, 14 Nov</div><div class="sm">7° Cloudy</div></div>
+ <div class="c34" style="text-align:right"><div class="lab">Alarm</div><div class="big">07:30</div><div class="sm">Tomorrow · Sun</div></div>
+</div>
+<div class="g rule2 need">
+ <div class="c12"><div class="n">4</div></div>
+ <div class="c34"><div class="lab">Needs you · 1 min</div><ul><li><b>2</b> PRs to merge</li><li><b>1</b> approval</li><li><b>1</b> reply owed</li></ul></div>
+</div>
+<div class="g rule2" style="padding-top:6px"><div class="lab c12">Today</div><div class="lab c34" style="text-align:right">4 events</div></div>
+<div class="g row now"><div class="c1 t">10:30</div><div class="c23"><div class="n">Standup</div></div><div class="c4 m">in 18 min</div></div>
+<div class="g hair row"><div class="c1 t">13:00</div><div class="c23"><div class="n">Lunch, Podil</div><div class="s">Leave <b style="color:var(--ink)">12:36</b> · 24 min drive</div></div><div class="c4 m">1 h</div></div>
+<div class="g hair row"><div class="c1 t">15:00</div><div class="c23"><div class="n">Sprint review</div><div class="s red">Overlaps Dentist by 30 min</div></div><div class="c4 m">1 h</div></div>
+<div class="g hair row"><div class="c1 t">15:30</div><div class="c23"><div class="n">Dentist</div></div><div class="c4 m">45 min</div></div>
+<div class="g rule2 row" style="padding-top:8px"><div class="c1"><div class="score">62</div></div><div class="c24"><div class="lab">Readiness · 07:40</div><div class="n" style="margin-top:2px">Sleep 6 h 12 m</div><div class="nudge">“Low recovery. Keep today light.”</div></div></div>
+<div class="g hair row" style="align-items:center"><div class="c1 lab" style="color:var(--red)">hedzer</div><div class="c24 red" style="font-size:16px">1 deploy failed · nytka</div></div>
+<div class="g hair row" style="align-items:center;padding:0"><div class="c12"><div class="n" style="font-size:16px">Music for Airports</div><div class="s" style="display:flex;gap:6px;align-items:center">Brian Eno · <svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>L 80 · R 76%</div></div><div class="c34 ctl">
+ <span><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></span><span><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span><span><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></span></div></div>
+<div class="hair" style="padding-bottom:9px"><div class="notif"><span>Signal<span>3</span></span><span>Gmail<span>5</span></span><span>Slack<span>2</span></span></div>
+<div class="g" style="padding-top:4px;font-size:14px"><div class="c1 lab" style="padding-top:2px">4 min</div><div class="c24"><b style="font-weight:600">Mom</b> “Call me when you’re free”</div></div></div>
+<div class="dock"><span><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span><span><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></span><span><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></span><span><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span><span><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span></div>
+<div class="search"><div class="q"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Search or ask</div><div class="mic"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></div></div>
+<div class="pill"><i></i></div>
+</div></body></html>

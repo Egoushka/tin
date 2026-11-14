@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home style board, November 2026</title>
+<style>
+  body { margin: 0; padding: 40px; background: #d9d7d2; font: 14px/1.4 system-ui, sans-serif; color: #222; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.lede { margin: 0 0 28px; color: #555; max-width: 70ch; }
+  .grid { display: grid; grid-template-columns: repeat(4, 412px); gap: 40px 32px; }
+  figure { margin: 0; }
+  figcaption { font-weight: 600; margin: 0 0 10px; font-size: 15px; }
+  figcaption span { font-weight: 400; color: #555; }
+  iframe { width: 412px; height: 915px; border: 0; border-radius: 28px; display: block; background: #000;
+           box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+</style>
+</head>
+<body>
+<h1>Home: twelve directions, same content</h1>
+<p class="lede">Every tile shows the full working Home (clock, agenda, Needs you, readiness, homelab, alarm, music, notifications, dock, search) at the Pixel 8a's 412 × 915 dp. Pick by eye; a mix ("10's shapes with 3's type") is a fine answer.</p>
+<div class="grid" id="grid"></div>
+<script>
+  const tiles = [
+    ['01', 'swiss', 'Swiss grid'], ['02', 'terminal', 'Terminal'], ['03', 'paper', 'Morning paper'], ['04', 'brutal', 'Brutalist blocks'],
+    ['05', 'bento', 'Bento widgets'], ['06', 'instrument', 'Instrument panel'], ['07', 'text', 'Text only'], ['08', 'hardware', 'Hardware panel'],
+    ['09', 'receipt', 'Receipt'], ['10', 'expressive', 'Material expressive'], ['11', 'river', 'Day river'], ['12', 'nightglass', 'Night glass'],
+  ];
+  const grid = document.getElementById('grid');
+  for (const [n, slug, name] of tiles) {
+    const f = document.createElement('figure');
+    f.innerHTML = `<figcaption>${n} · ${name}${slug === 'nightglass' ? ' <span>(current)</span>' : ''}</figcaption>
+      <iframe loading="eager" src="tile-${n}-${slug}.html" title="${name}" scrolling="no"></iframe>`;
+    grid.append(f);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Tile 11 · Day river</title>
+<!--
+Direction: Day river.
+Idea: the home screen is one vertical time axis; the clock's colon is where the axis starts, the bright NOW line crosses at 10:12, events hang off it by time (their length is their height) and everything else is pinned to the moment it belongs to: readiness at 07:40, Mom at 10:08, needs-you, homelab and music at now, the alarm at tomorrow 07:30.
+Fonts: JetBrains Mono 200/400/500 for clock and all times (tabular, so the colon sits exactly on the axis), Instrument Sans 400/600 for names and body (both Google Fonts).
+Palette: night #0a0c11, ink #eceff4, ink-2 #8d95a6, axis #394050, axis-past #232833, card #12151c, edge #ffffff1a, now/teal #5ef0dc, needs-you violet #9d8cff, broken red #ff6b78, clash amber #ffc65c.
+Cost/risk: the axis only reads well if events are placed by time, so a launcher needs a layout pass that scales the hour height and collapses the long gap between 13:00 and 15:00 (here drawn with a break, not to scale); the screen is a scrolling timeline, so on a busy day content below Dentist would sit under the fold and the dock has to stay fixed. Colour is kept to one meaning per hue (teal now, violet needs you, red broken, amber clash), which is stricter than Night glass.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box}
+:root{--ink:#eceff4;--ink2:#8d95a6;--ax:#394050;--card:#12151c;--edge:rgb(255 255 255/.1);--now:#5ef0dc;--v:#9d8cff;--bad:#ff6b78;--warn:#ffc65c}
+body{margin:0;width:412px;height:915px;overflow:hidden;position:relative;background:linear-gradient(180deg,#0e1118 0,#0a0c11 40%),#0a0c11;color:var(--ink);font:400 14px/18px "Instrument Sans",system-ui,sans-serif}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.i{width:16px;height:16px;stroke-width:1.6;flex:none}
+.sb{position:absolute;top:0;left:0;right:0;height:36px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;font:500 12px "JetBrains Mono",monospace}
+.sb div{display:flex;gap:8px;align-items:center}
+.pill{position:absolute;bottom:8px;left:50%;margin-left:-54px;width:108px;height:4px;border-radius:2px;background:rgb(236 239 244/.5)}
+.abs{position:absolute}
+.clock{left:24px;top:34px;font:200 64px/68px "JetBrains Mono",monospace;letter-spacing:0;color:var(--ink)}
+.dt{right:24px;top:50px;text-align:right}
+.dt b{display:block;font:600 16px/20px "Instrument Sans";margin-bottom:2px}
+.dt span{display:flex;gap:6px;align-items:center;justify-content:flex-end;color:var(--ink2)}
+.axis{left:119px;top:100px;width:2px;height:672px;background:linear-gradient(180deg,transparent 0,var(--ax) 14px,var(--ax) 100%);border-radius:1px}
+.axpast{left:119px;top:100px;width:2px;height:144px;background:linear-gradient(180deg,transparent 0,#2a303d 14px);}
+.r{position:absolute;left:136px;right:20px}
+.g{position:absolute;left:-112px;width:84px;text-align:right;font:500 12px/16px "JetBrains Mono",monospace;color:var(--ink2);top:1px}
+.g small{display:block;font:400 10.5px/13px "JetBrains Mono",monospace;color:var(--ink2);opacity:.85}
+.d{position:absolute;left:-21px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--ink2);border:2px solid #0a0c11;box-sizing:content-box;margin:-2px}
+.d.hollow{background:#0a0c11;border:2px solid var(--ink2);margin:0;width:10px;height:10px;box-sizing:border-box}
+.t{font:600 15px/18px "Instrument Sans"}
+.s{color:var(--ink2);font-size:12.5px;line-height:16px;display:flex;gap:5px;align-items:center}
+.past{opacity:.62}
+.chips{display:flex;gap:6px;margin-top:5px}
+.chip{display:flex;gap:5px;align-items:center;height:24px;padding:0 9px;border-radius:12px;background:rgb(255 255 255/.07);font-size:12.5px;color:#c4cad6;white-space:nowrap}
+.chip b{font:500 11px "JetBrains Mono";color:var(--ink)}
+.nowline{left:24px;right:0;top:253px;height:2px}
+.nowline:before{content:"";position:absolute;left:96px;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--now),rgb(94 240 220/.15));box-shadow:0 0 14px 1px rgb(94 240 220/.55)}
+.nowlab{left:24px;width:84px;top:245px;text-align:right;font:500 13px/18px "JetBrains Mono";color:var(--now)}
+.nowdot{left:112px;top:248px;width:16px;height:16px;border-radius:50%;background:var(--now);box-shadow:0 0 0 4px rgb(94 240 220/.2),0 0 16px 2px var(--now)}
+.hot{background:radial-gradient(120% 110% at 0% 0%,rgb(157 140 255/.3) 0,transparent 70%),var(--card);border:1px solid rgb(157 140 255/.55);border-radius:20px;box-shadow:0 0 32px -10px var(--v);padding:10px 14px;display:flex;gap:14px;align-items:center;height:88px}
+.hot .n{font:200 54px/54px "JetBrains Mono";letter-spacing:-.04em}
+.hot .lb{font:600 11px/14px "Instrument Sans";letter-spacing:.07em;text-transform:uppercase;color:var(--ink2)}
+.hot ul{list-style:none;margin:0 0 0 auto;padding:0;display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:17px}
+.hot li{display:flex;gap:7px;align-items:center}
+.vdot{left:-23px;top:36px;width:14px;height:14px;border-radius:50%;background:var(--v);box-shadow:0 0 14px 2px var(--v);border:0;margin:0}
+.bad{background:radial-gradient(110% 100% at 0% 50%,rgb(255 107 120/.2) 0,transparent 70%),var(--card);border:1px solid rgb(255 107 120/.45);border-radius:16px;height:42px;padding:0 14px;display:flex;align-items:center;gap:10px}
+.bad b{font:600 14px/16px "Instrument Sans";display:block}.bad small{font-size:12.5px;color:#d9bcc0;display:block;line-height:15px}
+.ev{background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:0 12px;display:flex;align-items:center;gap:8px}
+.mu{background:var(--card);border:1px solid var(--edge);border-radius:18px;height:52px;display:flex;align-items:center;padding:0 8px 0 8px;gap:10px}
+.art{width:36px;height:36px;border-radius:10px;flex:none;background:radial-gradient(70% 70% at 25% 25%,#3df0c4,transparent 70%),radial-gradient(80% 80% at 90% 90%,#5b3df0,transparent 70%),#1d8fd6}
+.mc{margin-left:auto;display:flex}
+.mc span{width:33px;height:48px;display:grid;place-items:center}
+.mc .i{width:20px;height:20px}.mu{height:52px}
+.lane{position:absolute;border-radius:14px;padding:8px 12px}
+.dock{left:0;right:0;top:777px;display:flex;justify-content:center;gap:20px}
+.dock div,.mic{width:56px;height:56px;border-radius:50%;background:var(--card);border:1px solid var(--edge);display:grid;place-items:center}
+.dock .i{width:24px;height:24px}
+.sbar{left:24px;right:24px;top:847px;height:53px;border-radius:28px;background:var(--card);border:1px solid rgb(255 255 255/.16);display:flex;align-items:center;padding:0 3px 0 18px;gap:12px;font-size:15px}
+.sbar .mic{margin-left:auto;width:46px;height:46px;background:var(--ink);color:#0a0c11;border:0}
+.sbar .mic .i{width:22px;height:22px}
+</style></head><body>
+<div class="sb"><span>10:12</span><div><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg><span style="display:flex;gap:4px;align-items:center"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/></svg>82%</span></div></div>
+<div class="abs clock">10:12</div>
+<div class="abs dt"><b>Sat, 14 Nov</b><span><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>7° Cloudy</span></div>
+
+<div class="abs axis"></div><div class="abs axpast"></div>
+
+<!-- past -->
+<div class="r past" style="top:114px;height:54px"><div class="g">07:40</div><div class="d hollow"></div>
+ <div class="t" style="display:flex;justify-content:space-between">Readiness <span class="mono" style="font-weight:500">62</span></div>
+ <div class="s">Sleep 6 h 12 m</div>
+ <div class="s" style="font-style:italic;color:#b7bdca">Low recovery. Keep today light.</div></div>
+<div class="r" style="top:178px;height:60px"><div class="g">10:08<small>4 min ago</small></div><div class="d"></div>
+ <div class="t" style="font-weight:400"><b style="font-weight:700">Mom</b> Call me when you’re free</div>
+ <div class="chips"><div class="chip"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>Signal <b>3</b></div><div class="chip"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Gmail <b>5</b></div><div class="chip"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg>Slack <b>2</b></div></div></div>
+
+<!-- now -->
+<div class="abs nowline"></div><div class="abs nowlab">NOW 10:12</div><div class="abs nowdot"></div>
+
+<div class="r" style="top:268px"><div class="g" style="top:36px;color:var(--v)">1 min<small>needs you</small></div><div class="d vdot"></div>
+ <div class="hot"><div><div class="lb">Needs you</div><div class="n">4</div></div>
+  <ul><li><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg>2 PRs to merge</li><li><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>1 approval</li><li><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>1 reply owed</li></ul></div></div>
+<div class="r" style="top:364px"><div class="g" style="top:13px">hedzer</div><div class="d" style="background:var(--bad);top:15px;box-shadow:0 0 10px 1px var(--bad)"></div>
+ <div class="bad"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg><div><b>1 deploy failed</b><small>nytka</small></div></div></div>
+<div class="r" style="top:414px"><div class="g" style="top:16px">now</div><div class="d" style="top:19px"></div>
+ <div class="mu"><div style="min-width:0;padding-left:2px"><div class="t" style="font-size:14px;white-space:nowrap">Music for Airports</div><div class="s" style="white-space:nowrap">Brian Eno · <svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>80 · 76%</div></div><div class="mc"><span><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></span><span><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span><span><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></span></div></div></div>
+
+<!-- future -->
+<div class="r" style="top:478px"><div class="g" style="top:10px;color:var(--ink)">10:30</div><div class="d" style="top:13px;background:var(--now)"></div>
+ <div class="ev" style="height:38px"><span class="t">Standup</span><span class="s" style="margin-left:auto;color:var(--now)">in 18 min</span></div></div>
+<div class="r" style="top:526px"><div class="g" style="top:5px">12:36</div><div class="d hollow" style="top:6px"></div>
+ <div class="s" style="height:20px;color:#c4cad6"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><b style="font-weight:600">Leave</b> · 24 min drive</div></div>
+<div class="r" style="top:552px"><div class="g" style="top:9px;color:var(--ink)">13:00</div><div class="d" style="top:12px"></div>
+ <div class="ev" style="height:36px"><span class="t">Lunch, Podil</span><span class="s" style="margin-left:auto">1 h</span></div></div>
+
+<div class="abs" style="left:119px;top:602px;width:2px;height:1px"></div>
+<div class="r" style="top:604px;height:92px">
+ <div class="g" style="color:var(--ink)">15:00</div><div class="d" style="top:4px"></div>
+ <div class="g" style="top:37px;color:var(--ink)">15:30</div><div class="d" style="top:40px"></div>
+ <div class="g" style="top:72px;opacity:.6">16:00</div>
+ <div class="lane" style="left:0;top:0;width:200px;height:72px;background:var(--card);border:1px solid var(--edge);padding:6px 10px"><div class="t" style="font-size:14px;line-height:16px">Sprint review</div><div class="s" style="color:var(--warn);margin-top:0;white-space:nowrap;font-size:12px;line-height:14px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Overlaps Dentist by 30 min</div></div>
+ <div class="lane" style="left:100px;top:40px;width:158px;height:54px;background:#1b202b;border:1px solid rgb(255 255 255/.18);padding:0"><div style="position:absolute;left:104px;top:5px"><div class="t" style="font-size:13px;line-height:16px">Dentist</div><div class="s" style="font-size:11.5px;line-height:14px">45 min</div></div></div>
+ <div class="abs" style="left:100px;top:40px;width:100px;height:32px;background:rgb(255 198 92/.22);border:1px solid rgb(255 198 92/.7);border-radius:0 0 0 0"></div>
+</div>
+
+<div class="r" style="top:716px"><div class="g" style="top:9px;color:var(--ink)">07:30<small>Sun</small></div><div class="d hollow" style="top:12px"></div>
+ <div class="ev" style="height:38px;border-style:dashed"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg><span class="t" style="font-weight:500">Alarm</span><span class="s" style="margin-left:auto">Tomorrow</span></div></div>
+
+<div class="abs dock"><div><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></div><div><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></div><div><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div><div><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></div></div>
+<div class="abs sbar"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search or ask</span><div class="mic"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></div></div>
+<div class="pill"></div>
+</body></html>

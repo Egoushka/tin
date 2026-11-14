@@ -1,0 +1,135 @@
+<!--
+Direction: Instrument panel
+Idea: Home is an avionics / pro-audio panel: engraved labels, a segmented arc gauge for readiness, a tick-marked time scale with a "now" needle for today, and warning lamps for what needs you (amber) and what is broken (red).
+Fonts: IBM Plex Mono (figures, 500/600) and Barlow Condensed (labels and names, 500/600/700), Google Fonts link, monospace / system condensed fallback.
+Palette: Graphite body #121417; Panel #1B1E22; Panel edge #2B3037; Engraving grey #7E8791; Text #E7EAEE; Dim segment #2A2F36;
+  Gauge lit (neutral ice) #CFE0EE; Now needle #FFFFFF; Attention amber #FFB020; Fault red #FF4538.
+Caption: colour keeps one meaning each: amber = needs you or a clash, red = broken, white/ice = everything else, as in Night glass.
+Cost/risk on a real phone: lots of small caps text at 10 to 11 px is hard to read in sunlight and for tired eyes; the "now" needle and arc gauge must redraw every minute (cheap if drawn once as SVG, but a live clock tile costs wakeups); mono figures widen strings, so long names need truncation rules. Dark graphite is cheap on OLED.
+-->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=412">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<title>Tile 06 · Instrument panel</title>
+<style>
+*{box-sizing:border-box}
+:root{--amber:#FFB020;--red:#FF4538;--eng:#7E8791;--tx:#E7EAEE;--pn:#1B1E22;--edge:#2B3037}
+body{margin:0;width:412px;height:915px;overflow:hidden;position:relative;background:#121417;color:var(--tx);font-family:'Barlow Condensed','Arial Narrow',sans-serif;
+ background-image:radial-gradient(100% 50% at 50% 0%,#1b1f24 0%,transparent 70%)}
+.ic{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.eng{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--eng);display:flex;justify-content:space-between;align-items:center}
+.eng .mono{letter-spacing:.04em;font-weight:500}
+.sb{position:absolute;top:0;left:0;right:0;height:44px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#aab1b9}
+.sb .r{display:flex;gap:6px;align-items:center}
+.pill{position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:4px;border-radius:2px;background:#6a717a}
+.pn{position:absolute;left:24px;right:24px;background:var(--pn);border:1px solid var(--edge);border-radius:6px;box-shadow:0 1px 0 #ffffff0d inset,0 6px 14px -8px #000}
+/* head */
+.head{top:46px;height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+.clock{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:46px;letter-spacing:-.04em;line-height:1}
+.clock i{font-style:normal;color:var(--eng);animation:none}
+.rd2{display:grid;grid-template-columns:auto auto;gap:3px 10px;align-items:baseline;font-size:13px}
+.rd2 .eng{font-size:10px;letter-spacing:.14em}
+.rd2 .v{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;text-align:right;white-space:nowrap}
+/* needs */
+.need{top:120px;height:88px;border-color:#6b4a0c;box-shadow:0 0 0 1px #ffb02022,0 0 24px -6px #ffb02060,0 1px 0 #ffffff0d inset;display:flex}
+.need .big{width:96px;border-right:1px solid var(--edge);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#201a0e;border-radius:6px 0 0 6px}
+.need .big b{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:48px;line-height:1;color:var(--amber);text-shadow:0 0 14px #ffb02099}
+.need .big span{font-size:11px;letter-spacing:.16em;font-weight:700;color:#e7a93b}
+.need .rows{flex:1;padding:9px 14px 8px 14px;display:flex;flex-direction:column;justify-content:space-between}
+.need .eng{color:#b68a30}
+.ann{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.ann .n{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--amber);width:16px}
+.ann .ic{color:#9b8a68}
+/* today */
+.today{top:216px;height:266px;padding:10px 14px}
+.today svg{display:block;margin:4px -2px 0}
+.tk{stroke:#4a525c;stroke-width:1}.tk.maj{stroke:#98a1ab}.axis{stroke:#4a525c}
+.tl{font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#98a1ab}
+.ev{fill:#2e3a46;stroke:#6f8396;stroke-width:1}.ev.clash{fill:#3a2d10;stroke:var(--amber)}
+.bl{paint-order:stroke;stroke:#12161a;stroke-width:3px;font-family:'Barlow Condensed';font-weight:700;font-size:10px;letter-spacing:.12em;fill:#dfe6ec}
+.needle{stroke:#fff;stroke-width:1.5}.nh{fill:#fff}
+.list{margin-top:2px}
+.row{display:grid;grid-template-columns:46px 1fr auto;column-gap:6px;align-items:center;padding:3px 0;border-top:1px solid #262b31}
+.row .t{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:#c5ccd3}
+.row .nm{font-size:18px;font-weight:600;letter-spacing:.02em;line-height:1.05}
+.row .sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9aa3ad;display:flex;gap:4px;align-items:center;margin-top:1px;letter-spacing:-.01em}
+.row .d{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9aa3ad}
+.row.now{background:#ffffff0c;margin:0 -8px;padding:4px 8px;border-radius:3px}
+.row.now .t{color:#fff}.row.now .d{color:#fff;font-weight:600}
+.row.clash .sub{color:var(--amber)}
+/* gauge */
+.gauge{top:486px;left:24px;right:auto;width:176px;height:156px}
+.gauge svg{position:absolute;left:36px;top:14px;width:104px;height:104px}
+.lit{stroke:#CFE0EE;stroke-width:3.4}.dim{stroke:#2A2F36;stroke-width:3.4}.hair{fill:none;stroke:#2B3037}
+.gauge .eng{position:absolute;left:12px;right:12px;top:8px}
+.gauge .num{position:absolute;left:0;right:0;top:54px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:600;line-height:1;letter-spacing:-.04em}
+.gauge .sl{position:absolute;left:0;right:0;top:98px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#aab1b9}
+.gauge .nd{position:absolute;left:12px;right:10px;bottom:8px;font-family:'Barlow Condensed';font-style:italic;font-size:14px;padding-top:6px;line-height:1.1;color:#b9c1c9;text-align:center}
+/* fault */
+.fault{top:486px;left:208px;right:24px;height:156px;border-color:#7a211c;background:#1f1514;box-shadow:0 0 0 1px #ff453822,0 0 26px -6px #ff453870,0 1px 0 #ffffff0d inset}
+.fault .eng{position:absolute;left:12px;right:12px;top:10px}
+.fault .lamp{position:absolute;right:12px;top:34px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffb0a8,var(--red) 55%,#8a1a12);box-shadow:0 0 14px 3px #ff4538aa}
+.fault .big{position:absolute;left:12px;top:30px;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:56px;line-height:1;color:var(--red);text-shadow:0 0 14px #ff453880}
+.fault .msg{position:absolute;left:12px;right:10px;bottom:10px;font-size:20px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.05}
+.fault .msg span{display:block;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:#ff8f86;letter-spacing:.02em;margin-top:3px}
+/* music */
+.mus{top:650px;height:64px;display:flex;align-items:center;padding:0 8px 0 14px;gap:10px}
+.mus .tx{flex:1;min-width:0}
+.mus b{display:block;font-size:18px;font-weight:600;letter-spacing:.02em;white-space:nowrap;line-height:1.05}
+.mus small{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9aa3ad;display:block;margin-top:2px;letter-spacing:-.02em;white-space:nowrap}
+.keys{display:flex;gap:4px}
+.k{width:48px;height:48px;border-radius:5px;background:linear-gradient(#262b31,#1c2025);border:1px solid #363c44;color:#dfe5ea;display:grid;place-items:center;box-shadow:0 2px 0 #0a0b0c,0 1px 0 #ffffff12 inset}
+.k.pl{color:#fff;border-color:#59616b}
+/* notifs */
+.nt{top:718px;height:56px;padding:6px 14px;display:flex;flex-direction:column;justify-content:space-between}
+.cnt{display:flex;gap:18px;align-items:center;font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#aab1b9}
+.cnt span{display:flex;gap:6px;align-items:center}
+.cnt b{font-family:'IBM Plex Mono',monospace;font-weight:600;color:#fff;font-size:14px;letter-spacing:0;background:#262b31;border-radius:3px;padding:0 5px}
+.cnt .age{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--eng);letter-spacing:0;text-transform:none}
+.nt .m{font-size:16px;font-weight:500;letter-spacing:.02em;line-height:1}
+.nt .m b{font-weight:700;color:#fff}
+/* dock */
+.dock{position:absolute;left:24px;right:24px;top:784px;height:54px;display:flex;justify-content:space-between}
+.dock a{width:64px;height:54px;border-radius:5px;background:linear-gradient(#262b31,#1c2025);border:1px solid #363c44;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#dfe5ea;box-shadow:0 2px 0 #0a0b0c,0 1px 0 #ffffff12 inset}
+.dock a i{font-style:normal;font-size:9px;letter-spacing:.16em;color:var(--eng);font-weight:600;text-transform:uppercase}
+.search{position:absolute;left:24px;right:24px;top:846px;height:50px;border-radius:6px;background:#0b0c0e;border:1px solid #2b3037;box-shadow:0 1px 3px #000 inset,0 1px 0 #ffffff10;display:flex;align-items:center;padding:0 4px 0 14px;gap:10px;color:#8a929b;font-size:17px;letter-spacing:.04em}
+.search span{flex:1}
+.search .mic{width:44px;height:44px;border-radius:5px;background:#E7EAEE;color:#101214;display:grid;place-items:center}
+</style></head><body>
+<div class="sb"><span>10:12</span><span class="r"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/></svg> 82%</span></div>
+
+<section class="pn head"><div class="clock">10<i>:</i>12</div>
+ <div class="rd2"><span class="eng">Date</span><span class="v">SAT 14 NOV</span><span class="eng">Wx</span><span class="v">7° CLOUDY</span><span class="eng">Alarm</span><span class="v">07:30 · TOMORROW · SUN</span></div></section>
+
+<section class="pn need"><div class="big"><b>4</b><span>NEEDS YOU</span></div>
+ <div class="rows"><div class="eng"><span>Open items</span><span class="mono">1 MIN</span></div>
+  <div class="ann"><span class="n">2</span><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg>PRs to merge</div>
+  <div class="ann"><span class="n">1</span><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Approval</div>
+  <div class="ann"><span class="n">1</span><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Reply owed</div></div></section>
+
+<section class="pn today"><div class="eng"><span>Today</span><span class="mono">4 EVENTS</span></div>
+ <svg viewBox="-2 0 336 84" width="336" height="84"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" fill="#FFB020" opacity=".5"/></pattern></defs><line x1="0.0" y1="16" x2="0.0" y2="26" class="tk maj"/><text x="0.0" y="10" class="tl" text-anchor="start">10</text><line x1="12.8" y1="20" x2="12.8" y2="26" class="tk"/><line x1="25.5" y1="20" x2="25.5" y2="26" class="tk"/><line x1="38.3" y1="20" x2="38.3" y2="26" class="tk"/><line x1="51.1" y1="16" x2="51.1" y2="26" class="tk maj"/><text x="51.1" y="10" class="tl" text-anchor="middle">11</text><line x1="63.8" y1="20" x2="63.8" y2="26" class="tk"/><line x1="76.6" y1="20" x2="76.6" y2="26" class="tk"/><line x1="89.4" y1="20" x2="89.4" y2="26" class="tk"/><line x1="102.2" y1="16" x2="102.2" y2="26" class="tk maj"/><text x="102.2" y="10" class="tl" text-anchor="middle">12</text><line x1="114.9" y1="20" x2="114.9" y2="26" class="tk"/><line x1="127.7" y1="20" x2="127.7" y2="26" class="tk"/><line x1="140.5" y1="20" x2="140.5" y2="26" class="tk"/><line x1="153.2" y1="16" x2="153.2" y2="26" class="tk maj"/><text x="153.2" y="10" class="tl" text-anchor="middle">13</text><line x1="166.0" y1="20" x2="166.0" y2="26" class="tk"/><line x1="178.8" y1="20" x2="178.8" y2="26" class="tk"/><line x1="191.5" y1="20" x2="191.5" y2="26" class="tk"/><line x1="204.3" y1="16" x2="204.3" y2="26" class="tk maj"/><text x="204.3" y="10" class="tl" text-anchor="middle">14</text><line x1="217.1" y1="20" x2="217.1" y2="26" class="tk"/><line x1="229.8" y1="20" x2="229.8" y2="26" class="tk"/><line x1="242.6" y1="20" x2="242.6" y2="26" class="tk"/><line x1="255.4" y1="16" x2="255.4" y2="26" class="tk maj"/><text x="255.4" y="10" class="tl" text-anchor="middle">15</text><line x1="268.2" y1="20" x2="268.2" y2="26" class="tk"/><line x1="280.9" y1="20" x2="280.9" y2="26" class="tk"/><line x1="293.7" y1="20" x2="293.7" y2="26" class="tk"/><line x1="306.5" y1="16" x2="306.5" y2="26" class="tk maj"/><text x="306.5" y="10" class="tl" text-anchor="middle">16</text><line x1="319.2" y1="20" x2="319.2" y2="26" class="tk"/><line x1="332.0" y1="20" x2="332.0" y2="26" class="tk"/><line x1="0" y1="26" x2="332" y2="26" class="axis"/><rect x="25.5" y="32" width="25.5" height="20" rx="2" class="ev"/><rect x="153.2" y="32" width="51.1" height="20" rx="2" class="ev"/><rect x="255.4" y="32" width="51.1" height="20" rx="2" class="ev clash"/><rect x="280.9" y="58" width="38.3" height="20" rx="2" class="ev clash"/><rect x="280.9" y="32" width="25.5" height="46" fill="url(#hatch)"/><text x="29.5" y="46" class="bl">STANDUP</text><text x="157.2" y="46" class="bl">LUNCH</text><text x="258.4" y="46" class="bl">SPRINT</text><text x="283.9" y="72" class="bl">DENT</text><line x1="10.2" y1="14" x2="10.2" y2="82" class="needle"/><path d="M6.2 12 h8 l-4 7 z" class="nh"/></svg>
+ <div class="list">
+  <div class="row now"><span class="t">10:30</span><span class="nm">Standup</span><span class="d">IN 18 MIN</span></div>
+  <div class="row"><span class="t">13:00</span><div><span class="nm">Lunch, Podil</span><div class="sub"><svg class="ic" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>LEAVE 12:36 · 24 MIN DRIVE</div></div><span></span></div>
+  <div class="row clash"><span class="t">15:00</span><div><span class="nm">Sprint review</span><div class="sub"><svg class="ic" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>OVERLAPS DENTIST BY 30 MIN</div></div><span></span></div>
+  <div class="row"><span class="t">15:30</span><span class="nm">Dentist</span><span class="d">45 MIN</span></div>
+ </div></section>
+
+<section class="pn gauge"><div class="eng"><span>Readiness</span><span class="mono">07:40</span></div><svg viewBox="0 0 140 140" width="136" height="136"><line x1="37.5" y1="102.5" x2="27.6" y2="112.4" class="lit"/><line x1="33.4" y1="97.9" x2="22.3" y2="106.3" class="lit"/><line x1="30.0" y1="92.7" x2="17.8" y2="99.6" class="lit"/><line x1="27.3" y1="87.1" x2="14.3" y2="92.3" class="lit"/><line x1="25.4" y1="81.2" x2="11.8" y2="84.7" class="lit"/><line x1="24.3" y1="75.2" x2="10.4" y2="76.7" class="lit"/><line x1="24.0" y1="69.0" x2="10.0" y2="68.7" class="lit"/><line x1="24.6" y1="62.8" x2="10.7" y2="60.6" class="lit"/><line x1="25.9" y1="56.8" x2="12.5" y2="52.7" class="lit"/><line x1="28.1" y1="51.0" x2="15.4" y2="45.2" class="lit"/><line x1="31.1" y1="45.5" x2="19.2" y2="38.1" class="lit"/><line x1="34.7" y1="40.5" x2="23.9" y2="31.5" class="lit"/><line x1="39.0" y1="36.0" x2="29.5" y2="25.7" class="lit"/><line x1="43.8" y1="32.2" x2="35.8" y2="20.7" class="lit"/><line x1="49.1" y1="29.0" x2="42.8" y2="16.5" class="lit"/><line x1="54.8" y1="26.6" x2="50.2" y2="13.4" class="lit"/><line x1="60.8" y1="24.9" x2="58.0" y2="11.2" class="lit"/><line x1="66.9" y1="24.1" x2="66.0" y2="10.1" class="lit"/><line x1="73.1" y1="24.1" x2="74.0" y2="10.1" class="lit"/><line x1="79.2" y1="24.9" x2="82.0" y2="11.2" class="lit"/><line x1="85.2" y1="26.6" x2="89.8" y2="13.4" class="lit"/><line x1="90.9" y1="29.0" x2="97.2" y2="16.5" class="lit"/><line x1="96.2" y1="32.2" x2="104.2" y2="20.7" class="dim"/><line x1="101.0" y1="36.0" x2="110.5" y2="25.7" class="dim"/><line x1="105.3" y1="40.5" x2="116.1" y2="31.5" class="dim"/><line x1="108.9" y1="45.5" x2="120.8" y2="38.1" class="dim"/><line x1="111.9" y1="51.0" x2="124.6" y2="45.2" class="dim"/><line x1="114.1" y1="56.8" x2="127.5" y2="52.7" class="dim"/><line x1="115.4" y1="62.8" x2="129.3" y2="60.6" class="dim"/><line x1="116.0" y1="69.0" x2="130.0" y2="68.7" class="dim"/><line x1="115.7" y1="75.2" x2="129.6" y2="76.7" class="dim"/><line x1="114.6" y1="81.2" x2="128.2" y2="84.7" class="dim"/><line x1="112.7" y1="87.1" x2="125.7" y2="92.3" class="dim"/><line x1="110.0" y1="92.7" x2="122.2" y2="99.6" class="dim"/><line x1="106.6" y1="97.9" x2="117.7" y2="106.3" class="dim"/><line x1="102.5" y1="102.5" x2="112.4" y2="112.4" class="dim"/><circle cx="70" cy="70" r="38" class="hair"/></svg><div class="num">62</div><div class="sl">SLEEP 6H 12M</div><div class="nd">Low recovery. Keep today light.</div></section>
+
+<section class="pn fault"><div class="eng"><span>Homelab · hedzer</span></div><div class="lamp"></div><div class="big">1</div><div class="msg">Deploy failed<span>NYTKA</span></div></section>
+
+<section class="pn mus"><div class="tx"><b>Music for Airports</b><small>BRIAN ENO · <svg class="ic" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg> L 80 · R 76%</small></div>
+ <div class="keys"><div class="k"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></div><div class="k pl"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></div><div class="k"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></div></div></section>
+
+<section class="pn nt"><div class="cnt"><span>Signal <b>3</b></span><span>Gmail <b>5</b></span><span>Slack <b>2</b></span><span class="age">4 min</span></div>
+ <div class="m"><b>Mom</b> “Call me when you're free”</div></section>
+
+<nav class="dock"><a><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><i>Phone</i></a><a><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><i>Msgs</i></a><a><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg><i>Cam</i></a><a><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg><i>Web</i></a><a><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg><i>Maps</i></a></nav>
+<div class="search"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search or ask</span><div class="mic"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></div></div>
+<div class="pill"></div>
+</body></html>

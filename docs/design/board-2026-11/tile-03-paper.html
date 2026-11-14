@@ -1,0 +1,96 @@
+<!--
+Direction: Morning paper
+Idea: Home as the front page of a personal daily: the "Needs you" count is the lead headline, the day is a column of dated items, and attention is weight plus one red ink mark.
+Fonts: Source Serif 4 (Google Fonts) for everything, real small caps for section labels, oldstyle-free lining figures for times.
+Palette: cream #F3ECDC, ink #1B1812, soft ink #5E564A, hairline #B9AE98, ink red #B3261E (one mark: lead headline and broken deploy only).
+Cost/risk on a real phone: serif at 13-15 px body reads well on e-ink-like warm light but is less compact than a grotesk, so long event names wrap to two lines; warm cream on OLED is bright (battery) and needs a night variant; masthead takes about 70 px of height that other tiles spend on content.
+-->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=412">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,800;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F3ECDC;--ink:#1B1812;--soft:#5E564A;--hair:#B9AE98;--red:#B3261E;--sw:1.5}
+*{box-sizing:border-box}
+body{margin:0;width:412px;height:915px;overflow:hidden;background:var(--bg);color:var(--ink);font:400 15px/1.25 'Source Serif 4',Georgia,serif;position:relative}
+.ic{fill:none;stroke:currentColor;stroke-width:var(--sw);stroke-linecap:round;stroke-linejoin:round;display:block}
+.screen{position:absolute;inset:0;padding:0 24px;display:flex;flex-direction:column}
+.sb{height:34px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600}
+.sb .r{display:flex;gap:6px;align-items:center}
+.sc{font-variant-caps:all-small-caps;letter-spacing:.09em;font-weight:600;font-size:16px;color:var(--soft)}
+.mast{text-align:center;border-top:3px double var(--ink);border-bottom:1px solid var(--ink);padding:6px 0 5px;font-size:28px;font-weight:800;font-style:italic;letter-spacing:-.01em;line-height:1.1}
+.date{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--ink);padding:5px 0 6px;font-size:14px}
+.date .clk{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums}
+.date .l{width:100px}.date .r{width:100px;text-align:right}
+.lead{padding:14px 0 16px;border-bottom:1px solid var(--ink)}
+.lead .k{display:flex;align-items:center;gap:7px}
+.lead .k i{width:9px;height:9px;background:var(--red);display:block}
+.lead h1{margin:2px 0 4px;font-size:80px;line-height:.95;font-weight:800;letter-spacing:-.03em}
+.lead h1 span{color:var(--red)}
+.lead p{margin:0;font-size:16px;line-height:1.3;font-style:italic;color:var(--soft)}
+.lead p b{font-style:normal;color:var(--ink);font-weight:600}
+.cols{display:flex;border-bottom:1px solid var(--ink)}
+.col{padding:10px 0 12px}
+.col.a{width:196px;padding-right:12px;border-right:1px solid var(--ink)}
+.col.b{flex:1;padding-left:12px}
+.ev{padding:11px 0;border-top:1px solid var(--hair);margin-top:0}
+.ev:first-of-type{border-top:0}
+.ev .h{display:flex;justify-content:space-between;align-items:baseline}
+.ev .t{font-weight:600;font-size:13px;font-variant-numeric:lining-nums tabular-nums}
+.ev .m{font-size:12.5px;color:var(--soft);font-style:italic}
+.ev .n{font-size:17px;font-weight:600;line-height:1.15}
+.ev .s{font-size:13px;color:var(--soft);line-height:1.25;margin-top:1px}
+.ev.now .n{font-weight:800}
+.ev .warn{color:var(--ink);font-weight:600}
+.ev .warn:before{content:"";display:inline-block;width:7px;height:7px;background:var(--red);margin-right:5px;vertical-align:1px}
+.score{font-size:46px;font-weight:800;line-height:1;letter-spacing:-.02em}
+.nudge{font-style:italic;font-size:14px;color:var(--soft);margin-top:4px;line-height:1.3}
+.blk{padding:12px 0;border-top:1px solid var(--hair)}
+.blk:first-child{border-top:0;padding-top:0}
+.err{font-size:16px;font-weight:800;line-height:1.2}
+.err:before{content:"";display:inline-block;width:8px;height:8px;background:var(--red);margin-right:6px;vertical-align:1px}
+.np{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ink);min-height:56px}
+.np .ti{font-weight:800;font-style:italic;font-size:17px;line-height:1.15}
+.np .s{font-size:13px;color:var(--soft);display:flex;gap:5px;align-items:center}
+.ctl{display:flex;margin-right:-10px}.ctl span{width:46px;height:48px;display:flex;align-items:center;justify-content:center}
+.wire{padding:10px 0 12px;border-bottom:1px solid var(--ink)}
+.wire .row1{display:flex;gap:16px;font-size:15px;font-weight:600}
+.wire .row1 span span{font-weight:400;color:var(--soft)}
+.wire .row2{font-size:14px;margin-top:3px;display:flex;justify-content:space-between}
+.wire .row2 em{color:var(--soft);font-size:13px}
+.dock{display:flex;justify-content:space-between;margin-top:auto;padding:6px 0 4px}
+.dock span{width:56px;height:52px;display:flex;align-items:center;justify-content:center}
+.search{display:flex;align-items:center;justify-content:space-between;border-top:3px double var(--ink);border-bottom:1px solid var(--ink);height:56px;font-size:19px;font-style:italic;color:var(--soft)}
+.search .q{display:flex;align-items:center;gap:10px}
+.search .mic{width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:var(--ink);margin-right:-8px}
+.pill{height:24px;display:flex;justify-content:center;align-items:center;margin-top:2px}
+.pill i{width:120px;height:4px;background:var(--ink);border-radius:2px}
+</style></head><body><div class="screen">
+<div class="sb"><span>10:12</span><span class="r"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/></svg>82%</span></div>
+<div class="mast">The Morning Brief</div>
+<div class="date"><span class="sc l">Sat, 14 Nov</span><span class="clk">10:12</span><span class="sc r">7° Cloudy</span></div>
+<div class="lead">
+ <div class="k sc"><i></i>Needs you · 1 min ago</div>
+ <h1><span>4</span> need you</h1>
+ <p><b>Two pull requests</b> to merge, <b>one approval</b> and <b>one reply</b> owed.</p>
+</div>
+<div class="cols">
+ <div class="col a">
+  <div class="sc" style="margin-bottom:3px">Today · 4 events</div>
+  <div class="ev now"><div class="h"><span class="t">10:30</span><span class="m">in 18 min</span></div><div class="n">Standup</div></div>
+  <div class="ev"><div class="h"><span class="t">13:00</span><span class="m">1 h</span></div><div class="n">Lunch, Podil</div><div class="s"><b style="font-weight:600;color:var(--ink)">Leave 12:36</b> · 24 min drive</div></div>
+  <div class="ev"><div class="h"><span class="t">15:00</span><span class="m">1 h</span></div><div class="n">Sprint review</div><div class="s warn">Overlaps Dentist by 30 min</div></div>
+  <div class="ev"><div class="h"><span class="t">15:30</span><span class="m">45 min</span></div><div class="n">Dentist</div></div>
+ </div>
+ <div class="col b">
+  <div class="blk"><div class="sc">Readiness · 07:40</div><div class="score">62</div><div class="s" style="font-size:14px;margin-top:2px">Sleep <b style="font-weight:600">6 h 12 m</b></div><div class="nudge">“Low recovery. Keep today light.”</div></div>
+  <div class="blk"><div class="sc">Homelab · hedzer</div><div class="err">1 deploy failed · nytka</div></div>
+  <div class="blk"><div class="sc">Alarm</div><div style="font-size:20px;font-weight:800;line-height:1.15">07:30</div><div class="s" style="font-size:13px;color:var(--soft)">Tomorrow · Sun</div></div>
+ </div>
+</div>
+<div class="np"><div><div class="sc" style="font-size:13px">Now playing</div><div class="ti">Music for Airports</div><div class="s">Brian Eno · <svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg> L 80 · R 76%</div></div><div class="ctl"><span><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></span><span><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span><span><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></span></div></div>
+<div class="wire"><div class="row1"><span>Signal <span>3</span></span><span>Gmail <span>5</span></span><span>Slack <span>2</span></span></div><div class="row2"><span><b style="font-weight:800">Mom:</b> “Call me when you’re free”</span><em>4 min</em></div></div>
+<div class="dock"><span><svg class="ic" width="25" height="25" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span><span><svg class="ic" width="25" height="25" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></span><span><svg class="ic" width="25" height="25" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></span><span><svg class="ic" width="25" height="25" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span><span><svg class="ic" width="25" height="25" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span></div>
+<div class="search"><div class="q"><svg class="ic" width="21" height="21" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Search or ask</div><div class="mic"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></div></div>
+<div class="pill"><i></i></div>
+</div></body></html>
