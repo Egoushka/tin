@@ -5,6 +5,7 @@ import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import io.github.egoushka.tin.home.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +75,7 @@ class NeedsYouSource(private val context: Context, private val authority: String
             val held = c.getColumnIndexOrThrow("held")
             val link = c.getColumnIndexOrThrow("deep_link")
             buildList {
-                while (c.moveToNext()) add(NeedsItem(c.getString(id), c.getString(title).orEmpty(), c.getString(source).orEmpty(), c.getLong(created), c.getInt(held) != 0, c.getString(link).orEmpty()))
+                while (c.moveToNext()) add(NeedsItem(c.getString(id) ?: continue, c.getString(title).orEmpty(), c.getString(source).orEmpty(), c.getLong(created), c.getInt(held) != 0, c.getString(link).orEmpty()))
             }
         }
         if (counts == null || items == null) null else NeedsYou.of(items, counts.first, counts.second)
@@ -82,10 +83,15 @@ class NeedsYouSource(private val context: Context, private val authority: String
         null
     } catch (_: IllegalArgumentException) {
         null // a column the provider does not have yet
+    } catch (e: RuntimeException) {
+        // A provider that dies or answers oddly must leave the last good read, not take Home down.
+        Log.d(TAG, "needs-you read failed: $e")
+        null
     }
 
     companion object {
         /** A starting value: stale after 3 missed beats, so a provider that went quiet fades within 3 minutes. */
         const val INTERVAL_MS = 60_000L
+        private const val TAG = "NeedsYou"
     }
 }
