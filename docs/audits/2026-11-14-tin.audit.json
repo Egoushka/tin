@@ -1,0 +1,894 @@
+{
+ "target": "Egoushka/tin",
+ "kind": "code",
+ "commit": "d0c7daa",
+ "date": "2026-11-14",
+ "profile": "standard",
+ "run_status": "incomplete",
+ "incomplete_reason": "ran by hand without the Workflow tool: one verifier for Android, lead verification for core, finder-only items listed as minor",
+ "units": [
+  {
+   "id": "core:defects",
+   "surface": "core",
+   "lens": "defects",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "core:reliability",
+   "surface": "core",
+   "lens": "reliability",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "core:structure",
+   "surface": "core",
+   "lens": "structure",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "core:usage",
+   "surface": "core",
+   "lens": "usage",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "core:outside",
+   "surface": "core",
+   "lens": "outside",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "android:defects",
+   "surface": "android",
+   "lens": "defects",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "android:reliability",
+   "surface": "android",
+   "lens": "reliability",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "android:structure",
+   "surface": "android",
+   "lens": "structure",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "android:usage",
+   "surface": "android",
+   "lens": "usage",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "android:outside",
+   "surface": "android",
+   "lens": "outside",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "ci-scripts:defects",
+   "surface": "ci-scripts",
+   "lens": "defects",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "ci-scripts:reliability",
+   "surface": "ci-scripts",
+   "lens": "reliability",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "ci-scripts:structure",
+   "surface": "ci-scripts",
+   "lens": "structure",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "ci-scripts:usage",
+   "surface": "ci-scripts",
+   "lens": "usage",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "ci-scripts:outside",
+   "surface": "ci-scripts",
+   "lens": "outside",
+   "status": "covered",
+   "read": [
+    "see finder notes in the report"
+   ]
+  },
+  {
+   "id": "kvaesitso:defects",
+   "surface": "android/kvaesitso upstream",
+   "lens": "defects",
+   "status": "out_of_scope",
+   "reason": "vendored upstream code"
+  },
+  {
+   "id": "home-ui:defects",
+   "surface": "Home composables, Music/Calendar/Weather sources",
+   "lens": "defects",
+   "status": "deferred",
+   "reason": "Android finder ran out of budget before them"
+  }
+ ],
+ "findings": [
+  {
+   "fingerprint": "mcp-http-no-origin-check",
+   "verdict": "confirmed",
+   "kind": "defect",
+   "unit": "core:defects",
+   "title": "A web page can call tin's tools through adb forward",
+   "claim": "/mcp accepts any Origin, any Host and any Content-Type; over adb forward every connection is uid 2000, so the uid check passes for any local process, a browser included.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/transport.rs:215",
+     "detail": "POST /mcp parses the body as JSON without looking at headers"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/transport.rs:188-193",
+     "detail": "only content-length and connection headers are read"
+    }
+   ],
+   "verification": {
+    "method": "lead read the code at d0c7daa independently of the finder",
+    "result": "confirmed: a text/plain cross-origin POST needs no preflight and reaches server.handle; DNS rebinding can read the reply"
+   },
+   "tier": "fix",
+   "severity": "high",
+   "trigger": "adb forward tcp:7381 is up and the owner opens a hostile page",
+   "fix": "403 on a foreign Origin or Host, 415 unless application/json",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "transport-unbounded-lines",
+   "verdict": "confirmed",
+   "kind": "defect",
+   "unit": "core:reliability",
+   "title": "A slow or endless request line holds a thread and memory",
+   "claim": "read_line has no length cap on both listeners; the unix socket has no read timeout.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/transport.rs:172",
+     "detail": "request line read_line without limit"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/transport.rs:105-130",
+     "detail": "no set_read_timeout on unix streams"
+    }
+   ],
+   "verification": {
+    "method": "lead read the code at d0c7daa independently of the finder",
+    "result": "confirmed by reading; the TCP decision listener is reachable from the tailnet"
+   },
+   "tier": "fix",
+   "severity": "medium",
+   "trigger": "a client that never sends a newline, or never sends at all",
+   "fix": "cap line length and header count, idle read timeout",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "android-subprocess-no-timeout",
+   "verdict": "confirmed",
+   "kind": "defect",
+   "unit": "core:reliability",
+   "title": "A hung phone command blocks tin's thread forever",
+   "claim": "run_argv and CmdBackend::run call Command::output() with no time limit; the Mac backend already has run_with_timeout.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/backend.rs:37",
+     "detail": "run_argv: Command::output()"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/backend.rs:53",
+     "detail": "cmd app_function: Command::output()"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/macos.rs:386",
+     "detail": "run_with_timeout exists for the Mac only"
+    }
+   ],
+   "verification": {
+    "method": "lead read the code at d0c7daa independently of the finder",
+    "result": "confirmed"
+   },
+   "tier": "fix",
+   "severity": "medium",
+   "trigger": "uiautomator dump on an animated screen, or a stuck cmd",
+   "fix": "shared run_with_timeout",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "screen-text-fixed-dump-path",
+   "verdict": "confirmed",
+   "kind": "defect",
+   "unit": "core:defects",
+   "title": "Two screen_text calls at once can swap or lose each other's dump",
+   "claim": "Every call writes, reads and deletes the same /data/local/tmp/tin/ui.xml while each connection has its own thread.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/system.rs:41",
+     "detail": "UI_DUMP const"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/system.rs:195-200",
+     "detail": "dump, cat, rm on that path"
+    }
+   ],
+   "verification": {
+    "method": "lead read the code at d0c7daa independently of the finder",
+    "result": "confirmed by reading"
+   },
+   "tier": "fix",
+   "severity": "low",
+   "fix": "unique file per call",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "money-system-verbs",
+   "verdict": "confirmed",
+   "kind": "risk",
+   "unit": "core:defects",
+   "title": "Banking apps can be opened, and their notifications read, through system tools",
+   "claim": "system__launch opens a MONEY_PACKAGES app after a tap on 'open <package>'; system__notifications returns banking notifications while screen_text refuses banking screens.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/system.rs:140",
+     "detail": "launch argv has no money check"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/system.rs:174-180",
+     "detail": "notifications has no money filter"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/system.rs:193",
+     "detail": "screen_text does refuse money"
+    }
+   ],
+   "verification": {
+    "method": "lead read the code at d0c7daa independently of the finder",
+    "result": "confirmed; AGENTS.md says a false positive is the safe direction"
+   },
+   "tier": "fix",
+   "severity": "medium",
+   "fix": "refuse launch of money packages in argv; drop money-app notifications",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "approval-key-any-length",
+   "verdict": "confirmed",
+   "kind": "defect",
+   "unit": "core:defects",
+   "title": "An empty approvals key file makes decisions forgeable",
+   "claim": "The key is trimmed and passed to Gate::new with no length check; an empty file gives a zero-length HMAC key.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/main.rs:96-104",
+     "detail": "read, trim, as_bytes"
+    },
+    {
+     "type": "file",
+     "ref": "core/src/gate.rs:143",
+     "detail": "Gate::new accepts any key"
+    }
+   ],
+   "verification": {
+    "method": "lead read the code at d0c7daa independently of the finder",
+    "result": "confirmed"
+   },
+   "tier": "fix",
+   "severity": "medium",
+   "trigger": "key_file empty or truncated",
+   "fix": "refuse to start the gate under 32 bytes",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "home-widget-wipe",
+   "verdict": "confirmed",
+   "kind": "defect",
+   "unit": "android:defects",
+   "title": "Home can erase every saved widget after one failed query",
+   "claim": "WidgetHost.liveIds() returns an empty set when the host query throws; HomeState reconciles against it and saves.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "android/home/src/main/.../WidgetHost.kt:148",
+     "detail": "emptySet() on failure"
+    },
+    {
+     "type": "file",
+     "ref": "android/home/src/main/.../HomeState.kt:63",
+     "detail": "reconcile(liveIds) then persist"
+    }
+   ],
+   "verification": {
+    "method": "fresh Sonnet verifier read WidgetHost, HomeState, HomeLayout, PageStore",
+    "result": "confirmed"
+   },
+   "tier": "fix",
+   "severity": "medium",
+   "fix": "skip reconcile when the query failed",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "home-needs-you-npe",
+   "verdict": "confirmed",
+   "kind": "defect",
+   "unit": "android:defects",
+   "title": "A NULL in the approvals feed crashes Home",
+   "claim": "NeedsYouSource.read passes getString(id) into a non-null field and catches only two exception types; the Signals scope has no handler.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "android/home/src/main/.../NeedsYouSource.kt:68",
+     "detail": "getString(id) into non-null"
+    },
+    {
+     "type": "file",
+     "ref": "android/home/src/main/.../Signals.kt",
+     "detail": "SupervisorJob + Main.immediate, no handler"
+    }
+   ],
+   "verification": {
+    "method": "fresh Sonnet verifier traced callers",
+    "result": "confirmed (crash); that Android then drops it as default launcher is unverified"
+   },
+   "tier": "fix",
+   "severity": "medium",
+   "fix": "skip null rows, catch broader in read()",
+   "effort": "S"
+  },
+  {
+   "fingerprint": "voice-signer-mismatch",
+   "verdict": "needs_validation",
+   "kind": "risk",
+   "unit": "android:defects",
+   "title": "Home's mic may never get tin's VOICE permission",
+   "claim": "scripts/build.sh builds tin debug-signed; Home's release is signed with the release key; VOICE is signature-level.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "scripts/build.sh:15",
+     "detail": "assembleDebug"
+    },
+    {
+     "type": "file",
+     "ref": "android/build.gradle.kts:13-24",
+     "detail": "signing only on release build type"
+    }
+   ],
+   "verification": {
+    "method": "fresh Sonnet verifier",
+    "result": "code path confirmed"
+   },
+   "tier": "fix",
+   "missing_fact": "how Yehor installs tin on the phone (laptop build with which key); Yehor"
+  },
+  {
+   "fingerprint": "tin-host-umask",
+   "verdict": "rejected",
+   "kind": "defect",
+   "unit": "android:defects",
+   "title": "tin's files world-writable under umask 0",
+   "claim": "TinService creates dirs 0777 before chmod.",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "android/app/src/main/.../TinService.kt:60-75",
+     "detail": "mkdirs then chmod 0700 before any file"
+    }
+   ],
+   "verification": {
+    "method": "fresh Sonnet verifier",
+    "result": "rejected: directories are 0700 before any file exists"
+   },
+   "tier": "skip",
+   "rejection_reason": "no file is created before the chmod; hardening Os.umask(077) is optional"
+  },
+  {
+   "fingerprint": "release-not-gated-on-core",
+   "verdict": "needs_validation",
+   "kind": "risk",
+   "unit": "core:reliability",
+   "title": "Release publishes without waiting for Rust tests",
+   "claim": "ci.yml release job needs only the android job",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": ".github/workflows/ci.yml:148",
+     "detail": "ci.yml release job needs only the android job"
+    }
+   ],
+   "verification": {
+    "method": "finder only; over the verify cap",
+    "result": "not independently verified"
+   },
+   "tier": "minor",
+   "missing_fact": "an independent read; any later session"
+  },
+  {
+   "fingerprint": "accept-money-assert-loose",
+   "verdict": "needs_validation",
+   "kind": "risk",
+   "unit": "core:reliability",
+   "title": "accept.py's money check passes on any approval error",
+   "claim": "asserts only that 'approval' is in the text",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "scripts/accept.py",
+     "detail": "asserts only that 'approval' is in the text"
+    }
+   ],
+   "verification": {
+    "method": "finder only; over the verify cap",
+    "result": "not independently verified"
+   },
+   "tier": "minor",
+   "missing_fact": "an independent read; any later session"
+  },
+  {
+   "fingerprint": "doctor-green-without-probe",
+   "verdict": "needs_validation",
+   "kind": "risk",
+   "unit": "core:reliability",
+   "title": "tin__doctor reports approvals healthy without probing",
+   "claim": "test expects healthy with approvals.invalid",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/mcp.rs",
+     "detail": "test expects healthy with approvals.invalid"
+    }
+   ],
+   "verification": {
+    "method": "finder only; over the verify cap",
+    "result": "not independently verified"
+   },
+   "tier": "minor",
+   "missing_fact": "an independent read; any later session"
+  },
+  {
+   "fingerprint": "held-calls-lost-on-restart",
+   "verdict": "needs_validation",
+   "kind": "risk",
+   "unit": "core:reliability",
+   "title": "A held call is forgotten when tin restarts; the tap then gets 404",
+   "claim": "tickets live in memory only",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/gate.rs:138",
+     "detail": "tickets live in memory only"
+    }
+   ],
+   "verification": {
+    "method": "finder only; over the verify cap",
+    "result": "not independently verified"
+   },
+   "tier": "minor",
+   "missing_fact": "an independent read; any later session"
+  },
+  {
+   "fingerprint": "signer-check-not-pinned",
+   "verdict": "needs_validation",
+   "kind": "risk",
+   "unit": "core:reliability",
+   "title": "CI signer check rejects only the debug cert, not a wrong key",
+   "claim": "no fingerprint pin",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": ".github/workflows/ci.yml:84",
+     "detail": "no fingerprint pin"
+    }
+   ],
+   "verification": {
+    "method": "finder only; over the verify cap",
+    "result": "not independently verified"
+   },
+   "tier": "minor",
+   "missing_fact": "an independent read; any later session"
+  },
+  {
+   "fingerprint": "decision-at-not-checked",
+   "verdict": "needs_validation",
+   "kind": "risk",
+   "unit": "core:reliability",
+   "title": "A late-collected approval still runs; signed timestamp never compared",
+   "claim": "ticket ttl only",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/gate.rs",
+     "detail": "ticket ttl only"
+    }
+   ],
+   "verification": {
+    "method": "finder only; over the verify cap",
+    "result": "not independently verified"
+   },
+   "tier": "minor",
+   "missing_fact": "an independent read; any later session"
+  },
+  {
+   "fingerprint": "mcp-tool-annotations",
+   "verdict": "confirmed",
+   "kind": "feature",
+   "unit": "core:structure",
+   "title": "Tell clients which tools only read and which wait for a tap",
+   "claim": "tin knows read_only and held, but tools/list sends no readOnlyHint or destructiveHint",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/mcp.rs",
+     "detail": "tin knows read_only and held, but tools/list sends no readOnlyHint or destructiveHint"
+    }
+   ],
+   "verification": {
+    "method": "lead checked the code: absent",
+    "result": "need is real"
+   },
+   "tier": "build",
+   "effort": "S",
+   "signal": "clients auto-allow read tools; tools/list carries annotations on every tool"
+  },
+  {
+   "fingerprint": "verb-single-definition",
+   "verdict": "confirmed",
+   "kind": "refactor",
+   "unit": "core:structure",
+   "title": "Adding a verb means one entry, not five match arms",
+   "claim": "VERBS + schema/argv/describe/run match arms; wildcard arms fail silently (empty schema, bare title)",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/system.rs:90-222",
+     "detail": "VERBS + schema/argv/describe/run match arms; wildcard arms fail silently (empty schema, bare title)"
+    }
+   ],
+   "verification": {
+    "method": "lead checked the code: absent",
+    "result": "need is real"
+   },
+   "tier": "build",
+   "effort": "M",
+   "signal": "the next verb (#45 logs) touches one place"
+  },
+  {
+   "fingerprint": "doctor-probes-approvals",
+   "verdict": "confirmed",
+   "kind": "feature",
+   "unit": "core:structure",
+   "title": "tin__doctor actually reaches the approvals server",
+   "claim": "doctor reports healthy without a request",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/mcp.rs",
+     "detail": "doctor reports healthy without a request"
+    }
+   ],
+   "verification": {
+    "method": "lead checked the code: absent",
+    "result": "need is real"
+   },
+   "tier": "build",
+   "effort": "S",
+   "signal": "doctor turns red when approvals is down"
+  },
+  {
+   "fingerprint": "release-waits-for-all-jobs",
+   "verdict": "confirmed",
+   "kind": "feature",
+   "unit": "core:structure",
+   "title": "A release only ships when Rust tests and the emulator job are green",
+   "claim": "release needs android only",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": ".github/workflows/ci.yml:148",
+     "detail": "release needs android only"
+    }
+   ],
+   "verification": {
+    "method": "lead checked the code: absent",
+    "result": "need is real"
+   },
+   "tier": "build",
+   "effort": "S",
+   "signal": "no release from a red commit"
+  },
+  {
+   "fingerprint": "tests-common-harness",
+   "verdict": "confirmed",
+   "kind": "refactor",
+   "unit": "core:structure",
+   "title": "One test harness for system and Mac tests",
+   "claim": "Inbox, signed, gated, call, text duplicated",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/tests/system.rs, core/tests/macos.rs",
+     "detail": "Inbox, signed, gated, call, text duplicated"
+    }
+   ],
+   "verification": {
+    "method": "lead checked the code: absent",
+    "result": "need is real"
+   },
+   "tier": "build",
+   "effort": "S",
+   "signal": "new gate tests written once"
+  },
+  {
+   "fingerprint": "appfunction-output-schema",
+   "verdict": "confirmed",
+   "kind": "feature",
+   "unit": "core:structure",
+   "title": "AppFunction results come back typed",
+   "claim": "response metadata ignored",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "core/src/metadata.rs",
+     "detail": "response metadata ignored"
+    }
+   ],
+   "verification": {
+    "method": "lead checked the code: absent",
+    "result": "need is real"
+   },
+   "tier": "build",
+   "effort": "M",
+   "signal": "outputSchema present on AppFunction tools"
+  },
+  {
+   "fingerprint": "mcp-2026-07-28",
+   "verdict": "confirmed",
+   "kind": "wild",
+   "unit": "core:outside",
+   "title": "Speak MCP 2026-07-28 (stateless) beside 2025-06-18",
+   "claim": "newer revision drops initialize and sessions",
+   "evidence": [
+    {
+     "type": "url",
+     "ref": "https://modelcontextprotocol.io/specification/2026-07-28/changelog",
+     "detail": "newer revision drops initialize and sessions"
+    }
+   ],
+   "verification": {
+    "method": "lead checked: absent in core/src",
+    "result": "bet with a named spike"
+   },
+   "tier": "wild",
+   "signal": "a client that sends the new revision works"
+  },
+  {
+   "fingerprint": "holds-as-tasks",
+   "verdict": "confirmed",
+   "kind": "wild",
+   "unit": "core:outside",
+   "title": "Approvals as MCP tasks instead of the approval__wait polling tool",
+   "claim": "2026-07-28 tasks extension",
+   "evidence": [
+    {
+     "type": "url",
+     "ref": "https://modelcontextprotocol.io/specification/2026-07-28/changelog",
+     "detail": "2026-07-28 tasks extension"
+    }
+   ],
+   "verification": {
+    "method": "lead checked: absent in core/src",
+    "result": "bet with a named spike"
+   },
+   "tier": "wild",
+   "signal": "one held call finishes without approval__wait"
+  },
+  {
+   "fingerprint": "appfunction-manager-direct",
+   "verdict": "confirmed",
+   "kind": "wild",
+   "unit": "core:outside",
+   "title": "Call AppFunctionManager directly instead of cmd",
+   "claim": "API 36 executeAppFunction; uid 2000 permission unknown",
+   "evidence": [
+    {
+     "type": "url",
+     "ref": "docs/peer-gaps/tin.md (feed-eater)",
+     "detail": "API 36 executeAppFunction; uid 2000 permission unknown"
+    }
+   ],
+   "verification": {
+    "method": "lead checked: absent in core/src",
+    "result": "bet with a named spike"
+   },
+   "tier": "wild",
+   "signal": "p95 overhead below the cmd path on the phone"
+  },
+  {
+   "fingerprint": "emergency-stop",
+   "verdict": "confirmed",
+   "kind": "wild",
+   "unit": "core:outside",
+   "title": "One tap pauses every write",
+   "claim": "peer-gap list; needs approvals app change",
+   "evidence": [
+    {
+     "type": "url",
+     "ref": "docs/peer-gaps/tin.md (feed-eater)",
+     "detail": "peer-gap list; needs approvals app change"
+    }
+   ],
+   "verification": {
+    "method": "lead checked: absent in core/src",
+    "result": "bet with a named spike"
+   },
+   "tier": "wild",
+   "signal": "pause blocks a held call in a test"
+  },
+  {
+   "fingerprint": "redact-successful-results",
+   "verdict": "rejected",
+   "kind": "feature",
+   "unit": "core:outside",
+   "title": "Redact every successful tool result",
+   "claim": "would blank OTPs and the word 'code' in notifications the owner asks for; decision for Yehor instead",
+   "evidence": [
+    {
+     "type": "doc",
+     "ref": "scratch finder notes",
+     "detail": "would blank OTPs and the word 'code' in notifications the owner asks for; decision for Yehor instead"
+    }
+   ],
+   "verification": {
+    "method": "lead judgement",
+    "result": "skipped"
+   },
+   "tier": "skip",
+   "rejection_reason": "would blank OTPs and the word 'code' in notifications the owner asks for; decision for Yehor instead"
+  },
+  {
+   "fingerprint": "screenshot-tool",
+   "verdict": "rejected",
+   "kind": "feature",
+   "unit": "core:outside",
+   "title": "Screenshot tool",
+   "claim": "needs its own money-safety design first",
+   "evidence": [
+    {
+     "type": "doc",
+     "ref": "scratch finder notes",
+     "detail": "needs its own money-safety design first"
+    }
+   ],
+   "verification": {
+    "method": "lead judgement",
+    "result": "skipped"
+   },
+   "tier": "skip",
+   "rejection_reason": "needs its own money-safety design first"
+  },
+  {
+   "fingerprint": "batch-calls",
+   "verdict": "rejected",
+   "kind": "feature",
+   "unit": "core:outside",
+   "title": "Batch several tool calls",
+   "claim": "one approval for many writes weakens the gate",
+   "evidence": [
+    {
+     "type": "doc",
+     "ref": "scratch finder notes",
+     "detail": "one approval for many writes weakens the gate"
+    }
+   ],
+   "verification": {
+    "method": "lead judgement",
+    "result": "skipped"
+   },
+   "tier": "skip",
+   "rejection_reason": "one approval for many writes weakens the gate"
+  },
+  {
+   "fingerprint": "mcp-elicitation",
+   "verdict": "rejected",
+   "kind": "feature",
+   "unit": "core:outside",
+   "title": "Elicitation for approvals",
+   "claim": "superseded by MRTR in 2026-07-28",
+   "evidence": [
+    {
+     "type": "doc",
+     "ref": "scratch finder notes",
+     "detail": "superseded by MRTR in 2026-07-28"
+    }
+   ],
+   "verification": {
+    "method": "lead judgement",
+    "result": "skipped"
+   },
+   "tier": "skip",
+   "rejection_reason": "superseded by MRTR in 2026-07-28"
+  },
+  {
+   "fingerprint": "oauth",
+   "verdict": "rejected",
+   "kind": "feature",
+   "unit": "core:outside",
+   "title": "OAuth on /mcp",
+   "claim": "local socket + adb; origin check covers the real threat",
+   "evidence": [
+    {
+     "type": "doc",
+     "ref": "scratch finder notes",
+     "detail": "local socket + adb; origin check covers the real threat"
+    }
+   ],
+   "verification": {
+    "method": "lead judgement",
+    "result": "skipped"
+   },
+   "tier": "skip",
+   "rejection_reason": "local socket + adb; origin check covers the real threat"
+  }
+ ]
+}
