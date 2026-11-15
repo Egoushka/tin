@@ -8,6 +8,7 @@
   `gate.rs` (held calls, the approvals client, decision signatures), `macos.rs` (the macOS backend: actionsdata →
   tools, the shortcut writer, Mac verbs defined the same way, and their parsers), `speech.rs` (speech tools, a client of `@tin-speech`).
   `marks.rs` (`system__screen_marks` / `system__tap_mark`: numbered boxes drawn on a screenshot, a grid when the tree is sparse; uses the `png` crate).
+  `telemetry.rs` (one OTLP span per tool call, `[telemetry]` in the policy; no args or results in spans).
 - `android/app`: Kotlin host app `io.github.egoushka.tin`; `TinService` is the Shizuku user service, `SpeechBridge`
   serves `@tin-speech` inside it, `SpeechService` owns the mic and the model in the app process.
 - `android/speech`: speech library (no tin dependency): VAD + Parakeet through sherpa-onnx, push-to-talk, protocol.

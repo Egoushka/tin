@@ -29,6 +29,21 @@ pub struct Policy {
     pub speech: SpeechPolicy,
     #[serde(default)]
     pub notifications: NotificationsPolicy,
+    pub telemetry: Option<TelemetryPolicy>,
+}
+
+/// `[telemetry]` sends one OpenTelemetry span per tool call to an OTLP/HTTP collector. Off without the table.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TelemetryPolicy {
+    /// Traces endpoint, `http://` over the tailnet, e.g. `http://100.64.0.4:4318/v1/traces`.
+    pub otlp_url: String,
+    #[serde(default = "default_service")]
+    pub service_name: String,
+}
+
+fn default_service() -> String {
+    "tin".into()
 }
 
 /// `[notifications] show_codes = ["com.example.app"]` lists apps whose notifications reach the model with one-time
