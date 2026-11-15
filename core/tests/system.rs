@@ -82,12 +82,12 @@ fn ungated(policy: &str, phone: Phone) -> Server {
 // S1: the registry.
 
 #[test]
-fn registry_has_six_read_and_six_write_verbs() {
-    assert_eq!(VERBS.len(), 12);
+fn registry_has_seven_read_and_seven_write_verbs() {
+    assert_eq!(VERBS.len(), 14);
     let read: Vec<&str> = VERBS.iter().filter(|v| v.read_only).map(|v| v.name).collect();
-    assert_eq!(read, ["notifications", "usage", "foreground_app", "screen_text", "battery", "connectivity"]);
+    assert_eq!(read, ["notifications", "usage", "foreground_app", "screen_text", "screen_marks", "battery", "connectivity"]);
     let write: Vec<&str> = VERBS.iter().filter(|v| !v.read_only).map(|v| v.name).collect();
-    assert_eq!(write, ["tap", "swipe", "type_text", "key", "launch", "settings_put"]);
+    assert_eq!(write, ["tap", "tap_mark", "swipe", "type_text", "key", "launch", "settings_put"]);
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn registry_lists_system_tools_with_notes_and_wait_tool() {
     let (s, _, _) = gated(Duration::from_millis(10), Duration::from_secs(60));
     let r = s.handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })).unwrap();
     let tools = r["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 14, "12 verbs, approval__wait and tin__doctor");
+    assert_eq!(tools.len(), 16, "14 verbs, approval__wait and tin__doctor");
     for v in VERBS {
         let t = tools.iter().find(|t| t["name"] == v.tool_name()).unwrap();
         let held = t["description"].as_str().unwrap().contains("approvals app");

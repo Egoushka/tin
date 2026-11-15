@@ -17,6 +17,10 @@ function = "foreground_app"
 package = "system"
 function = "screen_text"
 
+[[allow]]                     # a screenshot with numbered boxes, for apps whose screen_text is thin
+package = "system"
+function = "screen_marks"
+
 [[allow]]
 package = "system"
 function = "battery"
@@ -28,6 +32,10 @@ function = "connectivity"
 [[allow]]                     # a write verb: always held for approval
 package = "system"
 function = "key"
+
+[[allow]]                     # taps a screen_marks box by number; held for approval
+package = "system"
+function = "tap_mark"
 
 [notifications]               # one-time codes in notifications are masked as [code]; list apps that may show them
 # show_codes = ["com.example.app"]
