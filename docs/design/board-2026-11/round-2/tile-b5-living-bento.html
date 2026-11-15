@@ -1,0 +1,157 @@
+<!--
+Direction: B5 Living bento
+Idea: The bento keeps the same tiles but the moment decides their size, not their position: at 10:12 Needs you is the big tile and Lunch is a one-line tile; at 12:30 a huge "Leave now · 6 min" tile takes over and Needs you shrinks to a small one. Two phones side by side show the same Home at two hours.
+Fonts: Plus Jakarta Sans (400 body, 600/700/800 figures and names), Google Fonts link, system sans fallback.
+Palette: Wallpaper #FBE4D6 -> #E6DCF7 -> #CFE6F5; Ink #1E1A2E; Muted ink #5E5873; Needs-you tangerine #FF7A3D (text #FFFFFF); Leave-now teal #0F8A78 (text #FFFFFF);
+  Clock lilac #DCD3F8; Weather sky #CBE7F7; Alarm butter #FBEBB0; Event cream #FFFBF4 with next-event indigo #4B3FD8 and clash amber text #A64B00;
+  Readiness mint #CDEFD9; Homelab rose #FFD3D1 with fault red #C8281F; Music rose #F8D3E3; Signals sky #D6E6FA; Dock/search glass #FFFFFFB8; Label pill ink #1E1A2E.
+Caption: the two dark pills at the top centre are annotations, not part of the launcher. Breaks "colour only means attention" like 05: widgets keep an identity tint; attention is size plus solid saturation (tangerine Needs you, teal Leave now = act on time, red fault). Content is identical in both phones except the clock and which events are still ahead (Standup is past at 12:30).
+Cost/risk on a real phone: tiles that resize and reorder as the hour changes break muscle memory, which matters for one-handed use (the tile you tapped at 10:12 is somewhere else at 12:30); every size change needs rules the owner can predict and override, and the grid must re-layout each minute-level change without jumping; the same pastel-on-light cost as 05 in sunlight and on OLED power.
+-->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=824">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<title>Tile B5 · Living bento</title>
+<style>
+*{box-sizing:border-box}
+.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sb{position:absolute;top:0;left:0;right:0;height:44px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600;z-index:5}
+.sb .r{display:flex;gap:6px;align-items:center}
+.pill{position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;z-index:5}
+.dock{position:absolute;left:24px;right:24px;bottom:88px;height:56px;display:flex;justify-content:space-between}
+.dock a{width:56px;height:56px;border-radius:20px;display:flex;align-items:center;justify-content:center}
+.search{position:absolute;left:24px;right:24px;bottom:22px;height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 6px 0 18px;font-size:15px}
+.search span{flex:1}
+.mic{width:48px;height:48px;border-radius:24px;display:flex;align-items:center;justify-content:center}
+.lab{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+
+body{word-spacing:.08em;margin:0;width:824px;height:915px;overflow:hidden;position:relative;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1E1A2E}
+.ph{position:absolute;top:0;width:412px;height:915px;overflow:hidden;
+ background:radial-gradient(120% 70% at 0% 0%,#FBE4D6 0%,transparent 60%),radial-gradient(100% 70% at 100% 40%,#CFE6F5 0%,transparent 65%),linear-gradient(170deg,#F7DDE0 0%,#E6DCF7 55%,#D3E3F6 100%)}
+.ph.a{left:0}.ph.b{left:412px;box-shadow:-1px 0 0 #1E1A2E22}
+.pill{background:#1E1A2E;opacity:.7}
+.tag{position:absolute;top:10px;left:50%;transform:translateX(-50%);height:24px;padding:0 12px;border-radius:12px;background:#1E1A2E;color:#fff;font-size:11px;font-weight:700;letter-spacing:.04em;display:flex;align-items:center;white-space:nowrap;z-index:6}
+.g{position:absolute;top:50px;left:24px;right:24px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.a .g{grid-template-rows:100px 100px 56px 56px 56px 120px 76px 68px}
+.b .g{grid-template-rows:86px 192px 92px 66px 66px 72px 70px}
+.w{border-radius:24px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 0 #ffffff99 inset,0 6px 16px -8px #4a3a7a40}
+.lab{opacity:.62}
+.n{background:#FF7A3D;color:#fff;box-shadow:0 14px 28px -12px #ff6a1f90}
+.a .n{grid-column:1/3;grid-row:1/3;padding:16px 18px}
+.n .lab{opacity:.88}
+.n .big{font-size:96px;font-weight:800;line-height:.95;letter-spacing:-.04em;margin-top:6px}
+.n ul{list-style:none;margin:0;padding:0;font-size:13px;font-weight:600;position:absolute;left:18px;bottom:15px;right:14px}
+.n li{display:flex;gap:7px;align-items:center;line-height:22px}
+.n.sm{grid-row:3;grid-column:1/3;padding:12px 14px;box-shadow:0 8px 18px -10px #ff6a1f90}
+.n.sm .row{display:flex;gap:10px;align-items:center;margin-top:3px}
+.n.sm .row b{font-size:44px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.n.sm ul{position:static;font-size:11px;font-weight:600}
+.n.sm li{line-height:15px;gap:5px}
+.clock{background:#DCD3F8;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.a .clock{grid-column:3/5;grid-row:1}.b .clock{grid-column:1/3;grid-row:1}
+.clock b{font-size:40px;font-weight:800;letter-spacing:-.045em;line-height:1}
+.clock span{white-space:nowrap;font-size:12px;font-weight:600;text-align:right;line-height:1.35;color:#4B4470}
+.wx{background:#CBE7F7;padding:12px;display:flex;flex-direction:column;justify-content:space-between}
+.a .wx{grid-column:3;grid-row:2}.b .wx{grid-column:3;grid-row:1}
+.wx span{display:flex;gap:4px;align-items:center;font-size:11px;font-weight:600;color:#2c5a73}
+.wx b{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.al{background:#FBEBB0;padding:12px 10px;display:flex;flex-direction:column;justify-content:space-between}
+.a .al{grid-column:4;grid-row:2}.b .al{grid-column:4;grid-row:1}
+.al .top{display:flex;gap:4px;align-items:center;font-size:11px;font-weight:700;color:#6b5a12}
+.al .top i{font-style:normal}
+.al b{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.al div span{display:block;margin-top:3px;font-size:11px;font-weight:500;color:#6b5a12;line-height:1.2}
+/* Standup, the next event, is the medium tile at 10:12 */
+.sb1{grid-column:1/3;grid-row:3/6;background:#FFFBF4;padding:14px 16px;display:flex;flex-direction:column}
+.sb1 .lab{justify-content:space-between;display:flex;align-items:center;color:#4B3FD8;opacity:1}
+.sb1 .nm{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:10px}
+.sb1 .cd{margin-top:auto;display:flex;align-items:baseline;gap:6px;color:#4B3FD8}
+.sb1 .cd b{font-size:60px;font-weight:800;letter-spacing:-.045em;line-height:.9}
+.sb1 .cd span{font-size:16px;font-weight:700}
+.ev{background:#FFFBF4;padding:0 10px 0 12px;display:flex;align-items:center;gap:10px;border-radius:20px}
+.a .e1{grid-column:3/5;grid-row:3}.a .e2{grid-column:3/5;grid-row:4}.a .e3{grid-column:3/5;grid-row:5}
+.b .e4{grid-column:1/3;grid-row:4}.b .e5{grid-column:3/5;grid-row:4}
+.ev .tx b s{text-decoration:none;font-size:11.5px;font-weight:600;color:#5E5873;margin-right:7px}
+.ev .tx{display:flex;flex-direction:column;min-width:0}
+.ev .tx b{font-size:13px;font-weight:700;line-height:1.2}
+.ev .tx span{font-size:11px;color:#5E5873;line-height:1.25;white-space:nowrap}
+.ev .tx span:not(.warn){padding-left:0}
+.ev .tx span.warn{color:#A64B00;font-weight:600;display:flex;gap:3px;align-items:flex-start;white-space:normal}
+.b .ev{padding:0 12px;gap:8px}
+.b .ev .tx span.warn{white-space:normal;align-items:flex-start}
+.rd{background:#CDEFD9}
+.a .rd{grid-column:1/3;grid-row:6}
+.rd .row{display:flex;gap:10px;align-items:center;margin-top:7px}
+.ring{width:42px;height:42px;border-radius:50%;background:conic-gradient(#1F8F55 0 62%,#ffffff99 0);display:flex;align-items:center;justify-content:center;flex:none}
+.ring b{width:32px;height:32px;border-radius:50%;background:#E8F7EE;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800}
+.rd .tx{font-size:11px;line-height:1.3}
+.rd .tx strong{display:block;font-size:15px;font-weight:700}
+.rd .tx span{font-size:11px;color:#3d5a49}
+.rd .nu{display:block;font-style:italic;font-size:11px;line-height:1.3;color:#3d5a49;margin-top:7px}
+.rd .tx em{font-style:italic;color:#3d5a49}
+.rd.flat{grid-column:1/5;grid-row:5;display:flex;align-items:center;gap:12px;padding:0 16px}
+.rd.flat .lab{font-size:10.5px;display:block}
+.rd.flat .tx{display:flex;flex-direction:column}
+.rd.flat .tx em{margin-top:1px}
+.hl{background:#FFD3D1;color:#7a1410}
+.a .hl{grid-column:3/5;grid-row:6}
+.b .hl{grid-column:3/5;grid-row:3;padding:12px 14px}
+.hl .lab{opacity:.8;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center}
+.hl .m{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:14px;font-weight:800;color:#8A1710}
+.hl .m i{width:10px;height:10px;border-radius:5px;background:#C8281F;box-shadow:0 0 0 3px #C8281F33;flex:none}
+.hl .pj{font-size:11px;font-weight:600;color:#8A1710;margin:1px 0 0 17px}
+.mu{background:#F8D3E3;grid-column:1/5;display:flex;align-items:center;padding:0 6px 0 14px;gap:10px}
+.a .mu{grid-row:7}.b .mu{grid-row:6}
+.art{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#8E9BFF,#F78DB8 60%,#FFB48A);flex:none}
+.mu .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mu .tx b{font-size:14px;font-weight:700;white-space:nowrap}
+.mu .tx span{font-size:12px;color:#5E3A4C}
+.mu .tx small{font-size:11px;font-weight:600;display:flex;gap:4px;align-items:center;color:#5E3A4C}
+.ctl{display:flex}
+.ctl a{width:46px;height:48px;display:flex;align-items:center;justify-content:center}
+.ctl a.pp{width:48px;height:48px;border-radius:24px;background:#1E1A2E;color:#fff}
+.nt{background:#D6E6FA;grid-column:1/5;padding:10px 14px;display:flex;flex-direction:column;justify-content:space-between}
+.a .nt{grid-row:8}.b .nt{grid-row:7}
+.chips{display:flex;gap:6px}
+.chips span{height:26px;padding:0 10px;border-radius:13px;background:#ffffffd0;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500}
+.chips span b{font-weight:800}
+.mom{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;white-space:nowrap}
+.mom b{font-weight:700}.mom i{font-style:normal;font-size:11px;color:#4B5B78}
+/* the 12:30 hero: leave now */
+.lv{grid-column:1/5;grid-row:2;background:#0F8A78;color:#fff;padding:16px 18px;box-shadow:0 14px 28px -12px #0f8a7890}
+.lv .lab{opacity:.9;font-size:12px}
+.lv .lab span{display:flex;gap:6px;align-items:center}
+.lv .big{position:absolute;left:18px;top:38px;display:flex;align-items:baseline;gap:6px}
+.lv .big b{font-size:104px;font-weight:800;letter-spacing:-.05em;line-height:1}
+.lv .big span{font-size:28px;font-weight:700}
+.lv .sub{position:absolute;left:190px;right:16px;top:58px;display:flex;flex-direction:column;font-size:12px;line-height:1.3}
+.lv .sub b{font-size:15px;font-weight:700}
+.lv .sub span{opacity:.85}
+.lv .bar{position:absolute;left:18px;right:18px;bottom:14px;height:6px;border-radius:3px;background:#ffffff40}
+.lv .bar i{position:absolute;left:0;top:0;bottom:0;width:75%;border-radius:3px;background:#fff}
+.lv .nav{position:absolute;right:16px;bottom:30px;height:48px;padding:0 18px;border-radius:24px;background:#fff;color:#0B6E5F;font-size:14px;font-weight:700;display:flex;gap:7px;align-items:center}
+.dock a{background:#FFFFFFB8;box-shadow:0 1px 0 #fff inset,0 6px 14px -8px #4a3a7a50}
+.dock a:nth-child(1){color:#1E8A4F}.dock a:nth-child(2){color:#3B6FDB}.dock a:nth-child(3){color:#6A4FD6}.dock a:nth-child(4){color:#E0701F}.dock a:nth-child(5){color:#D23E6E}
+.search{background:#FFFFFFE0;box-shadow:0 1px 0 #fff inset,0 8px 20px -10px #4a3a7a60;color:#5E5873}
+.mic{background:#1E1A2E;color:#fff}
+
+</style></head><body>
+<div class="ph a"><div class="tag">10:12 · Needs you leads</div><div class="sb"><span>10:12</span><span class="r"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/></svg> 82%</span></div><main class="g"><section class="w n"><div class="lab"><span>Needs you</span><span>1 min</span></div><div class="big">4</div>
+  <ul><li><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg>2 PRs to merge</li><li><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>1 approval</li><li><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>1 reply owed</li></ul></section><section class="w clock"><b>10:12</b><span>Sat,<br>14 Nov</span></section><section class="w wx"><span><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Cloudy</span><b>7°</b></section><section class="w al"><span class="top"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg><i>Sun</i></span><div><b>07:30</b><span>Tomorrow</span></div></section><section class="w sb1"><div class="lab"><span>Next · 10:30</span><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="nm">Standup</div><div class="cd"><b>18</b><span>min</span></div></section>
+ <section class="w ev e1"><div class="tx"><b><s>13:00</s>Lunch, Podil</b><span>Leave 12:36 · 24 min drive</span></div></section>
+ <section class="w ev e2"><div class="tx"><b><s>15:00</s>Sprint review</b><span class="warn"><svg class="ic" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Overlaps Dentist by 30 min</span></div></section>
+ <section class="w ev e3"><div class="tx"><b><s>15:30</s>Dentist</b><span>45 min</span></div></section><section class="w rd"><div class="lab"><span>Readiness</span><span>07:40</span></div>
+  <div class="row"><div class="ring"><b>62</b></div><div class="tx"><span>Sleep</span><strong>6 h 12 m</strong></div></div><em class="nu">Low recovery. Keep today light.</em></section><section class="w hl"><div class="lab"><span>Homelab · hedzer</span><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg></div><div class="m"><i></i>1 deploy failed</div><div class="pj">nytka</div></section><section class="w mu"><div class="art"></div><div class="tx"><b>Music for Airports</b><span>Brian Eno</span><small><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>L 80 · R 76%</small></div>
+  <div class="ctl"><a><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></a><a class="pp"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></a><a><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></a></div></section><section class="w nt"><div class="chips"><span><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>Signal <b>3</b></span><span><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Gmail <b>5</b></span><span><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg>Slack <b>2</b></span></div>
+  <div class="mom"><span><b>Mom</b> Call me when you're free</span><i>4 min</i></div></section></main><nav class="dock"><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></a></nav><div class="search"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search or ask</span><b class="mic"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></b></div><div class="pill"></div></div><div class="ph b"><div class="tag">12:30 · Leaving leads</div><div class="sb"><span>12:30</span><span class="r"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/></svg> 82%</span></div><main class="g"><section class="w clock"><b>12:30</b><span>Sat,<br>14 Nov</span></section><section class="w wx"><span><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Cloudy</span><b>7°</b></section><section class="w al"><span class="top"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg><i>Sun</i></span><div><b>07:30</b><span>Tomorrow</span></div></section><section class="w lv"><div class="lab"><span><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>Leave now</span><span>12:36</span></div>
+  <div class="big"><b>6</b><span>min</span></div>
+  <div class="sub"><b>Lunch, Podil · 13:00</b><span>24 min drive</span></div>
+  <div class="bar"><i></i></div>
+  <a class="nav"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>Navigate</a></section><section class="w n sm"><div class="lab"><span>Needs you</span><span>1 min</span></div>
+  <div class="row"><b>4</b><ul><li><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg>2 PRs to merge</li><li><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>1 approval</li><li><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>1 reply owed</li></ul></div></section><section class="w hl"><div class="lab"><span>Homelab · hedzer</span><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg></div><div class="m"><i></i>1 deploy failed</div><div class="pj">nytka</div></section><section class="w ev e4"><div class="tx"><b><s>15:00</s>Sprint review</b><span class="warn"><svg class="ic" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Overlaps Dentist by 30 min</span></div></section>
+ <section class="w ev e5"><div class="tx"><b><s>15:30</s>Dentist</b><span>45 min</span></div></section><section class="w rd flat"><div class="ring"><b>62</b></div><div class="tx"><div class="lab"><span>Readiness · 07:40</span></div><strong>Sleep 6 h 12 m</strong><em>Low recovery. Keep today light.</em></div></section><section class="w mu"><div class="art"></div><div class="tx"><b>Music for Airports</b><span>Brian Eno</span><small><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>L 80 · R 76%</small></div>
+  <div class="ctl"><a><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></a><a class="pp"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></a><a><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></a></div></section><section class="w nt"><div class="chips"><span><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>Signal <b>3</b></span><span><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Gmail <b>5</b></span><span><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg>Slack <b>2</b></span></div>
+  <div class="mom"><span><b>Mom</b> Call me when you're free</span><i>4 min</i></div></section></main><nav class="dock"><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></a><a><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></a></nav><div class="search"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search or ask</span><b class="mic"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></b></div><div class="pill"></div></div>
+</body></html>
