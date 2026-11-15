@@ -771,8 +771,8 @@ fn policy_system_example_loads() {
     let p = Policy::from_toml(include_str!("../../examples/system-policy.toml")).unwrap();
     let s = Server::new(Box::new(Phone::default()), p);
     let tools: Vec<(String, Decision)> = s.system_tools().into_iter().map(|t| (t.name, t.decision)).collect();
-    assert_eq!(tools.len(), 7);
-    assert_eq!(tools.iter().filter(|(_, d)| *d == Decision::Approval).map(|(n, _)| n.as_str()).collect::<Vec<_>>(), ["system__key"]);
+    assert_eq!(tools.len(), 9);
+    assert_eq!(tools.iter().filter(|(_, d)| *d == Decision::Approval).map(|(n, _)| n.as_str()).collect::<Vec<_>>(), ["system__key", "system__tap_mark"]);
 }
 
 #[test]
