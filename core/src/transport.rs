@@ -4,7 +4,7 @@
 //! (`POST /approvals/decision`), whose body is HMAC-signed, so the tailnet can reach nothing else.
 
 use crate::mcp::Server;
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::AsRawFd;
 use std::net::{TcpListener, TcpStream};
@@ -198,6 +198,28 @@ fn is_json_type(ctype: &str) -> bool {
     ctype.trim().get(..16).is_some_and(|p| p.eq_ignore_ascii_case("application/json"))
 }
 
+/// Puts the caller's `traceparent` and `x-run-id` headers into `params._meta`, unless the message already has them.
+fn add_trace_context(msg: &mut Value, traceparent: Option<&str>, run_id: Option<&str>) {
+    let Some(params) = msg.get_mut("params").and_then(Value::as_object_mut) else { return };
+    let meta = params.entry("_meta").or_insert_with(|| json!({}));
+    let Some(meta) = meta.as_object_mut() else { return };
+    for (key, value) in [("traceparent", traceparent), ("run_id", run_id)] {
+        if let Some(v) = value.filter(|v| !v.is_empty() && v.len() <= 128) {
+            meta.entry(key).or_insert_with(|| json!(v));
+        }
+    }
+}
+
+fn trace_and_handle(server: &Server, msg: &mut Value, traceparent: Option<&str>, run_id: Option<&str>) -> Option<Value> {
+    add_trace_context(msg, traceparent, run_id);
+    server.handle(msg)
+}
+
+/// Serves one HTTP connection on any stream (tests).
+pub fn serve_connection(server: &Server, read: impl Read, writer: impl Write) -> std::io::Result<()> {
+    handle_connection(server, read, writer, Routes::All)
+}
+
 /// HTTP/1.1 with keep-alive: one request after another on the same connection until the client closes.
 fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, routes: Routes) -> std::io::Result<()> {
     let mut reader = BufReader::new(read);
@@ -214,6 +236,7 @@ fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, r
         let mut content_length = 0usize;
         let mut close = false;
         let (mut origin, mut host, mut ctype) = (None, None, None);
+        let (mut traceparent, mut run_id) = (None, None);
         let mut headers = 0;
         loop {
             let Some(h) = read_capped_line(&mut reader)? else {
@@ -239,6 +262,8 @@ fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, r
                     "origin" => origin = Some(v.trim().to_string()),
                     "host" => host = Some(v.trim().to_string()),
                     "content-type" => ctype = Some(v.trim().to_string()),
+                    "traceparent" => traceparent = Some(v.trim().to_string()),
+                    "x-run-id" => run_id = Some(v.trim().to_string()),
                     _ => {}
                 }
             }
@@ -273,7 +298,7 @@ fn handle_connection(server: &Server, read: impl Read, mut writer: impl Write, r
                 return Ok(());
             }
             ("POST", "/mcp") => match serde_json::from_slice::<Value>(&body) {
-                Ok(msg) => match server.handle(&msg) {
+                Ok(mut msg) => match trace_and_handle(server, &mut msg, traceparent.as_deref(), run_id.as_deref()) {
                     Some(reply) => respond(&mut writer, 200, "OK", Some(&reply.to_string()))?,
                     None => respond(&mut writer, 202, "Accepted", None)?,
                 },

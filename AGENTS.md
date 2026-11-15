@@ -7,6 +7,7 @@
   `@tin`, the decision-only TCP listener), `system.rs` (the `Verb` type and the Android verbs: each verb's schema, argv, describe and run sit in one definition, no wildcard arms; their dump parsers),
   `gate.rs` (held calls, the approvals client, decision signatures), `macos.rs` (the macOS backend: actionsdata →
   tools, the shortcut writer, Mac verbs defined the same way, and their parsers), `speech.rs` (speech tools, a client of `@tin-speech`).
+  `telemetry.rs` (one OTLP span per tool call, `[telemetry]` in the policy; no args or results in spans).
 - `android/app`: Kotlin host app `io.github.egoushka.tin`; `TinService` is the Shizuku user service, `SpeechBridge`
   serves `@tin-speech` inside it, `SpeechService` owns the mic and the model in the app process.
 - `android/speech`: speech library (no tin dependency): VAD + Parakeet through sherpa-onnx, push-to-talk, protocol.
