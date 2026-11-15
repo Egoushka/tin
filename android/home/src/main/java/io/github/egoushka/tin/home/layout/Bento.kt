@@ -68,6 +68,7 @@ data class Marks(
     val nextSoon: Boolean,
     val live: Set<Long>,
     val agenda: Set<Long>,
+    val music: Boolean,
 )
 
 /**
@@ -191,7 +192,9 @@ private fun bypass(old: Marks, new: Marks): Boolean =
         !old.broken.containsAll(new.broken) ||
         (new.faultSinceMs ?: Long.MIN_VALUE) > (old.faultSinceMs ?: Long.MIN_VALUE) ||
         old.leave != new.leave || old.nextSoon != new.nextSoon ||
-        old.live != new.live || old.agenda != new.agenda
+        old.live != new.live || old.agenda != new.agenda ||
+        // Music starting answers the user's own tap, so it shows at once; it leaving can wait.
+        (new.music && !old.music)
 
 private fun build(nowMs: Long, s: BentoInputs, order: List<Slot>, rows: Int): Arrangement {
     val leave = Bento.leaveNow(s.events, nowMs, s.leadMin)
@@ -260,6 +263,7 @@ private fun build(nowMs: Long, s: BentoInputs, order: List<Slot>, rows: Int): Ar
         nextSoon = soon,
         live = today.filter { it.current }.map { it.event.id }.toSet(),
         agenda = today.map { it.event.id }.toSet(),
+        music = musicShown,
     )
     return Arrangement(
         placed = placed,

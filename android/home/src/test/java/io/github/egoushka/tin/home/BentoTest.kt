@@ -230,7 +230,7 @@ class BentoTest {
         var cur = first
         var changes = 0
         for (m in 1..4) {
-            val flipped = base.copy(notes = if (m % 2 == 1) 3 else 0, musicPlaying = m % 2 == 0)
+            val flipped = base.copy(notes = if (m % 2 == 1) 3 else 0)
             val next = arrange(at(10) + m * min, flipped, o, 8, cur)
             if (next.placed != cur.placed) changes++
             cur = next
@@ -248,7 +248,9 @@ class BentoTest {
     @Test fun newInformationBypassesTheHold() {
         val calm = BentoInputs(needs = needs(2), needsNewestMs = at(8), events = listOf(standup, lunch))
         val held = arrange(at(10), calm, order, 8)
-        assertFalse(rebuilt(held, at(10, 1), calm.copy(musicPlaying = true)))
+        assertTrue(rebuilt(held, at(10, 1), calm.copy(musicPlaying = true)))
+        val playing = arrange(at(10), calm.copy(musicPlaying = true), order, 8)
+        assertFalse(rebuilt(playing, at(10, 1), calm.copy(musicPausedAtMs = at(10, 1))))
 
         val item = calm.copy(needs = needs(3), needsNewestMs = at(10, 1))
         assertTrue(rebuilt(held, at(10, 1), item))

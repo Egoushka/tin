@@ -70,7 +70,7 @@ them, a starting value from the review that LB11 measures.
 
 **Stability.** The whole arrangement (sizes and positions) is held for 5 minutes. These bypass the hold, because they are new
 information or a predictable boundary: a new Needs-you item or held call, a new fault, Leave now opening or closing, Next event
-crossing 15 min, and an event starting or ending.
+crossing 15 min, an event starting or ending, and music starting (it answers his own tap).
 
 **Leave now.**
 
