@@ -1,0 +1,83 @@
+<!--
+Direction: Text only
+Idea: Home as a page of lowercase type on black: no cards, no icons, no boxes. Hierarchy is size and weight only, attention is one accent colour, the dock is five words.
+Fonts: Inter with optical size (Inter Display cut at opsz 32 for the big figures), three sizes only: 72 / 20 / 14 px, weights 200, 400, 600, 700. Google Fonts link, system sans fallback.
+Palette: Black #000000; Text #F2F2F2; Secondary #8A8A8A; Tertiary #5A5A5A; Accent "look here" #FF6A3D (needs you, a clash, a failed deploy).
+Caption: the single accent carries one meaning, "look at this", so a clash and a failed deploy share it with Needs you; weight separates them (4 is 700 at 72 px, the others 600 at 20/14 px).
+Cost/risk on a real phone: with no icons and no boxes the touch targets are invisible, so every word needs a 48 px tall hit area and a pressed state; low-contrast grey on black below 4.5:1 is the risk (#5A5A5A is used only for hairlines and the dim "mic"). True black is the cheapest look on OLED. Reads fast but gives nothing to learn the layout from on first day.
+-->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=412">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,200..700;1,14..32,400&display=swap" rel="stylesheet">
+<title>Tile 07 · Text only</title>
+<style>
+*{box-sizing:border-box}
+:root{--a:#FF6A3D;--g:#8A8A8A;--d:#5A5A5A}
+body{margin:0;width:412px;height:915px;overflow:hidden;position:relative;background:#000;color:#F2F2F2;font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.35;font-feature-settings:'tnum','cv11','ss03'}
+.sb{position:absolute;top:0;left:0;right:0;height:44px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600;color:#bbb}
+.sb .r{font-weight:400;color:var(--g)}
+.pill{position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:4px;border-radius:2px;background:#fff;opacity:.45}
+.col{position:absolute;left:24px;right:24px;top:52px}
+.s{font-size:14px;color:var(--g)}
+.m{font-size:20px;font-weight:400;letter-spacing:-.01em}
+b,.b{font-weight:600}
+.time{font-size:72px;font-weight:200;letter-spacing:-.04em;line-height:1;font-variation-settings:'opsz' 32;margin:6px 0 0 -3px}
+.meta{margin-top:6px}
+.need{margin-top:20px;display:flex;align-items:flex-end;gap:12px;color:var(--a)}
+.need .n{font-size:72px;font-weight:700;letter-spacing:-.05em;line-height:.8;font-variation-settings:'opsz' 32}
+.need .m{font-weight:600;line-height:1;padding-bottom:1px}
+.need .age{margin-left:auto;color:var(--g);font-size:14px;padding-bottom:1px}
+.need+.s{margin-top:10px;color:#cfcfcf}
+.need+.s span{color:var(--g)}
+.sec{margin-top:22px}
+.ev{display:grid;grid-template-columns:52px 1fr;align-items:baseline;margin-top:7px}
+.ev .t{color:var(--g)}
+.ev .s{display:block;margin-top:0}
+.ev.now .m{font-weight:600}.ev.now .t{color:#F2F2F2}
+.ev.now .m i{font-style:normal;font-size:14px;font-weight:600;margin-left:8px;color:#F2F2F2}
+.ev.clash .s{color:var(--a);font-weight:600}
+.rd{margin-top:20px}
+.rd .nd{font-style:italic;color:#cfcfcf}
+.hl{margin-top:16px;color:var(--a)}
+.hl .m{font-weight:600}.hl .k{color:var(--g);font-weight:400;font-size:14px;display:block;margin-bottom:0}
+.mu{margin-top:20px}
+.mu .m{display:flex;justify-content:space-between}
+.mu .ctl{position:absolute;right:0;display:flex}
+.w{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 4px;color:#d8d8d8;font-weight:600}
+.mu .row2{display:flex;justify-content:space-between;align-items:center;margin-top:0}
+.mu .row2 .ctl{display:flex;position:static;gap:2px;margin-right:-6px}
+.nt{margin-top:14px}
+.nt .s b{color:#F2F2F2}
+.msg{margin-top:2px}
+.dock{position:absolute;left:24px;right:24px;top:790px;display:flex;justify-content:space-between;border-top:1px solid #1c1c1c}
+.dock a{min-height:48px;display:flex;align-items:center;font-weight:600;font-size:14px;color:#e8e8e8}
+.search{position:absolute;left:24px;right:24px;top:842px;height:52px;border-top:1px solid #2a2a2a;display:flex;align-items:center;justify-content:space-between;font-size:20px;font-weight:300;color:var(--g);letter-spacing:-.01em}
+.search .mic{font-size:14px;font-weight:600;color:#F2F2F2;min-height:48px;display:flex;align-items:center;padding-left:20px}
+</style></head><body>
+<div class="sb"><span>10:12</span><span class="r">wifi · 82%</span></div>
+<div class="col">
+ <div class="time">10:12</div>
+ <div class="s meta">sat, 14 nov · 7° cloudy<br>alarm 07:30 · tomorrow · sun</div>
+
+ <div class="need"><span class="n">4</span><span class="m">need you</span><span class="age">1 min</span></div>
+ <div class="s">2 prs to merge · 1 approval · 1 reply owed</div>
+
+ <div class="sec s">today · 4 events</div>
+ <div class="ev now"><span class="t">10:30</span><span class="m">standup<i>in 18 min</i></span></div>
+ <div class="ev"><span class="t">13:00</span><div><span class="m">lunch, podil</span><span class="s">leave 12:36 · 24 min drive</span></div></div>
+ <div class="ev clash"><span class="t">15:00</span><div><span class="m">sprint review</span><span class="s">overlaps dentist by 30 min</span></div></div>
+ <div class="ev"><span class="t">15:30</span><div><span class="m">dentist</span> <span class="s" style="display:inline;margin-left:8px">45 min</span></div></div>
+
+ <div class="rd"><span class="m b">readiness 62</span> <span class="s">&nbsp; sleep 6 h 12 m · 07:40</span><div class="s nd">low recovery. keep today light.</div></div>
+ <div class="hl"><span class="k">homelab · hedzer</span><span class="m">1 deploy failed · nytka</span></div>
+
+ <div class="mu"><div class="m">music for airports</div>
+  <div class="row2"><span class="s">brian eno · l 80 · r 76%</span><span class="ctl"><span class="w">prev</span><span class="w">pause</span><span class="w">next</span></span></div></div>
+ <div class="nt s">signal <b>3</b> · gmail <b>5</b> · slack <b>2</b><div class="msg"><b style="color:#F2F2F2">mom</b> <span style="color:#d8d8d8">call me when you're free</span> · 4 min</div></div>
+</div>
+<nav class="dock"><a>phone</a><a>messages</a><a>camera</a><a>browser</a><a>maps</a></nav>
+<div class="search"><span>search or ask</span><span class="mic">mic</span></div>
+<div class="pill"></div>
+</body></html>

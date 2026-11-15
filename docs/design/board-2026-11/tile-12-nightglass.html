@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Tile 12 · Night glass (current, reference)</title>
+<!--
+Direction: Night glass (current, approved). Baseline the other tiles are compared against.
+Idea: frosted cards in a dark room; nothing is coloured at rest, light means attention (violet = needs you, teal = now, red = broken).
+Fonts: Inter (11/13/15 type scale, 76 px clock at weight 200, tabular figures).
+Palette: bg #07070b, surface #14141d at 55%, surface-2 #ffffff14, edge #ffffff1f, edge-hi #ffffff47, ink #f2f2f7, ink-2 #b8b8c8, glow-1 violet #7c5cff (needs you), glow-2 teal #00e0c7 (room light, bottom right), glow-3 indigo #2a1f6e (room light, top left), signal #5ef0dc (now), bad #ff6b78 (broken).
+Cost/risk: backdrop-filter blur on 7 cards plus two radial paints costs GPU and battery on a live launcher; on a real phone the blur sees only the wallpaper, so the frost is a static texture. Side margin is 16 px as in the approved design (brief asks 24: back-gesture zone); the cards would need 8 px more inset to follow it.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,200..800&display=swap">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#07070b;--surface:#14141d;--edge:rgb(255 255 255/.12);--edge-hi:rgb(255 255 255/.28);--ink:#f2f2f7;--ink-2:#b8b8c8;--sig:#5ef0dc;--bad:#ff6b78;--v:#7c5cff;--w-bg:color-mix(in srgb,#14141d 55%,transparent)}
+body{margin:0;width:412px;height:915px;overflow:hidden;background:
+ radial-gradient(85% 45% at 0% 0%,#2a1f6e 0,transparent 75%),radial-gradient(70% 38% at 100% 100%,rgb(0 224 199/.22) 0,transparent 72%),var(--bg);
+ color:var(--ink);font:450 13px/16px Inter,system-ui,sans-serif;position:relative;font-feature-settings:"tnum" 1}
+.i{width:16px;height:16px;stroke-width:1.6;flex:none;vector-effect:non-scaling-stroke}
+.i *{vector-effect:non-scaling-stroke}
+.sb{position:absolute;top:0;left:0;right:0;height:44px;padding:0 30px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.sb div{display:flex;gap:8px;align-items:center}
+.pill{position:absolute;bottom:8px;left:50%;margin-left:-54px;width:108px;height:4px;border-radius:2px;background:rgb(255 255 255/.55)}
+.clock{position:absolute;top:52px;left:26px;font-size:76px;line-height:80px;font-weight:200;letter-spacing:-.04em;font-feature-settings:"tnum" 1,"ss01" 1}
+.date{position:absolute;top:70px;right:28px;text-align:right}
+.date b{display:block;font:550 15px/20px Inter;margin-bottom:4px}
+.date span{display:flex;gap:6px;align-items:center;justify-content:flex-end;color:var(--ink-2)}
+.w{position:absolute;background:var(--w-bg);border:1px solid var(--edge);border-radius:28px;backdrop-filter:blur(20px) saturate(160%);box-shadow:inset 0 1px 0 var(--edge-hi),0 16px 32px -16px rgb(0 0 0/.6);padding:12px 14px}
+.lab{font:600 11px/16px Inter;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2)}
+.hd{display:flex;justify-content:space-between;align-items:center}
+.hd :last-child:not(.lab){font:500 11px/16px Inter;color:var(--ink-2)}
+.hot .lab,.hot svg{color:var(--ink)}
+.ag{left:16px;right:16px;top:135px;height:222px;padding:14px 14px}
+.row{display:grid;grid-template-columns:48px 1fr auto;align-items:center;padding:0 8px;column-gap:0}
+.row .t{color:var(--ink-2)}
+.row .n{font:550 15px/20px Inter}
+.row .r{font:500 11px/16px Inter;color:var(--ink-2)}
+.row .s{grid-column:2/4;display:flex;gap:6px;align-items:center;color:var(--ink-2);margin-top:2px}
+.row.now{background:rgb(94 240 220/.10);box-shadow:inset 0 0 0 1px rgb(94 240 220/.22);border-radius:16px;height:36px}
+.row.now .n{display:flex;align-items:center;gap:8px}
+.row.now .n:before{content:"";width:3px;height:16px;border-radius:2px;background:var(--sig)}
+.hot{background:radial-gradient(120% 90% at 0% 0%,rgb(124 92 255/.30) 0,transparent 70%),var(--w-bg);border-color:color-mix(in srgb,var(--v) 55%,var(--edge));box-shadow:inset 0 1px 0 color-mix(in srgb,var(--v) 60%,var(--edge-hi)),0 0 36px -12px var(--v),0 16px 32px -16px rgb(0 0 0/.6)}
+.big{font-size:44px;line-height:52px;font-weight:200;margin:12px 0 4px;letter-spacing:-.02em}
+.li{display:flex;gap:8px;align-items:center;line-height:19px}
+.ring{position:relative;width:60px;height:60px}
+.ring svg{width:60px;height:60px;transform:rotate(-90deg);stroke-width:6;vector-effect:none}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font:550 15px/20px Inter}
+.mini{display:flex;align-items:center;gap:10px;padding:8px 12px}
+.mini{white-space:nowrap}.mini p{margin:0;font:550 15px/20px Inter}
+.mini span{display:block;font:450 13px/16px Inter;color:var(--ink-2)}
+.mini.bad{background:radial-gradient(110% 100% at 0% 50%,rgb(255 107 120/.22) 0,transparent 70%),var(--w-bg);border-color:color-mix(in srgb,var(--bad) 45%,var(--edge))}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 10px 1px var(--bad);margin:0 0 0 2px;flex:none}
+.art{width:48px;height:48px;border-radius:14px;background:radial-gradient(70% 70% at 25% 25%,#3df0c4,transparent 70%),radial-gradient(80% 80% at 90% 90%,#5b3df0,transparent 70%),#1d8fd6;flex:none}
+.ctl{display:flex;gap:14px;margin-left:auto;align-items:center}
+.ctl .i{width:24px;height:24px}
+.ic{position:absolute;width:56px;height:56px;border-radius:50%;background:var(--w-bg);border:1px solid var(--edge);display:grid;place-items:center;backdrop-filter:blur(20px);top:777px}
+.ic .i{width:24px;height:24px}
+.sbar{position:absolute;left:16px;right:16px;top:847px;height:53px;border-radius:28px;display:flex;align-items:center;padding:0 0 0 18px;gap:12px;font-size:15px}
+.mic{margin-left:auto;width:48px;height:48px;margin-right:2px;border-radius:50%;background:var(--ink);color:#0b0b12;display:grid;place-items:center;box-shadow:0 4px 14px -4px rgb(0 0 0/.6)}
+.mic .i{width:22px;height:22px}
+</style></head><body>
+<div class="sb"><span>10:12</span><div><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg><span style="display:flex;gap:4px;align-items:center"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/></svg>82%</span></div></div>
+<div class="clock">10:12</div>
+<div class="date"><b>Sat, 14 Nov</b><span><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>7° Cloudy</span></div>
+
+<div class="w ag">
+ <div class="hd" style="padding:0 8px;height:20px;margin-bottom:6px"><span class="lab">Today</span><span>4 events</span></div>
+ <div class="row now"><span class="t">10:30</span><span class="n">Standup</span><span class="r" style="color:var(--ink)">in 18 min</span></div>
+ <div class="row" style="margin-top:8px"><span class="t">13:00</span><span class="n">Lunch, Podil</span><span class="r">1 h</span><span class="s"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>Leave 12:36 · 24 min drive</span></div>
+ <div class="row" style="margin-top:8px"><span class="t">15:00</span><span class="n">Sprint review</span><span class="r">1 h</span><span class="s"><span style="color:var(--v);display:contents"></span><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Overlaps Dentist by 30 min</span></div>
+ <div class="row" style="margin-top:8px"><span class="t">15:30</span><span class="n">Dentist</span><span class="r">45 min</span></div>
+</div>
+
+<div class="w hot" style="left:16px;top:369px;width:185px;height:158px">
+ <div class="hd"><span class="lab">Needs you</span><span>1 min</span></div>
+ <div class="big">4</div>
+ <div class="li"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg>2 PRs to merge</div><div class="li"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>1 approval</div><div class="li"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>1 reply owed</div>
+</div>
+<div class="w" style="left:211px;right:16px;top:369px;height:158px">
+ <div class="hd"><span class="lab">Readiness</span><span>07:40</span></div>
+ <div style="display:flex;align-items:center;gap:14px;margin-top:10px">
+  <div class="ring"><svg viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="27" stroke="rgb(255 255 255/.14)"/><circle cx="30" cy="30" r="27" stroke="#f2f2f7" stroke-dasharray="105 170" stroke-linecap="round" pathLength="170" style="stroke-dasharray:105.2 170"/></svg><b>62</b></div>
+  <div><div style="color:var(--ink-2)">Sleep</div><div style="font:550 15px/20px Inter">6 h 12 m</div></div>
+ </div>
+ <div style="font-style:italic;color:var(--ink-2);margin-top:12px;font-size:13px;line-height:17px">Low recovery. Keep today light.</div>
+</div>
+
+<div class="w mini bad" style="left:16px;top:539px;width:185px;height:56px"><span class="dot"></span><div><p>hedzer</p><span style="color:var(--ink-2)">1 deploy failed · nytka</span></div></div>
+<div class="w mini" style="left:211px;right:16px;top:539px;height:56px"><svg class="i x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg><div><p>07:30</p><span>Tomorrow · Sun</span></div></div>
+
+<div class="w mini" style="left:16px;right:16px;top:607px;height:73px;padding:12px 14px;gap:12px;border-radius:28px"><div class="art"></div><div><p>Music for Airports</p><span style="display:flex;gap:6px;align-items:center">Brian Eno · <svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>80 · 76%</span></div><div class="ctl"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></div></div>
+
+<div class="w" style="left:16px;right:16px;top:691px;height:63px;padding:8px 16px;border-radius:24px">
+ <div style="display:flex;gap:14px;color:var(--ink-2);height:24px;align-items:center"><span class="li" style="gap:5px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>Signal <b style="font:500 11px Inter;color:var(--ink)">3</b></span><span class="li" style="gap:5px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Gmail <b style="font:500 11px Inter;color:var(--ink)">5</b></span><span class="li" style="gap:5px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg>Slack <b style="font:500 11px Inter;color:var(--ink)">2</b></span></div>
+ <div style="display:flex;justify-content:space-between;margin-top:2px"><span><b style="font-weight:600">Mom</b>&nbsp; Call me when you’re free</span><span style="color:var(--ink-2);font:500 11px Inter">4 min</span></div>
+</div>
+
+<div class="ic" style="left:26px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="ic" style="left:102px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></div><div class="ic" style="left:178px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></div><div class="ic" style="left:254px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div><div class="ic" style="left:330px"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></div>
+<div class="w sbar"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span style="color:var(--ink)">Search or ask</span><div class="mic"><svg class="i " viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></div></div>
+<div class="pill"></div>
+</body></html>
