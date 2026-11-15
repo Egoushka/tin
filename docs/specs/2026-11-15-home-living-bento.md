@@ -1,88 +1,141 @@
 # Tin Home: Living bento
 
 2026-11-15 · spec, written before any code · inputs: the style board `docs/design/board-2026-11/` (Yehor picked **b5** in round 2),
-`DESIGN.md` (tokens), `docs/specs/2026-11-03-home-layout.md` (the current card stack).
+`DESIGN.md` (tokens), `docs/specs/2026-11-03-home-layout.md` (the current card stack). Revised the same day after a design review
+(blockers: lead contradictions, fit, packing holes, the tile mapping, and Leave-now edge cases).
 
 ## Goal
 
-The main page becomes a bento whose **tile sizes follow the moment**. The thing that needs Yehor now is the biggest tile. Everything
-else shrinks but keeps its place in the order, so a thumb still finds it. The dock, search, pages, gestures, Tune, widgets and
-voice keep working as they do today.
+The main page becomes a bento whose **tile sizes follow the moment**. The one thing that needs Yehor now is the biggest tile. Every
+other tile keeps its place in his order, so a thumb still finds it. The dock, search, pages, gestures, widgets and voice keep working
+as they do today.
 
-## What changes and what stays
+## Tiles and how today's cards map onto them
 
-- **Changes:** how the main page (page 0) draws its six cards (NeedsYou, Today, Glance, Music, Alarm, Homelab). The full-width
-  stack becomes a 4-column grid with sizes taken from the rules below. The theme moves from Night glass to the Living bento tokens in
-  `DESIGN.md`, light and dark from the system.
-- **Stays:** `HomeLayout.order` and `hidden` (Yehor's order is still the base order, and edit mode still moves and hides),
-  widgets (placed as 4×N tiles at their position in the order, where N is their rows), `PinsRow`, the dock, `SearchBar`, the pages
-  to the right, gestures, `GrantRow` for missing permissions, and freshness (age on every tile, fading when stale).
-- **Not in this spec:** a readiness tile (Home has no Oura source yet), real travel times (see "Leave now" below), and new pages.
+| Tile | From today's code | Orderable | Notes |
+|---|---|---|---|
+| Glance row | `top()`: clock, date, weather, torch | no, always row 0 | Clock 2×1, weather 1×1, alarm 1×1. Fixed sizes. The torch becomes a 48 dp key in the weather tile. The clock's tap routes are unchanged. |
+| Leave now | new, from the agenda | no, first below row 0 while it exists | See "Leave now" |
+| Needs you | `CardId.NeedsYou` | yes | |
+| Next event | `CardId.Today`, its first upcoming item | yes, moves with Today | |
+| Rest of today | `CardId.Today`, the other items | yes, directly after Next event | Up to 3 rows, then "+N more" |
+| Homelab | `CardId.Homelab` | yes | |
+| Music | `CardId.Music` | yes | |
+| Notifications | `CardId.Glance` (the notification glance) | yes | |
+| Widget | `Slot.Widget` | yes | 4 wide; grid rows = ceil((70·rows − 30 + 12) / 94), capped at 4 |
+
+`CardId.Alarm` moves into the glance row. A saved `home.order` decodes as before, with `Alarm` dropped and `Today` expanded into
+Next event plus Rest of today, so no saved layout breaks (LB10). The hidden flag keeps working per tile, and a hidden Alarm hides it
+from the glance row.
 
 ## Sizing rules
 
-A pure function `arrange(now, signals, layout, held): List<Placed>` lives in `layout/Bento.kt`. It has no Compose and no clock of
-its own. A tile's size is `w×h` in grid units.
+`arrange(now, signals, order, rows, held): Arrangement` is a pure function in `layout/Bento.kt`, with no Compose and no clock of its
+own. `rows` is the number of grid rows that fit on page 0 above the pins, the dock and search. `held` is the last arrangement and
+when it was made.
 
-| Tile | Calm | Moment | Size in the moment |
-|---|---|---|---|
-| Needs you | 1×1, count only | `open > 0` | 2×2, the lead figure and up to 3 rows |
-| Next event | 2×1, one line | starts in ≤ 30 min | 2×2, the minutes as the lead figure |
-| Leave now | absent | an event with a location whose leave time (below) is within 45 min, until it starts | 4×2 at the top, the minutes until leave as the lead figure |
-| Rest of today | 2×1 rows, up to 3 | at least one clash | the clash row shows the clash line |
-| Homelab | 1×1, grey dot | `broken > 0` | 2×1, the box and the failed service |
-| Alarm | 1×1 | — | — |
-| Clock and date | 2×1, always first | — | — |
-| Weather | 1×1 | — | — |
-| Music | absent | playing or paused within 10 min | 4×1 |
-| Notifications | 4×1 when `total > 0` | — | — |
+**One lead at most.** The lead is the only tile with a saturated fill and the display figure. The first case that holds wins:
 
-- **One lead at a time.** When several tiles are in their moment, the order is Leave now > Needs you > Next event > Homelab.
-  Only the first gets the lead treatment: its moment size, a saturated fill and the display figure. The others step down to 2×1 in their pastel, as Needs you does at 12:30 in b5.
-- **Order.** Leave now goes first while it exists. Otherwise tiles follow `HomeLayout.order`, packed densely (first fit, row by row,
-  no holes except at the end of the grid).
-- **Stability.** A tile changes size at most once in 5 minutes. A new Needs-you item, a new fault or a Leave-now start bypasses
-  this, because they are new information. `held` carries the last sizes and when they last changed.
-- **Leave time.** v1 has no routing. Leave time is `begin − lead`, where `lead` is a Tune knob ("Travel lead", 15/30/45/60
-  min, default 30). The tile says "Leave by 12:30" and names the event. It never claims a drive time it did not measure.
-  Real travel times are open question 1.
-- **Edit mode** draws every tile at its calm size with the existing move and hide controls, so the order is edited without the
-  moment moving things.
+1. **Leave now**, while its window is open (below): 4×2.
+2. **Next event** starting in 15 min or less: 2×2, with the minutes as the figure.
+3. **Homelab** with a fault that began within the last 30 min: 2×2, naming the box and the service.
+4. **Needs you** with a held call, or an item newer than 30 min: 2×2, with the count and up to 3 rows.
+5. Otherwise there is no lead. Everything is calm.
+
+Needs you does not lead just because `open > 0`. For a developer that is nearly always true, so the page would never change.
+
+**Calm and stepped-down sizes.** Every tile that isn't the lead takes one of these sizes:
+
+| Tile | Size | Content |
+|---|---|---|
+| Needs you | 2×1 when `open > 0`, 1×1 at 0 | count, plus the first row in 2×1 |
+| Next event | 2×1 | title and "in 18 min"; "now · ends 11:00" while it is in progress |
+| Rest of today | 2×1 per row, up to 3 | "+N more" in the last row; absent when nothing is left today |
+| Homelab | 2×1 when broken, 1×1 when healthy | the box and service, or a grey "all up" |
+| Music | 4×1 while playing or paused within 10 min, otherwise absent | |
+| Notifications | 4×1 when `total > 0`, otherwise absent | |
+
+**Packing.** Tiles go strictly in order, row by row. A tile that doesn't fit the rest of a row starts the next row, and the last tile
+in the unfinished row stretches to fill it. Nothing is ever pulled forward out of order, so positions only move when sizes change.
+
+**Fit.** If the tiles need more than `rows`, calm tiles collapse in this order until they fit:
+
+1. Rest of today down to 1 row.
+2. Notifications into a 28 dp chip line under the glance row.
+3. Music to 2×1.
+4. Healthy Homelab and zero Needs you vanish (their state stays in edit mode).
+
+If it still doesn't fit, page 0 scrolls, which is today's behaviour. On the Pixel 8a the space is about 6 rows with pins and 7 without
+them, a starting value from the review that LB11 measures.
+
+**Stability.** The whole arrangement (sizes and positions) is held for 5 minutes. These bypass the hold, because they are new
+information or a predictable boundary: a new Needs-you item or held call, a new fault, Leave now opening or closing, Next event
+crossing 15 min, and an event starting or ending.
+
+**Leave now.**
+
+- An event qualifies when its location is a place. Locations with a URL, or naming Meet, Zoom, Teams, Webex, "online" or
+  "call", don't qualify.
+- The leave time is `begin − lead`, where `lead` is a Tune knob ("Travel lead": 15, 30, 45 or 60 min, default 30).
+- The window opens 45 min before the leave time and closes when the event begins. While open, the tile shows "Leave by 12:30 ·
+  Lunch, Podil" with the minutes until then as the figure.
+- After the leave time the tile reads "Late · starts 13:00", and the figure becomes the minutes until the start.
+- It never shows a drive time it did not measure.
+- Next event skips the event that Leave now is showing.
+- All-day events are already filtered out (`CalendarSource.query` skips `ALL_DAY` rows).
+
+**Edit mode** stays as the current full-width list (`EditedSlot` with its move, hide and resize controls). The bento resumes when
+edit mode ends.
 
 ## Look
 
-Tokens, type, grid and contrast are in `DESIGN.md`. A size change animates once, with the emphasized easing over 400 ms; under
-reduced motion it does not animate. TalkBack reads each tile as its label, value and state ("Needs you, 4, 2 PRs to merge…").
-Ukrainian strings keep the layout at font scale 2.0 (the existing `HomeFrameTest` bar).
+- **Tokens, type, grid and contrast:** see `DESIGN.md`, which holds the light and dark sets as real keys.
+- **Wallpaper:** Home paints its own wallpaper gradient. Showing the system wallpaper is a Tune choice later.
+- **Edges:** every tile has a 1 dp edge (ink at 8%), so the pastel tiles stay visible against the pastel wallpaper in sunlight.
+- **Stale and focus:** a stale tile fades its fill to 55% and tints its age line. The text stays at full contrast. Focus mode dims
+  calm fills the same way.
+- **Motion:** a size change animates once, with the emphasized easing over 400 ms, and does not animate under reduced motion.
+- **TalkBack** reads each tile as its label, value and state ("Needs you, 4, 2 PRs to merge…").
 
 ## Acceptance checks (machine-run)
 
 | ID | Check | How |
 |---|---|---|
-| LB1 | At 10:12 with the board's fixture (4 open, standup 10:30, lunch 13:00 at Podil, a fault, music playing), `arrange` gives Needs you 2×2 as the lead, Next event 2×2 at standup, Homelab 2×1 and Music 4×1 | `BentoTest` (unit) |
-| LB2 | At 12:05 with the same fixture and lead 30 min, Leave now is 4×2, first and the lead. Needs you steps down to 2×1. At 12:31 the Leave-now tile still shows "Leave by 12:30" until 13:00, then it is gone | `BentoTest` |
-| LB3 | Packing never overlaps, never exceeds 4 columns, and leaves no hole before the last tile, for every subset of the 10 tiles (2^10 cases) | `BentoTest` (property) |
-| LB4 | Stability: a signal that flips every minute changes a tile's size at most once in 5 min, and a new Needs-you item changes it at once | `BentoTest` |
-| LB5 | The dock and search bar stay on screen and in place at font scale 1.0 and 2.0, in English and Ukrainian, at both fixture times | `HomeFrameTest` (Compose, updated) |
-| LB6 | Every text and fill pair in `DESIGN.md` is at least 4.5:1, or 3:1 for the display figure, in light and dark | `ContrastTest` (updated to the new tokens) |
-| LB7 | Edit mode shows calm sizes and the move and hide controls still reorder `HomeLayout` | `HomeControlsTest` (updated) |
-| LB8 | CI's emulator job saves screenshots of Home at 10:12 and 12:05, light and dark, at 412×915 dp as an artifact. They are the gate's before and after | `connectedCheck` screenshot test |
-| LB9 | `:home:testDebugUnitTest :home:lintDebug :home:assembleRelease` green; Night glass tests retired, not skipped | CI `android` |
+| LB1 | At 10:12 with the board fixture (4 open, the newest 1 min old; standup 10:30; lunch 13:00 at Podil; a fault from 09:00; music playing), Needs you is the 2×2 lead. Next event is 2×1 "in 18 min". Homelab is 2×1 and not the lead, because its fault is older than 30 min. Music is 4×1 | `BentoTest` |
+| LB2 | At 12:05, lead 30: Leave now is the 4×2 lead, first below the glance row, with the figure 25. Needs you is 2×1. Next event shows Sprint review, not Lunch. At 12:31 it reads "Late · starts 13:00", and at 13:00 it is gone | `BentoTest` |
+| LB3 | Across every subset of tiles and sizes, nothing overlaps, nothing is wider than 4, the order equals the input order, and the only gaps are filled by a stretched last-in-row tile | `BentoTest`, property-based |
+| LB4 | A signal flipping every minute changes the arrangement at most once in 5 min. Each bypass event in "Stability" changes it within the same minute | `BentoTest` |
+| LB5 | Dock and search stay on screen and in place, and no tile text is clipped, at font scale 1.0 and 2.0, in English and Ukrainian, at 10:12 and 12:05 | `HomeFrameTest`, updated |
+| LB6 | Every text and fill pair in `DESIGN.md` (both sets) is at least 4.5:1. Display figures are at least 3:1 | `ContrastTest`, reading the new tokens |
+| LB7 | Edit mode shows the full-width list, and move and hide still change `HomeLayout` | `HomeControlsTest` |
+| LB8 | Robolectric and Roborazzi screenshots of page 0 at 10:12 and 12:05, light and dark, at w412dp-h914dp-420dpi, with a fixed clock and fake signals, compared against committed goldens | the `android` job, a new `HomeShotsTest` |
+| LB9 | `:home:testDebugUnitTest :home:lintDebug :home:assembleRelease` is green. Any retired test is deleted with its feature, not skipped | the CI `android` job |
+| LB10 | Every old `home.order` value, including ones with `Alarm` and widgets, decodes to the new tiles without losing a widget or a hidden flag | `LayoutStoreTest`, `HomeLayoutTest` |
+| LB11 | `rows` is measured from the real frame at 412×915 with and without pins. Both fixtures fit without scrolling when pins are off | `HomeFrameTest` |
+| LB12 | A missing calendar or notification permission shows a 4×1 `GrantRow` tile in that tile's place | `GrantRowTest` |
 
-## Slices
+Tests to update alongside: `HomeLayoutTest`, `LayoutStoreTest`, `TokensTest`, `TuneTest`, `MotionTest`, `GrantRowTest`,
+`WidgetLifecycleTest`, `HomeFramePagesTest`, `StringsTest`, `DeadCardsTest`, `NeedsYouCardTest`, `TodaySheetTest`.
 
-1. **S1 `arrange`:** `Bento.kt`, `BentoTest` (LB1–LB4) and the Travel lead knob. No UI change.
-2. **S2 tokens and font:** the Living bento tokens next to Night glass's, Plus Jakarta Sans bundled (400/500/700/800), and the
-   `ContrastTest` update (LB6).
-3. **S3 the grid:** page 0 draws `arrange`'s output, with the tiles restyled, edit mode, and LB5, LB7 and LB8.
-4. **S4 retire Night glass:** remove its tokens, `NightGlassCssTest` and the glass renderer from page 0 (LB9), and point
-   `docs/design/night-glass/README.md` at this spec.
+## Slices (one PR each)
 
-## Open questions for Yehor
+1. **S1 `arrange`:** `Bento.kt` and `BentoTest` (LB1–LB4). Pure Kotlin, no UI change.
+2. **S2 screenshots:** add Roborazzi with the fixed clock and fake signals, and record goldens of **today's** Home (the "before").
+   Re-render the b5 mockup with the `DESIGN.md` tokens for Yehor to see before S4.
+3. **S3 tokens and font:** add the Living bento tokens next to `Ng`, bundle Plus Jakarta Sans (400/500/700/800) and measure the
+   APK delta, and update `ContrastTest` (LB6). No visual change yet.
+4. **S4 the grid:** page 0 draws `arrange` with the existing card contents in the new tile shells. This covers the glance row, Leave
+   now, widgets, grants, the tile mapping and migration (LB5, LB7, LB10–LB12). The goldens are updated: this is the "after".
+5. **S5 tile restyle:** each tile's content in the final type and colour, plus the Travel lead knob in Tune.
+6. **S6 Tune cleanup:** gap is fixed at 12 dp on page 0. The attention colour, frost, glass tint, room light and presets keep
+   working for the drawer, sheets and pages, which still use `Ng`. Restyling those surfaces is a separate spec, so nothing outside
+   page 0 changes here.
 
-1. **Travel time.** v1 uses a fixed lead (default 30 min). A real drive time needs a routing source: Google Maps' Routes API
-   (paid, with a key on the phone), OSRM on the box (free and self-hosted, but no live traffic), or the time Maps shows when the
-   event opens. If he says nothing, the fixed lead stays.
-2. **Readiness.** The b5 tile shows Oura readiness, but Home has no Oura source. Adding one is its own spec, with an Oura token on
-   the phone or a relay on the box. Without it, the tile is absent.
-3. **Font size in the APK.** Plus Jakarta Sans with 4 weights (OFL) adds a few hundred KB, **UNKNOWN** until measured in S2.
+## Open questions for Yehor (each has a default)
+
+1. **Travel time.** v1 uses a fixed lead. A real drive time needs a routing source: Google's Routes API (paid, a key on the phone),
+   OSRM on nickel (free, no live traffic), or nothing. Default: the fixed lead.
+2. **Readiness.** Home has no Oura source, so there is no tile until one exists. Default: absent.
+3. **Font.** S3 measures the APK size cost of the bundled font. Default: bundle it.
+4. **Mockup changes.** b5 used all-caps labels and white on tangerine. The build uses sentence-case labels and ink on tangerine,
+   because white was 2.6:1. S2's re-render shows this before any tile is restyled.

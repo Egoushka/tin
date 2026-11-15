@@ -22,9 +22,26 @@ colors:
   tint-music: "#F8D3E3"    # music
   tint-notes: "#D6E6FA"    # notifications
   glass: "#FFFFFFB8"       # dock keys and the search bar
-  # Dark set (system dark theme): the same names. Tints are 14% of the light tint over bg #16131F.
-  # ink #F3F0FA (≥10.9:1), muted #ABA5BF (≥5.2:1), needs #FF8A52 with ink-dark #1E1A2E (7.3:1),
-  # leave #3DD6BE with ink-dark (9.3:1), fault #FF8A80 (5.7:1 on dark rose); light-set tints become the accents (≥9.2:1).
+  edge: "#1E1A2E14"        # 1 dp tile edge (ink at 8%), keeps pastel tiles visible on the pastel wallpaper in sunlight
+  # Text on a saturated fill is always ink (needs) or white (leave), labels included; muted is never used on them.
+dark:
+  # System dark theme. Same roles; tints are 14% of the light tint over bg.
+  bg: "#16131F"
+  ink: "#F3F0FA"           # ≥10.9:1 on every dark tint
+  muted: "#ABA5BF"         # ≥5.2:1 on every dark tint
+  needs: "#FF8A52"         # text on it: ink-dark #1E1A2E, 7.3:1
+  leave: "#3DD6BE"         # text on it: ink-dark, 9.3:1
+  fault: "#FF8A80"         # 5.7:1 on dark tint-lab
+  tint-time: "#322E3D"
+  tint-sky: "#2F313D"
+  tint-alarm: "#363133"
+  tint-event: "#37333D"
+  tint-health: "#303239"
+  tint-lab: "#372E38"
+  tint-music: "#362E3A"
+  tint-notes: "#2F313E"
+  edge: "#F3F0FA1A"
+  glass: "#2A2638CC"
 typography:
   # One family: Plus Jakarta Sans, bundled (400, 500, 700, 800 only). Tabular figures everywhere.
   display: { fontSize: "56sp", fontWeight: 800, lineHeight: "56sp" }  # the lead figure: "4", "6 min", "18 min"
@@ -57,15 +74,15 @@ There is one family, Plus Jakarta Sans, with four weights that each have a job: 
 
 ```
 ┌──────────────────────────────┐  status bar
-│ ┌──────────┐ ┌──────┐┌─────┐ │
-│ │ Needs you│ │10:12 ││ 7°  │ │  row 1–2: the lead tile (2×2) + clock (2×1)
-│ │    4     │ ├──────┤├─────┤ │           + weather/alarm (1×1 each)
-│ │ 2 PRs…   │ │ ⏰7:30││  …  │ │
-│ └──────────┘ └──────┘└─────┘ │
-│ ┌──────────┐ ┌─────────────┐ │
-│ │ Standup  │ │ 13:00 Lunch │ │  next event big (2×2) when < 30 min away;
-│ │  18 min  │ │ 15:00 Sprint│ │  the rest of the day as 2×1 rows
-│ └──────────┘ └─────────────┘ │
+│ ┌────────────┐┌─────┐┌─────┐ │
+│ │ 10:12 Sat  ││ 7° ⚡││⏰7:30│ │  row 0, fixed: clock 2×1, weather + torch, alarm
+│ └────────────┘└─────┘└─────┘ │
+│ ┌────────────┐┌────────────┐ │
+│ │ Needs you  ││ Standup    │ │  the lead (2×2, saturated, one figure)
+│ │     4      ││ in 18 min  │ │  next to calm 2×1 tiles, in Yehor's order
+│ │ 2 PRs …    │├────────────┤ │
+│ │            ││ 13:00 Lunch│ │
+│ └────────────┘└────────────┘ │
 │ ┌──────────────────────────┐ │
 │ │ ♪ Music for Airports ⏮⏸⏭│ │  4×1 while playing
 │ └──────────────────────────┘ │
@@ -77,11 +94,11 @@ There is one family, Plus Jakarta Sans, with four weights that each have a job: 
 └──────────────────────────────┘
 ```
 
-The grid has 4 columns with an 82 dp unit, a 12 dp gap and 24 dp gutters (the side edges belong to the back gesture). Tiles pack densely in a stable order. The sizing rules are in `docs/specs/2026-11-15-home-living-bento.md`.
+The grid has 4 columns with an 82 dp unit, a 12 dp gap and 24 dp gutters (the side edges belong to the back gesture). Tiles pack densely in a stable order. Row 0 (clock, weather, alarm) is fixed. Below it, tiles go in Yehor's order, with at most one lead. The sizing, fit and stability rules are in `docs/specs/2026-11-15-home-living-bento.md`.
 
 ## Elevation & Depth
 
-The tiles are flat pastel with no shadow. The dock keys and the search bar are white glass (72% white) with a soft shadow, because they float over the moving grid.
+The tiles are flat pastel with a 1 dp edge (`edge`) and no shadow. The dock keys and the search bar are white glass (72% white) with a soft shadow, because they float over the moving grid.
 
 ## Shapes
 
