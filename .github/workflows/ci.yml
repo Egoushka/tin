@@ -77,12 +77,15 @@ jobs:
       # Home's unit tests include the page 0 screenshots (HomeShotsTest): verifyRoborazziDebug runs them all and compares
       # the shots with the goldens in android/home/src/test/screenshots. A change that is meant to move pixels re-records
       # them (`:home:recordRoborazziDebug`) in the same PR.
+      - name: Are goldens committed
+        id: gold
+        run: ls android/home/src/test/screenshots/*.png >/dev/null 2>&1 || echo "missing=true" >> "$GITHUB_OUTPUT"
       - name: Record the goldens (bootstrap, while none are committed)
-        if: hashFiles('android/home/src/test/screenshots/*.png') == ''
+        if: steps.gold.outputs.missing == 'true'
         working-directory: android
         run: ./gradlew --no-daemon :home:recordRoborazziDebug
       - name: Upload the recorded goldens
-        if: hashFiles('android/home/src/test/screenshots/*.png') == ''
+        if: steps.gold.outputs.missing == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: home-goldens
