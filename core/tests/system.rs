@@ -772,7 +772,7 @@ fn policy_system_example_loads() {
     let s = Server::new(Box::new(Phone::default()), p);
     let tools: Vec<(String, Decision)> = s.system_tools().into_iter().map(|t| (t.name, t.decision)).collect();
     assert_eq!(tools.len(), 9);
-    assert_eq!(tools.iter().filter(|(_, d)| *d == Decision::Approval).map(|(n, _)| n.as_str()).collect::<Vec<_>>(), ["system__key", "system__tap_mark"]);
+    assert_eq!(tools.iter().filter(|(_, d)| *d == Decision::Approval).map(|(n, _)| n.as_str()).collect::<Vec<_>>(), ["system__tap_mark", "system__key"]);
 }
 
 #[test]
