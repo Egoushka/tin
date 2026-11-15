@@ -15,6 +15,8 @@ class AlarmSource(private val context: Context) {
     private val _next = MutableStateFlow<Long?>(read())
     val next: StateFlow<Long?> = _next
 
+    internal fun seed(next: Long?) { _next.value = next }
+
     private var started = false
 
     private val receiver = object : BroadcastReceiver() {

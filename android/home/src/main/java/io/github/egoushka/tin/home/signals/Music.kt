@@ -41,6 +41,8 @@ class MusicSource(private val context: Context) {
     private val _state = MutableStateFlow<MusicState?>(null)
     val state: StateFlow<MusicState?> = _state
 
+    internal fun seed(state: MusicState?) { _state.value = state }
+
     private var controller: MediaController? = null
     private var buds: Buds? = null
     private var started = false

@@ -25,6 +25,8 @@ class CalendarSource(private val context: Context) {
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state
 
+    internal fun seed(state: State) { _state.value = state }
+
     private var scope: CoroutineScope? = null
     private var observing = false
 

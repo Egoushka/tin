@@ -79,6 +79,7 @@ import io.github.egoushka.tin.home.gestures.Gesture
 import io.github.egoushka.tin.home.gestures.GestureEffects
 import io.github.egoushka.tin.home.gestures.GestureMap
 import io.github.egoushka.tin.home.gestures.GestureStore
+import io.github.egoushka.tin.home.layer.LocalNow
 import io.github.egoushka.tin.home.layout.ownsSwipeUp
 import io.github.egoushka.tin.home.signals.Agenda
 import io.github.egoushka.tin.home.R
@@ -435,12 +436,13 @@ private fun Home(
 }
 
 @Composable
-private fun Glance(weather: WeatherSource, tune: Tune, modifier: Modifier = Modifier, actions: Actions, routes: GlanceRoutes) {
+internal fun Glance(weather: WeatherSource, tune: Tune, modifier: Modifier = Modifier, actions: Actions, routes: GlanceRoutes) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
-    val now by produceState(System.currentTimeMillis()) {
+    val clock = LocalNow.current
+    val now by produceState(clock()) {
         while (true) {
-            value = System.currentTimeMillis()
+            value = clock()
             delay(60_000 - value % 60_000) // wake on the minute
         }
     }

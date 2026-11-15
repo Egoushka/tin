@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("io.github.takahirom.roborazzi")
 }
 
 // versionCode is the commit count, so every commit on main is an in-place update; versionName carries it and the
@@ -117,6 +118,9 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     testImplementation("org.robolectric:robolectric:4.17")
     testImplementation("androidx.compose.ui:ui-test-junit4")
+    // Page 0 screenshots against goldens in src/test/screenshots (HomeShotsTest); `:home:verifyRoborazziDebug` compares them.
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.79.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.79.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     // On an emulator or the phone: `:home:connectedCheck` (docs/specs/2026-11-04-home-on-kvaesitso.md, the EMU checks).

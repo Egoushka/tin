@@ -23,6 +23,8 @@ class HomelabSource(private val baseUrl: String = BuildConfig.GATUS_URL) {
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state
 
+    internal fun seed(state: State) { _state.value = state }
+
     private var started = false
 
     fun start(scope: CoroutineScope) {

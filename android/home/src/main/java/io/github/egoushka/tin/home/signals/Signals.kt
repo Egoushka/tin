@@ -37,6 +37,9 @@ class Signals private constructor(context: Context) {
     companion object {
         @Volatile private var instance: Signals? = null
 
+        /** Sources that read nothing: tests seed their states and nothing observes the device. */
+        internal fun idle(context: Context): Signals = Signals(context)
+
         fun of(context: Context): Signals = instance ?: synchronized(this) {
             instance ?: Signals(context).also { it.start(); instance = it }
         }

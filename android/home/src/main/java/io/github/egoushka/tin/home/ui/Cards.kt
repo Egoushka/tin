@@ -330,7 +330,8 @@ fun AlarmCard(alarm: AlarmSource, actions: Actions) {
         inMin >= 60 -> stringResource(R.string.alarm_in_hm, inMin / 60, inMin % 60)
         else -> stringResource(R.string.alarm_in_min, inMin)
     }
-    val sameDay = java.time.Instant.ofEpochMilli(next).atZone(java.time.ZoneId.systemDefault()).toLocalDate() == java.time.LocalDate.now()
+    val zone = java.time.ZoneId.systemDefault()
+    val sameDay = java.time.Instant.ofEpochMilli(next).atZone(zone).toLocalDate() == java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     val at = if (sameDay) clock(context, next) else {
         val pattern = DateFormat.getBestDateTimePattern(locale, if (DateFormat.is24HourFormat(context)) "EEEHm" else "EEEjm")
         android.icu.text.SimpleDateFormat(pattern, locale).format(java.util.Date(next))
