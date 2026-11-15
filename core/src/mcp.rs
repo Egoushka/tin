@@ -510,18 +510,24 @@ impl Server {
 
     fn run(&self, tool: &Tool, args: &Value) -> Value {
         let start = Instant::now();
-        let outcome = match &tool.source {
-            Source::App(f) => self.backend.execute(&f.package, &f.id, &args.to_string()),
+        // The text of the answer, and the PNG (base64) a verb attached, if any.
+        let outcome: Result<(String, Option<String>), String> = match &tool.source {
+            Source::App(f) => self.backend.execute(&f.package, &f.id, &args.to_string()).map(|t| (t, None)),
             Source::System(v) => v.run(args, &|p, a| self.backend.shell(p, a)).map(|mut r| {
                 if v.name == "notifications" {
                     system::mask_notification_codes(&mut r, &self.policy.notifications.show_codes);
                 }
-                r.to_string()
+                let image = r.as_object_mut().and_then(|o| o.remove(system::IMAGE_KEY)).and_then(|v| v.as_str().map(str::to_string));
+                (r.to_string(), image)
             }),
         };
         eprintln!("tin: called {} ok={} {} ms", tool.name, outcome.is_ok(), start.elapsed().as_millis());
         match outcome {
-            Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
+            Ok((text, image)) => {
+                let mut content = vec![json!({ "type": "text", "text": text })];
+                content.extend(image.map(|data| json!({ "type": "image", "data": data, "mimeType": "image/png" })));
+                json!({ "content": content, "isError": false })
+            }
             Err(e) => tool_error(&e),
         }
     }

@@ -4,6 +4,7 @@
 pub mod backend;
 pub mod gate;
 pub mod macos;
+pub mod marks;
 pub mod mcp;
 pub mod metadata;
 pub mod policy;
