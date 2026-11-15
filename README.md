@@ -48,7 +48,8 @@ computer to call those same typed functions on my own phone, with a hard rule th
 - Serves system tools next to the AppFunctions, run as the shell user: `system__notifications` (banking apps' notifications are left out and counted; one-time codes in titles and text are masked as `[code]` and counted in `codes_masked`, per-app opt-out with `[notifications] show_codes`),
   `system__usage`,
   `system__foreground_app`, `system__screen_text` (a `uiautomator` dump, refused while a banking app is on screen),
-  `system__battery`, `system__connectivity`, and the write verbs `system__tap`, `swipe`, `type_text`, `key`, `launch`
+  `system__screen_marks` (a screenshot with numbered boxes over tappable things, a numbered grid when the tree is empty; same banking refusal),
+  `system__battery`, `system__connectivity`, and the write verbs `system__tap`, `tap_mark` (tap a numbered box), `swipe`, `type_text`, `key`, `launch`
   (refused for banking apps) and `settings_put`. Arguments are checked before anything runs.
 - Holds every call that changes state (any write verb, any AppFunction the policy does not mark `read_only`) until
   the phone's owner taps Run in the [approvals](https://github.com/Egoushka/approvals) app. The decision comes back

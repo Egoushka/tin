@@ -17,6 +17,10 @@ function = "foreground_app"
 package = "system"
 function = "screen_text"
 
+[[allow]]                     # a screenshot with numbered boxes, for apps whose screen_text is thin
+package = "system"
+function = "screen_marks"
+
 [[allow]]
 package = "system"
 function = "battery"
@@ -29,6 +33,10 @@ function = "connectivity"
 package = "system"
 function = "key"
 
+[[allow]]                     # taps a screen_marks box by number; held for approval
+package = "system"
+function = "tap_mark"
+
 [notifications]               # one-time codes in notifications are masked as [code]; list apps that may show them
 # show_codes = ["com.example.app"]
 
@@ -39,3 +47,10 @@ token_file = "/data/local/tmp/tin/approvals.token"   # the approvals source toke
 key_file = "/data/local/tmp/tin/approvals.key"       # APPROVAL_HMAC_KEY (at least 32 bytes), mode 600
 callback = "https://tin.phone.invalid/approvals/"    # must be a prefix in the server's APPROVALS_CALLBACK_ROUTES
 callback_listen = "<phone tailnet ip>:7382"
+
+# One OpenTelemetry span per tool call (name, policy decision, approval wait, outcome; never arguments or results) to an
+# OTLP/HTTP collector over the tailnet. Off without this table. A caller joins a trace by sending `traceparent` and
+# `x-run-id` headers, or `_meta.traceparent` and `_meta.run_id` in the call.
+# [telemetry]
+# otlp_url = "http://100.64.0.4:4318/v1/traces"
+# service_name = "tin"

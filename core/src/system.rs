@@ -2,6 +2,7 @@
 //! programs with argv (never a shell) and validates its arguments before anything runs. Read verbs parse `dumpsys` and
 //! `uiautomator` output into JSON; write verbs only ever run after an approvals tap (the policy forces it).
 
+use crate::marks;
 use crate::policy::MONEY_PACKAGES;
 use serde_json::{Map, Value, json};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -50,7 +51,7 @@ pub fn exec_plain(argv: &[String], _: &Value, shell: Shell) -> Result<Value, Str
     Ok(json!({ "ok": true, "output": out.trim() }))
 }
 
-pub const VERBS: &[Verb] = &[NOTIFICATIONS, USAGE, FOREGROUND_APP, SCREEN_TEXT, BATTERY, CONNECTIVITY, TAP, SWIPE, TYPE_TEXT, KEY, LAUNCH, SETTINGS_PUT];
+pub const VERBS: &[Verb] = &[NOTIFICATIONS, USAGE, FOREGROUND_APP, SCREEN_TEXT, SCREEN_MARKS, BATTERY, CONNECTIVITY, TAP, TAP_MARK, SWIPE, TYPE_TEXT, KEY, LAUNCH, SETTINGS_PUT];
 
 pub const INSTRUCTIONS: &str = "Android AppFunctions and system tools on this phone. Only what the phone's policy allows is listed. Read-only tools run at once; anything that changes state waits for a tap in the approvals app (call approval__wait with the ticket if the first wait runs out). Functions that move money are refused.";
 
@@ -63,6 +64,33 @@ pub fn verb(name: &str) -> Option<&'static Verb> {
 fn ui_dump_path() -> String {
     static CALLS: AtomicU64 = AtomicU64::new(0);
     format!("/data/local/tmp/tin/ui-{}-{}.xml", std::process::id(), CALLS.fetch_add(1, Ordering::Relaxed))
+}
+
+/// `uiautomator dump` XML of the screen now, through a dump file of this call's own that is removed after.
+fn read_ui_dump(shell: Shell) -> Result<String, String> {
+    let dump = ui_dump_path();
+    let read = (|| {
+        let out = sh(shell, &["uiautomator", "dump", &dump])?;
+        if !out.contains("dumped to") {
+            return Err(format!("uiautomator: {out}"));
+        }
+        sh(shell, &["cat", &dump])
+    })();
+    let _ = sh(shell, &["rm", "-f", &dump]);
+    read
+}
+
+/// A screenshot of the screen now as PNG bytes: `screencap` writes a file of this call's own, `base64` reads it back
+/// as text (the shell channel is text only), and the file is removed after.
+fn read_screenshot(shell: Shell) -> Result<Vec<u8>, String> {
+    static CALLS: AtomicU64 = AtomicU64::new(0);
+    let path = format!("/data/local/tmp/tin/shot-{}-{}.png", std::process::id(), CALLS.fetch_add(1, Ordering::Relaxed));
+    let read = (|| {
+        sh(shell, &["screencap", "-p", &path])?;
+        marks::base64_decode(&sh(shell, &["base64", "-w", "0", &path])?)
+    })();
+    let _ = sh(shell, &["rm", "-f", &path]);
+    read
 }
 
 const MAX_COORD: i64 = 10_000;
@@ -166,16 +194,7 @@ const SCREEN_TEXT: Verb = Verb {
             if let Some(fg) = parse_foreground(&sh(shell, &["dumpsys", "activity", "activities"])?) {
                 refuse_money(fg["package"].as_str().unwrap_or(""))?;
             }
-            let dump = ui_dump_path();
-            let read = (|| {
-                let out = sh(shell, &["uiautomator", "dump", &dump])?;
-                if !out.contains("dumped to") {
-                    return Err(format!("uiautomator: {out}"));
-                }
-                sh(shell, &["cat", &dump])
-            })();
-            let _ = sh(shell, &["rm", "-f", &dump]);
-            let screen = parse_ui(&read?)?;
+            let screen = parse_ui(&read_ui_dump(shell)?)?;
             for p in screen["packages"].as_array().into_iter().flatten() {
                 refuse_money(p.as_str().unwrap_or(""))?;
             }
@@ -183,6 +202,45 @@ const SCREEN_TEXT: Verb = Verb {
         },
     },
 };
+
+const SCREEN_MARKS: Verb = Verb {
+    name: "screen_marks",
+    read_only: true,
+    description: "A screenshot with numbered boxes over the tappable things, for apps whose screen_text is empty or thin (games, canvases): a clickable view gets a box, and a screen with fewer than three gets a numbered 4 x 8 grid (`sparse`). Returns the image and each mark's number, bounds, centre and label; tap one with system__tap_mark using the returned `marks_id`. Refused while a banking app is in front.",
+    schema: || object(json!({}), &[]),
+    action: Action::Read {
+        run: |_, shell| {
+            if let Some(fg) = parse_foreground(&sh(shell, &["dumpsys", "activity", "activities"])?) {
+                refuse_money(fg["package"].as_str().unwrap_or(""))?;
+            }
+            let parsed = marks::parse_marks(&read_ui_dump(shell)?)?;
+            for p in &parsed.packages {
+                refuse_money(p)?;
+            }
+            let shot = read_screenshot(shell)?;
+            let (width, height) = marks::png_size(&shot)?;
+            let mut list = parsed.marks;
+            let sparse = marks::is_sparse(&list);
+            if sparse {
+                marks::add_grid(&mut list, width as i64, height as i64);
+            }
+            let (image, _) = marks::render(&shot, &list)?;
+            let package = parsed.package.unwrap_or_default();
+            let id = marks::remember(&package, &list);
+            Ok(json!({
+                "marks_id": id,
+                "package": package,
+                "sparse": sparse,
+                "screen": { "width": width, "height": height },
+                "marks": list.iter().map(marks::Mark::to_json).collect::<Vec<_>>(),
+                IMAGE_KEY: marks::base64_encode(&image),
+            }))
+        },
+    },
+};
+
+/// A read verb's result carries its picture under this key; the server moves it into an MCP image item.
+pub const IMAGE_KEY: &str = "_image_png_base64";
 
 const BATTERY: Verb = Verb {
     name: "battery",
@@ -220,6 +278,45 @@ const TAP: Verb = Verb {
         argv: |args| Ok(argv_of(&["input", "tap", &coord(args, "x")?, &coord(args, "y")?])),
         describe: |args, _| format!("tap at ({}, {})", arg_text(args, "x"), arg_text(args, "y")),
         exec: exec_plain,
+    },
+};
+
+fn uint(args: &Value, k: &str) -> Result<u64, String> {
+    args.get(k).and_then(Value::as_u64).ok_or_else(|| format!("{k}: a positive integer is required"))
+}
+
+const TAP_MARK: Verb = Verb {
+    name: "tap_mark",
+    read_only: false,
+    description: "Tap the centre of a numbered mark from system__screen_marks. Needs that call's `marks_id`; refused when the app in front changed since.",
+    schema: || {
+        object(
+            json!({ "marks_id": { "type": "integer", "minimum": 1, "description": "from system__screen_marks" }, "mark": { "type": "integer", "minimum": 1, "maximum": 200, "description": "the box number on the image" } }),
+            &["marks_id", "mark"],
+        )
+    },
+    action: Action::Write {
+        argv: |args| {
+            let (m, _) = marks::lookup(uint(args, "marks_id")?, uint(args, "mark")?)?;
+            let (x, y) = m.center();
+            Ok(argv_of(&["input", "tap", &x.to_string(), &y.to_string()]))
+        },
+        describe: |args, _| match marks::lookup(uint(args, "marks_id").unwrap_or(0), uint(args, "mark").unwrap_or(0)) {
+            Ok((m, package)) => {
+                let (x, y) = m.center();
+                let label = m.label.map(|l| format!(" \"{}\"", clip(&l, 40))).unwrap_or_default();
+                format!("tap mark {}{label} at ({x}, {y}) in {package}", m.n)
+            }
+            Err(_) => format!("tap mark {}", arg_text(args, "mark")),
+        },
+        exec: |argv, args, shell| {
+            let (_, package) = marks::lookup(uint(args, "marks_id")?, uint(args, "mark")?)?;
+            let now = parse_foreground(&sh(shell, &["dumpsys", "activity", "activities"])?).and_then(|f| f["package"].as_str().map(str::to_string));
+            if now.as_deref() != Some(package.as_str()) {
+                return Err(format!("refused: the screen is no longer {package}; call system__screen_marks again"));
+            }
+            exec_plain(argv, args, shell)
+        },
     },
 };
 
