@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -42,14 +43,20 @@ data class CardLight(val kind: LightKind = LightKind.Calm, val stale: Boolean = 
 
 private val CardShape = RoundedCornerShape(Dimen.radiusCard)
 
+/** Where the cards and the glance read the time; screenshot tests provide a fixed clock. */
+val LocalNow = staticCompositionLocalOf<() -> Long> { System::currentTimeMillis }
+
 /** The wall clock, advancing every 30 s so ages and "in 18 min" stay true without a per-card timer. */
 @Composable
-fun rememberNow(): Long = produceState(System.currentTimeMillis()) {
-    while (true) {
-        delay(30_000)
-        value = System.currentTimeMillis()
-    }
-}.value
+fun rememberNow(): Long {
+    val clock = LocalNow.current
+    return produceState(clock()) {
+        while (true) {
+            delay(30_000)
+            value = clock()
+        }
+    }.value
+}
 
 @Composable
 fun ageText(age: Age): String = when (age.unit) {

@@ -74,9 +74,30 @@ jobs:
       - name: Build the tin app
         run: ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}" BUILD_TYPE="${{ steps.key.outputs.signed == 'true' && 'release' || 'debug' }}" scripts/build.sh
       # Home's release build is where its real voice engine is wired; debug keeps the scripted one.
+      # Home's unit tests include the page 0 screenshots (HomeShotsTest): verifyRoborazziDebug runs them all and compares
+      # the shots with the goldens in android/home/src/test/screenshots. A change that is meant to move pixels re-records
+      # them (`:home:recordRoborazziDebug`) in the same PR.
+      - name: Record the goldens (bootstrap, while none are committed)
+        if: hashFiles('android/home/src/test/screenshots/*.png') == ''
+        working-directory: android
+        run: ./gradlew --no-daemon :home:recordRoborazziDebug
+      - name: Upload the recorded goldens
+        if: hashFiles('android/home/src/test/screenshots/*.png') == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: home-goldens
+          path: android/home/src/test/screenshots
+          if-no-files-found: error
       - name: Module tests and Home release build
         working-directory: android
-        run: ./gradlew --no-daemon :speech:testDebugUnitTest :home:testDebugUnitTest :home:assembleRelease
+        run: ./gradlew --no-daemon :speech:testDebugUnitTest :home:verifyRoborazziDebug :home:assembleRelease
+      - name: Upload the screenshot diffs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: home-screenshot-diffs
+          path: android/home/build/outputs/roborazzi
+          if-no-files-found: ignore
       # Home on the Kvaesitso engine: the vendored tree, the licence split, and the APK size and code size it started at.
       - name: Home engine checks
         run: scripts/home-release-check.sh --measure

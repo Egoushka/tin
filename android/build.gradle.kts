@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.20" apply false
     id("com.android.library") version "9.4.1" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.4.20" apply false
+    id("io.github.takahirom.roborazzi") version "1.79.0" apply false
 }
 
 // One release key for tin and Home: VoiceService's permission is signature-level, so both APKs must share a signer.

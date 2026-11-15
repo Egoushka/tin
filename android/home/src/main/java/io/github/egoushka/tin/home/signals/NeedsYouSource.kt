@@ -27,6 +27,9 @@ class NeedsYouSource(private val context: Context, private val authority: String
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state
 
+    /** Screenshot tests show a fixed state without a provider. */
+    internal fun seed(state: State) { _state.value = state }
+
     private var scope: CoroutineScope? = null
     private val base = Uri.parse("content://$authority")
 
