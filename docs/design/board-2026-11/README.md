@@ -26,3 +26,20 @@ Yehor asked for a new direction for Home, so this board comes before any code. I
 | 12 | Night glass | The current approved design | Frosted cards in a dark room; light means attention |
 
 The board uses Google Fonts, and the tile builders noted where a face may have fallen back. The phone would bundle whatever the chosen direction needs.
+
+## Round 2: between Bento and Day river
+
+Yehor's verdict on round 1 (2026-11-15): he liked 05 Bento and 11 Day river, "but they still was not quite what i want". Round 2 has six tiles. Each one tests a single idea of what is missing between those two. Its brief is [round-2/BRIEF.md](round-2/BRIEF.md).
+
+![b1 Bento by time, b2 Warm dark river, b3 Now / Next / Later](round-2/row-b1.png)
+
+![b4 Horizontal day, b5 Living bento at 10:12 and 12:30, b6 Bento at night](round-2/row-b4.png)
+
+| # | Idea it tests |
+|---|---|
+| b1 | Bento laid out by time: pastel tiles hang off a slim time axis, sized by importance |
+| b2 | River, but warmer: a dark axis with soft per-kind pastel tints and big radii |
+| b3 | River compressed into Now, Next and Later bands of bento tiles; no literal axis |
+| b4 | A horizontal day strip under the clock, with a compact bento below it |
+| b5 | Living bento: tile sizes follow the hour, and at 12:30 "Leave now · 6 min" takes over |
+| b6 | Bento in a dark room: frosted tiles with pastel accents and a "next 6 hours" ribbon |
