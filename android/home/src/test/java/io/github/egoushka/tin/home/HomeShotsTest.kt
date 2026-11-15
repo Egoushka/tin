@@ -91,16 +91,16 @@ class HomeShotsTest {
         dir.deleteRecursively()
     }
 
-    @Config(sdk = [36], qualifiers = "w412dp-h914dp-420dpi-notnight")
+    @Config(sdk = [36], qualifiers = "w412dp-h914dp-notnight-420dpi")
     @Test fun at1012Light() = shoot(10, 12, "light")
 
-    @Config(sdk = [36], qualifiers = "w412dp-h914dp-420dpi-night")
+    @Config(sdk = [36], qualifiers = "w412dp-h914dp-night-420dpi")
     @Test fun at1012Dark() = shoot(10, 12, "dark")
 
-    @Config(sdk = [36], qualifiers = "w412dp-h914dp-420dpi-notnight")
+    @Config(sdk = [36], qualifiers = "w412dp-h914dp-notnight-420dpi")
     @Test fun at1205Light() = shoot(12, 5, "light")
 
-    @Config(sdk = [36], qualifiers = "w412dp-h914dp-420dpi-night")
+    @Config(sdk = [36], qualifiers = "w412dp-h914dp-night-420dpi")
     @Test fun at1205Dark() = shoot(12, 5, "dark")
 
     private fun fixture(now: Long): Signals {
