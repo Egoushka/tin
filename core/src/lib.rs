@@ -4,10 +4,12 @@
 pub mod backend;
 pub mod gate;
 pub mod macos;
+pub mod marks;
 pub mod mcp;
 pub mod metadata;
 pub mod policy;
 pub mod redact;
 pub mod system;
+pub mod telemetry;
 pub mod speech;
 pub mod transport;
