@@ -5,6 +5,7 @@ use crate::gate::{Gate, Outcome};
 use crate::metadata::Function;
 use crate::policy::{Decision, Policy, SYSTEM, Subject};
 use crate::system::{self, Verb};
+use crate::telemetry::{self, Span, SpanSink};
 use crate::speech::{self, Speech};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -73,6 +74,16 @@ pub struct Server {
     tools: RwLock<HashMap<String, Tool>>,
     speech: Option<Speech>,
     policy_source: Option<PolicySource>,
+    telemetry: Option<Arc<dyn SpanSink>>,
+}
+
+/// What one call tells its span: how the policy ruled, whether it waited for a tap, how it ended.
+#[derive(Default)]
+struct CallNote {
+    decision: &'static str,
+    ticket: Option<String>,
+    wait: Option<(u64, u64)>,
+    outcome: Option<&'static str>,
 }
 
 /// `<last two package segments>__<method>`, limited to `[A-Za-z0-9_-]` and 64 characters (what MCP clients accept).
@@ -107,7 +118,7 @@ pub fn name_all(functions: Vec<Function>) -> Vec<(String, Function)> {
 impl Server {
     pub fn new(backend: Box<dyn Backend>, policy: Policy) -> Self {
         let speech = policy.speech.enabled.then(|| Speech::new(speech::SOCKET));
-        Self { backend, policy, gate: None, gate_off: None, tools: RwLock::new(HashMap::new()), speech, policy_source: None }
+        Self { backend, policy, gate: None, gate_off: None, tools: RwLock::new(HashMap::new()), speech, policy_source: None, telemetry: None }
     }
 
     /// Points the speech tools at another socket (tests); does not enable them.
@@ -115,6 +126,12 @@ impl Server {
         if self.speech.is_some() {
             self.speech = Some(Speech::new(socket));
         }
+        self
+    }
+
+    /// Every tool call emits a span to `sink` (see `telemetry`).
+    pub fn with_telemetry(mut self, sink: Arc<dyn SpanSink>) -> Self {
+        self.telemetry = Some(sink);
         self
     }
 
@@ -246,8 +263,48 @@ impl Server {
     }
 
     fn call_tool(&self, params: &Value) -> Value {
+        let Some(sink) = &self.telemetry else { return self.call_inner(params, &mut CallNote::default()) };
+        let start = telemetry::now_ns();
+        let mut note = CallNote::default();
+        let result = self.call_inner(params, &mut note);
+        let end = telemetry::now_ns();
+        let meta = params.get("_meta");
+        let meta_str = |k: &str| meta.and_then(|m| m.get(k)).and_then(Value::as_str);
+        let (trace_id, parent_id) = match meta_str("traceparent").and_then(telemetry::parse_traceparent) {
+            Some((t, p)) => (t, Some(p)),
+            None => (telemetry::new_id(32), None),
+        };
+        let name = params.get("name").and_then(Value::as_str).unwrap_or("");
+        let error = result["isError"] == true;
+        let pending = result["structuredContent"]["status"] == "pending";
+        let outcome = note.outcome.unwrap_or(if error { "error" } else if pending { "pending" } else { "ok" });
+        let span_id = telemetry::new_id(16);
+        let mut attrs = vec![
+            ("tin.tool".to_string(), name.chars().take(80).collect::<String>()),
+            ("tin.policy.decision".into(), note.decision.into()),
+            ("tin.outcome".into(), outcome.into()),
+        ];
+        if let Some(t) = &note.ticket {
+            attrs.push(("tin.ticket".into(), t.clone()));
+        }
+        if let Some(r) = meta_str("run_id").filter(|r| !r.is_empty()) {
+            attrs.push(("jarvis.run_id".into(), r.chars().take(128).collect()));
+        }
+        if let Some((a, b)) = note.wait {
+            let mut wait_attrs = Vec::new();
+            if let Some(t) = &note.ticket {
+                wait_attrs.push(("tin.ticket".to_string(), t.clone()));
+            }
+            sink.emit(Span { trace_id: trace_id.clone(), span_id: telemetry::new_id(16), parent_id: Some(span_id.clone()), name: "tin.approval.wait".into(), start_ns: a, end_ns: b, attrs: wait_attrs, error: false });
+        }
+        sink.emit(Span { trace_id, span_id, parent_id, name: "tin.tool_call".into(), start_ns: start, end_ns: end, attrs, error });
+        result
+    }
+
+    fn call_inner(&self, params: &Value, note: &mut CallNote) -> Value {
         let name = params.get("name").and_then(Value::as_str).unwrap_or("");
         let args = params.get("arguments").cloned().unwrap_or(json!({}));
+        note.decision = "builtin";
         if let Some(speech) = &self.speech
             && Speech::handles(name)
         {
@@ -265,7 +322,7 @@ impl Server {
         }
         if name == WAIT_TOOL {
             return match (&self.gate, args.get("ticket").and_then(Value::as_str)) {
-                (Some(gate), Some(ticket)) => self.settle(gate, ticket, false),
+                (Some(gate), Some(ticket)) => self.settle(gate, ticket, false, note),
                 (None, _) => tool_error("no approvals server is configured, so nothing is ever held"),
                 (_, None) => tool_error("ticket: a string is required"),
             };
@@ -277,7 +334,14 @@ impl Server {
             }
         }
         let Some(tool) = self.tools.read().unwrap().get(name).cloned() else {
+            note.decision = "unknown";
             return tool_error(&format!("unknown or not allowed tool: {name}"));
+        };
+        note.decision = match tool.decision {
+            Decision::Allow => "allow",
+            Decision::Approval => "approval",
+            Decision::Refuse => "refuse",
+            Decision::Deny => "unknown",
         };
         match tool.decision {
             Decision::Allow => self.run(&tool, &args),
@@ -305,7 +369,7 @@ impl Server {
                     Source::App(f) => (format!("tin: {} in {}", f.method(), f.package), args.to_string()),
                 };
                 match gate.hold(name, &args, &title, &summary) {
-                    Ok(held) => self.settle(gate, &held.ticket, held.existing),
+                    Ok(held) => self.settle(gate, &held.ticket, held.existing, note),
                     Err(e) => tool_error(&format!("could not ask for approval: {e}")),
                 }
             }
@@ -314,8 +378,18 @@ impl Server {
 
     /// Waits on a ticket and turns the outcome into a tool result, running the call if it was approved. `repeat` marks
     /// a call that found its ticket already pending.
-    fn settle(&self, gate: &Gate, ticket: &str, repeat: bool) -> Value {
-        match gate.wait(ticket) {
+    fn settle(&self, gate: &Gate, ticket: &str, repeat: bool, note: &mut CallNote) -> Value {
+        note.ticket = Some(ticket.to_string());
+        let waited = telemetry::now_ns();
+        let outcome = gate.wait(ticket);
+        note.wait = Some((waited, telemetry::now_ns()));
+        note.outcome = match &outcome {
+            Outcome::Pending => Some("pending"),
+            Outcome::Denied(_) => Some("denied"),
+            Outcome::Expired => Some("expired"),
+            _ => None,
+        };
+        match outcome {
             Outcome::Run { tool, args } => {
                 let result = match self.tools.read().unwrap().get(&tool).cloned() {
                     Some(t) if t.decision == Decision::Approval => self.run(&t, &args),

@@ -41,7 +41,14 @@ fn main() {
     let result = match args.first().map(String::as_str) {
         Some("serve") => load_policy(&policy_path).and_then(|(policy, source)| {
             let approvals = policy.approvals.clone();
+            let telemetry = policy.telemetry.clone();
             let mut server = Server::new(backend()?, policy).with_policy_source(source);
+            if let Some(t) = &telemetry {
+                match tin_core::telemetry::OtlpSink::new(&t.otlp_url, &t.service_name) {
+                    Ok(sink) => server = server.with_telemetry(Arc::new(sink)),
+                    Err(e) => eprintln!("tin: telemetry is off: {e}"),
+                }
+            }
             let mut gate_on = false;
             if let Some(a) = &approvals {
                 match tin_core::gate::build(a)? {

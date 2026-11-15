@@ -9,5 +9,6 @@ pub mod metadata;
 pub mod policy;
 pub mod redact;
 pub mod system;
+pub mod telemetry;
 pub mod speech;
 pub mod transport;
