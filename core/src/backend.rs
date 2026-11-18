@@ -63,7 +63,26 @@ pub const RUN_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Runs `program` with argv, no shell. `Ok` is stdout; a non-zero exit is `Err` with stderr (or stdout).
 pub fn run_argv(program: &str, args: &[String]) -> Result<String, String> {
-    run_argv_timeout(program, args, RUN_TIMEOUT)
+    run_argv_timeout(program, args, run_limit())
+}
+
+fn run_limit() -> Duration {
+    #[cfg(test)]
+    if let Some(d) = test_seam::RUN_LIMIT.with(|c| c.get()) {
+        return d;
+    }
+    RUN_TIMEOUT
+}
+
+/// Per-thread overrides so a test can shorten the limits and point `CmdBackend` at a fake `cmd`.
+#[cfg(test)]
+mod test_seam {
+    use std::{cell::{Cell, RefCell}, time::Duration};
+    thread_local! {
+        pub static RUN_LIMIT: Cell<Option<Duration>> = const { Cell::new(None) };
+        pub static CMD_MARGIN: Cell<Option<Duration>> = const { Cell::new(None) };
+        pub static CMD_PROGRAM: RefCell<Option<String>> = const { RefCell::new(None) };
+    }
 }
 
 /// `run_argv` with a limit: a program still running after `timeout` is killed and the call fails.
@@ -91,11 +110,23 @@ pub struct CmdBackend {
 impl CmdBackend {
     /// The process limit: the forwarded `--timeout-duration` plus a margin for `cmd` itself to report its own timeout.
     fn limit(&self) -> Duration {
-        Duration::from_secs(u64::from(self.timeout_secs) + 5)
+        #[allow(unused_mut)]
+        let mut margin = Duration::from_secs(5);
+        #[cfg(test)]
+        if let Some(m) = test_seam::CMD_MARGIN.with(|c| c.get()) {
+            margin = m;
+        }
+        Duration::from_secs(u64::from(self.timeout_secs)) + margin
     }
 
     fn run(args: &[&str], timeout: Duration) -> Result<String, String> {
-        let mut cmd = Command::new("cmd");
+        #[allow(unused_mut)]
+        let mut program = "cmd".to_string();
+        #[cfg(test)]
+        if let Some(p) = test_seam::CMD_PROGRAM.with(|c| c.borrow().clone()) {
+            program = p;
+        }
+        let mut cmd = Command::new(program);
         cmd.arg("app_function").args(args);
         let out = run_output(cmd, timeout).map_err(|e| spawn_or_timeout("cmd", e))?;
         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -157,5 +188,31 @@ mod tests {
     #[test]
     fn stdin_is_closed() {
         assert_eq!(run_argv_timeout("cat", &[], Duration::from_secs(5)).unwrap(), "");
+    }
+
+    #[test]
+    fn run_argv_uses_the_default_limit() {
+        test_seam::RUN_LIMIT.with(|c| c.set(Some(Duration::from_millis(300))));
+        let started = std::time::Instant::now();
+        let err = run_argv("sleep", &["10".into()]).unwrap_err();
+        assert_eq!(err, "sleep timed out after 0 s");
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn cmd_backend_kills_a_hung_cmd_at_its_limit() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("tin-fake-cmd-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let fake = dir.join("cmd");
+        std::fs::write(&fake, "#!/bin/sh\nexec sleep 10\n").unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        test_seam::CMD_PROGRAM.with(|c| *c.borrow_mut() = Some(fake.display().to_string()));
+        test_seam::CMD_MARGIN.with(|c| c.set(Some(Duration::from_millis(300))));
+        let started = std::time::Instant::now();
+        let err = CmdBackend { timeout_secs: 0 }.list().unwrap_err();
+        assert!(err.ends_with("timed out after 0 s"), "{err}");
+        assert!(started.elapsed() < Duration::from_secs(5));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
