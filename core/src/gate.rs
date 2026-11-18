@@ -298,6 +298,11 @@ impl Gate {
 
     /// The callback route: a signed decision from the approvals server. Returns the HTTP status and JSON body.
     pub fn decide(&self, body: &[u8]) -> (u16, Value) {
+        self.decide_at(body, SystemTime::now())
+    }
+
+    /// `decide` with the clock passed in, so a test can stand on either side of the ttl.
+    fn decide_at(&self, body: &[u8], now: SystemTime) -> (u16, Value) {
         let answer = |code: u16, ok: bool, message: &str| (code, json!({ "ok": ok, "message": message }));
         let Ok(d) = serde_json::from_slice::<Value>(body) else { return answer(400, false, "not JSON") };
         let field = |k: &str| d.get(k).and_then(Value::as_str).unwrap_or("");
@@ -308,6 +313,12 @@ impl Gate {
         if !verify(&self.key, decision, id, action, at, d.get("edited").unwrap_or(&Value::Null), sig) {
             eprintln!("tin: decision for {id} with a bad signature");
             return answer(401, false, "bad signature");
+        }
+        // The signature covers `at`, so a decision collected long ago cannot be given a fresh stamp.
+        match parse_rfc3339(at) {
+            Some(stamp) if now.duration_since(stamp).map_or(true, |age| age <= self.cfg.ttl) => {}
+            Some(_) => return answer(410, false, "decision is older than the ticket's lifetime"),
+            None => return answer(400, false, "at is not a timestamp"),
         }
         self.sweep();
         let mut tickets = self.tickets.lock().unwrap();
@@ -423,4 +434,109 @@ pub fn rfc3339(t: SystemTime) -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = yoe + era * 400 + i64::from(m <= 2);
     format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", rem / 3600, rem % 3600 / 60, rem % 60)
+}
+
+/// The inverse of `rfc3339`: `2026-11-01T12:00:00Z`, with optional fractional seconds. UTC only.
+fn parse_rfc3339(s: &str) -> Option<SystemTime> {
+    let b = s.as_bytes();
+    let num = |r: std::ops::Range<usize>| -> Option<i64> {
+        let part = s.get(r)?;
+        part.bytes().all(|c| c.is_ascii_digit()).then(|| part.parse().ok())?
+    };
+    if b.len() < 20 || b[4] != b'-' || b[7] != b'-' || b[10] != b'T' || b[13] != b':' || b[16] != b':' || *b.last()? != b'Z' {
+        return None;
+    }
+    let (y, m, d, hh, mm, ss) = (num(0..4)?, num(5..7)?, num(8..10)?, num(11..13)?, num(14..16)?, num(17..19)?);
+    let frac = &s[19..s.len() - 1];
+    if !(frac.is_empty() || (frac.starts_with('.') && frac.len() > 1 && frac[1..].bytes().all(|c| c.is_ascii_digit()))) {
+        return None;
+    }
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) || hh > 23 || mm > 59 || ss > 60 {
+        return None;
+    }
+    // Howard Hinnant's days_from_civil.
+    let y = y - i64::from(m <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    let secs = u64::try_from(days * 86_400 + hh * 3600 + mm * 60 + ss).ok()?;
+    let nanos: u32 = if frac.len() > 1 { format!("{:0<9}", &frac[1..frac.len().min(10)]).parse().ok()? } else { 0 };
+    Some(UNIX_EPOCH + Duration::new(secs, nanos))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const KEY: &[u8] = b"0123456789abcdef0123456789abcdef";
+    const TTL: Duration = Duration::from_secs(60);
+
+    struct Nobody;
+    impl Approver for Nobody {
+        fn put(&self, _: &str, _: &Value) -> Result<(), String> {
+            Ok(())
+        }
+        fn delete(&self, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    fn body(id: &str, at: &str) -> Vec<u8> {
+        let sig = sign(KEY, "d1", id, "run", at, &json!({}));
+        json!({ "decision": "d1", "id": id, "action": "run", "edited": {}, "at": at, "sig": sig }).to_string().into_bytes()
+    }
+
+    /// A gate holding one ticket, and the clock to decide it at: `age` after the stamp `at` was made.
+    fn decide_aged(age: Duration) -> u16 {
+        let cfg = GateConfig { source: "tin".into(), callback: "/cb".into(), wait: Duration::from_millis(10), ttl: TTL };
+        let gate = Gate::new(Box::new(Nobody), KEY, cfg);
+        let id = gate.hold("t", &json!({}), "t", "s").unwrap().ticket;
+        let stamped = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        gate.decide_at(&body(&id, &format!("{}.250Z", &rfc3339(stamped)[..19])), stamped + Duration::from_millis(250) + age).0
+    }
+
+    #[test]
+    fn a_decision_exactly_one_ttl_old_still_runs() {
+        assert_eq!(decide_aged(TTL), 200);
+    }
+
+    #[test]
+    fn a_decision_older_than_the_ttl_is_refused() {
+        assert_eq!(decide_aged(TTL + Duration::from_millis(1)), 410);
+    }
+
+    #[test]
+    fn a_fresh_decision_runs() {
+        assert_eq!(decide_aged(Duration::ZERO), 200);
+    }
+
+    #[test]
+    fn a_stale_refusal_leaves_the_ticket_pending() {
+        let cfg = GateConfig { source: "tin".into(), callback: "/cb".into(), wait: Duration::from_millis(10), ttl: TTL };
+        let gate = Gate::new(Box::new(Nobody), KEY, cfg);
+        let id = gate.hold("t", &json!({}), "t", "s").unwrap().ticket;
+        let at = "2026-11-01T12:00:00.000Z";
+        assert_eq!(gate.decide(&body(&id, at)).0, 410);
+        assert_eq!(gate.decide_at(&body(&id, at), parse_rfc3339(at).unwrap()).0, 200);
+    }
+
+    #[test]
+    fn an_unparseable_at_is_refused() {
+        let cfg = GateConfig { source: "tin".into(), callback: "/cb".into(), wait: Duration::from_millis(10), ttl: TTL };
+        let gate = Gate::new(Box::new(Nobody), KEY, cfg);
+        let id = gate.hold("t", &json!({}), "t", "s").unwrap().ticket;
+        assert_eq!(gate.decide(&body(&id, "yesterday")).0, 400);
+    }
+
+    #[test]
+    fn parse_is_the_inverse_of_rfc3339() {
+        for secs in [0, 951_782_400, 1_762_000_000, 1_800_000_000] {
+            let t = UNIX_EPOCH + Duration::from_secs(secs);
+            assert_eq!(parse_rfc3339(&rfc3339(t)), Some(t));
+        }
+        assert_eq!(parse_rfc3339("2026-11-01T12:00:00.5Z"), parse_rfc3339("2026-11-01T12:00:00Z").map(|t| t + Duration::from_millis(500)));
+        assert_eq!(parse_rfc3339("2026-11-01T12:00:00+02:00"), None);
+    }
 }

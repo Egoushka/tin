@@ -113,7 +113,7 @@ fn t4_held_call_has_an_approval_wait_child() {
     let s2 = s.clone();
     let caller = std::thread::spawn(move || call_meta(&s2, "system__tap", json!({ "x": 1, "y": 2 }), json!({ "run_id": "r1" })));
     let id = inbox.nth(0)["id"].as_str().unwrap().to_string();
-    let body = common::signed_at(&id, "run", "2026-11-01T12:00:00.000Z");
+    let body = common::signed_at(&id, "run", &common::now_stamp());
     s.gate().unwrap().decide(&body);
     caller.join().unwrap();
     let spans = rec.spans();

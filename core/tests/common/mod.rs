@@ -61,6 +61,13 @@ pub fn text(result: &Value) -> &str {
     result["content"][0]["text"].as_str().unwrap()
 }
 
+/// The server's timestamp format for the current moment, so a decision is never older than a ticket's ttl.
+pub fn now_stamp() -> String {
+    let now = std::time::SystemTime::now();
+    let ms = now.duration_since(std::time::UNIX_EPOCH).unwrap().subsec_millis();
+    format!("{}.{ms:03}Z", &gate::rfc3339(now)[..19])
+}
+
 /// A correctly signed decision body for item `id`, stamped `at`.
 pub fn signed_at(id: &str, action: &str, at: &str) -> Vec<u8> {
     let decision = "01JB0000000000000000000009";

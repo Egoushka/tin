@@ -72,7 +72,7 @@ fn gated(wait: Duration, ttl: Duration) -> (Arc<Server>, Phone, Inbox) {
 }
 
 fn signed(id: &str, action: &str) -> Vec<u8> {
-    common::signed_at(id, action, "2026-11-01T12:00:00.000Z")
+    common::signed_at(id, action, &common::now_stamp())
 }
 
 fn ungated(policy: &str, phone: Phone) -> Server {
