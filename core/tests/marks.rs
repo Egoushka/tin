@@ -214,7 +214,7 @@ fn k7_tap_mark_taps_the_marks_centre_after_approval() {
     let title = inbox.nth(0)["title"].as_str().unwrap().to_string();
     assert!(title.contains("mark 2") && title.contains("Settings") && title.contains("(800, 300)"), "{title}");
     assert!(!phone.ran("input"), "nothing runs before the tap");
-    s.gate().unwrap().decide(&common::signed_at(&item, "run", "2026-11-01T12:00:00.000Z"));
+    s.gate().unwrap().decide(&common::signed_at(&item, "run", &common::now_stamp()));
     let r = caller.join().unwrap();
     assert_eq!(r["isError"], false, "{r}");
     assert_eq!(phone.calls_of("input"), [vec!["input", "tap", "800", "300"]]);
@@ -242,7 +242,7 @@ fn k9_tap_mark_refuses_when_the_app_changed() {
     let id = marks_json(&call(&s, "system__screen_marks", json!({})))["marks_id"].clone();
     let (item, caller) = common::held(&s, &inbox, "system__tap_mark", json!({ "marks_id": id, "mark": 1 }));
     *phone.package.lock().unwrap() = "com.other";
-    s.gate().unwrap().decide(&common::signed_at(&item, "run", "2026-11-01T12:00:00.000Z"));
+    s.gate().unwrap().decide(&common::signed_at(&item, "run", &common::now_stamp()));
     let r = caller.join().unwrap();
     assert_eq!(r["isError"], true);
     assert!(!phone.ran("input"));
