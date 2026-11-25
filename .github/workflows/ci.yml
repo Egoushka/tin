@@ -11,6 +11,7 @@ permissions:
 # GitHub-hosted by default; set the repo variable CI_RUNS_ON=self-hosted to use the box's runner (it needs rustup).
 jobs:
   core:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork || github.event.pull_request.user.type == 'Bot'
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
     defaults:
       run:
@@ -25,6 +26,7 @@ jobs:
       - run: cargo clippy --all-targets --locked -- -D warnings
 
   android:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork || github.event.pull_request.user.type == 'Bot'
     runs-on: ubuntu-latest
     outputs:
       signed: ${{ steps.key.outputs.signed }}
@@ -136,6 +138,7 @@ jobs:
 
   # Home's instrumented tests on an API 35 emulator (docs/specs/2026-11-04-home-on-kvaesitso.md, the EMU checks).
   emulator:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork || github.event.pull_request.user.type == 'Bot'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
